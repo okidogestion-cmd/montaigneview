@@ -6,8 +6,7 @@
 ## Où en est-on
 
 - **Milestone 0 — Inspection et base** : fait le 25/10/2026 (voir PROGRESS).
-- **Milestone 1 — Terrain jouable** : fait le 25/10/2026 (voir PROGRESS).
-- **Milestone 2 — Boucle de manche hors ligne** : prochaine étape (préparation 60 s, transition 3 s, duel 120 s, prolongation 30 s, meilleur des 5, cible d'entraînement).
+- **Milestone 1 — Terrain jouable** : à faire, en attente de trois décisions (ci-dessous).
 
 ## Écarts entre le prototype existant et `CLAUDE.md`
 
@@ -32,12 +31,10 @@
   donc il n'est pas dans `res://` comme dans l'arborescence indicative) : Claude Code le lit à la racine.
 - **25/10/2026** — Les fichiers `.uid` créés par Godot 4.7 sont versionnés (recommandation Godot).
 
-### Tranché avec l'utilisateur le 25/10/2026
-1. **Arène :** reconstruite selon `CLAUDE.md` (deux petites îles symétriques à ~90 m).
-   L'archipel procédural reste dans l'historique et dans l'ancienne scène `scenes/main.tscn`.
-2. **Atelier de peinture :** gardé dans le code (`scripts/paint.gd`, `shaders/camo.gdshader`)
-   mais **hors de la boucle principale** ; à rebrancher quand le 1v1 fonctionne.
-3. **Entraînement :** une simple cible (Milestone 2), pas l'ennemi ordinateur du prototype.
+### À trancher avec l'utilisateur avant le Milestone 1
+1. Reconstruire l'arène selon `CLAUDE.md` (petites îles symétriques à 80–100 m) à la place de l'archipel procédural ?
+2. Garder l'atelier de peinture (camouflage peint) comme mécanique du jeu, ou le mettre de côté ?
+3. Garder l'ennemi ordinateur comme mode « Entraînement », ou le remplacer par une simple cible ?
 
 ## Stratégie technique proposée pour le Milestone 1
 
