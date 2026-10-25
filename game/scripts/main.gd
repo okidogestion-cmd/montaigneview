@@ -15,7 +15,7 @@ const HIDE_TIME := 45.0
 const HIDE_FOV := [50.0, 17.0]
 const FIRE_FOV := [55.0, 14.0, 5.5]
 const ZOOM_LABELS := ["x1", "x4", "x10"]
-const SKY := Color("#b8ccd7")
+const SKY := Color("#b3dbf2")   # couleur de l'horizon, reprise par le brouillard
 const FOG_NEAR := 200.0
 const FOG_FAR := 1100.0
 const ENEMY_VIEW := Vector3(0, 92, -125)   # d'où l'ennemi regarde ta montagne pendant la cachette
@@ -102,11 +102,19 @@ func _on_ready_pressed() -> void:
 
 func _build_environment() -> void:
 	env = Environment.new()
-	env.background_mode = Environment.BG_COLOR
-	env.background_color = SKY
+	var sky_mat := ShaderMaterial.new()
+	sky_mat.shader = preload("res://shaders/sky.gdshader")
+	var sky := Sky.new()
+	sky.sky_material = sky_mat
+	env.background_mode = Environment.BG_SKY
+	env.sky = sky
+	# Ombres bleutées façon Wind Waker : la lumière ambiante colore le côté à l'ombre.
 	env.ambient_light_source = Environment.AMBIENT_SOURCE_COLOR
-	env.ambient_light_color = Color("#d9e0e6")
-	env.ambient_light_energy = 0.75
+	env.ambient_light_color = Color("#9fb4dc")
+	env.ambient_light_energy = 0.85
+	env.tonemap_mode = Environment.TONE_MAPPER_LINEAR
+	env.adjustment_enabled = true
+	env.adjustment_saturation = 1.04
 	env.fog_enabled = true
 	env.fog_mode = Environment.FOG_MODE_DEPTH
 	env.fog_light_color = SKY
@@ -119,10 +127,14 @@ func _build_environment() -> void:
 	we.environment = env
 	add_child(we)
 	var sun := DirectionalLight3D.new()
-	sun.light_color = Color("#fff1dc")
-	sun.light_energy = 0.9
+	sun.light_color = Color("#fff3dc")
+	sun.light_energy = 0.42
+	sun.shadow_enabled = true
+	sun.shadow_bias = 0.05
+	sun.directional_shadow_max_distance = 260.0
+	sun.directional_shadow_blend_splits = true
 	add_child(sun)
-	sun.look_at_from_position(Vector3(-0.4, 1, 0.25) * 100, Vector3.ZERO)
+	sun.look_at_from_position(Vector3(-0.8, 0.62, 0.15) * 100, Vector3.ZERO)
 
 func D() -> Dictionary:
 	return LEVELS[level]
@@ -603,6 +615,7 @@ func _process(dt: float) -> void:
 		hud.fog_overlay.color.a = 0
 	recoil *= exp(-dt * 7)
 	camera.rotation = Vector3(pitch + sy + recoil, yaw + sx, 0)
+	world.update_grass(camera.global_position)
 
 	for i in range(fx.size() - 1, -1, -1):
 		var f: Dictionary = fx[i]

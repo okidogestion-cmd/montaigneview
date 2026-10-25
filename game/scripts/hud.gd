@@ -10,6 +10,7 @@ signal ready_pressed
 signal menu_pressed
 signal again_pressed
 
+const ZONES: Dictionary = preload("res://scripts/world.gd").ZONES
 const INK := Color("#0e1418")
 const PANEL := Color(0.047, 0.07, 0.086, 0.82)
 const LINE := Color(0.925, 0.94, 0.91, 0.16)
@@ -342,8 +343,8 @@ func _build_hide() -> void:
 	for k in ["neige", "roche", "herbe", "foret"]:
 		var b := Button.new()
 		b.focus_mode = Control.FOCUS_NONE
-		b.text = {"neige": "Neige", "roche": "Roche", "herbe": "Herbe", "foret": "Forêt"}[k]
-		b.icon = _swatch_icon({"neige": "#e6ecf0", "roche": "#7a7671", "herbe": "#6b9342", "foret": "#2e5130"}[k])
+		b.text = ZONES[k]["label"]
+		b.icon = _swatch_icon(ZONES[k]["color"])
 		b.icon_alignment = HORIZONTAL_ALIGNMENT_CENTER
 		b.vertical_icon_alignment = VERTICAL_ALIGNMENT_TOP
 		b.custom_minimum_size = Vector2(64, 0)
@@ -372,9 +373,9 @@ func _frame_style() -> StyleBoxFlat:
 	s.set_corner_radius_all(4)
 	return s
 
-func _swatch_icon(hex: String) -> Texture2D:
+func _swatch_icon(color: Color) -> Texture2D:
 	var img := Image.create(30, 22, false, Image.FORMAT_RGBA8)
-	img.fill(Color(hex))
+	img.fill(color)
 	return ImageTexture.create_from_image(img)
 
 func set_swatch(zone: String) -> void:

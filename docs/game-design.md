@@ -34,6 +34,14 @@ trahit sa position. C'est un jeu d'observation et de patience, pas un jeu d'acti
 - Chaque cachette se trouve dans une zone et a son couvert (rocher, buisson, sapin).
 - Tenue qui correspond au terrain = l'ennemi te repère **3 fois moins vite**.
 
+**Direction choisie le 25/10/2026, à faire après les décors :**
+- **Se cacher soi-même :** pendant la phase cachette, on contrôle son sniper en 3e personne
+  (ZQSD + souris) et on se couche n'importe où : dans l'herbe, contre un rocher, sous un sapin.
+  Les repères fixes disparaissent.
+- **Se peindre soi-même :** un atelier où l'on peint directement son sniper au pinceau
+  (palette de couleurs, taches, rayures), comme une vraie peinture de camouflage.
+  L'ennemi repère d'autant plus vite que les couleurs peintes diffèrent du terrain autour.
+
 ### 3.2 Visée
 - 3 zooms : **x1** (vue libre avec point de visée), **x4** et **x10** (lunette ronde avec réticule).
 - La visée oscille légèrement (respiration).
@@ -77,9 +85,10 @@ trahit sa position. C'est un jeu d'observation et de patience, pas un jeu d'acti
 - 15 cachettes par montagne (5 directions × 3 hauteurs).
 - Décor : sapins, rochers, buissons, avec des clairières autour des cachettes.
 - Lumière de jour, brouillard léger à l'horizon.
-- **Style visuel :** low poly, couleurs franches (le prototype utilise des formes simples :
-  cônes pour les sapins, polyèdres pour les rochers). À garder pour la version Steam : c'est lisible,
-  rapide à produire, et ça va avec l'idée de « repérer une couleur qui détonne ».
+- **Style visuel : façon Zelda Wind Waker** (choisi le 25/10/2026). Ombrage cartoon à deux tons
+  avec ombres bleutées, contours noirs sur le décor proche (qui s'effacent au loin pour ne pas
+  trahir les snipers), ciel peint avec gros nuages, herbe qui bouge au vent, fleurs, cailloux,
+  lac avec écume dessinée, arbres ronds et sapins à étages. Ça va avec l'idée de « repérer une couleur qui détonne ».
 
 ## 5. Commandes (PC)
 
@@ -134,7 +143,10 @@ game/
 
 | Étape | Contenu | Résultat |
 |---|---|---|
-| 1. Prototype Godot | Refaire le prototype web à l'identique dans Godot, avec des formes simples | Une partie complète jouable |
+| 1. Prototype Godot | Refaire le prototype web à l'identique dans Godot, avec des formes simples | Une partie complète jouable ✅ |
+| 1b. Décors Wind Waker | Ombrage cartoon, ciel, herbe, fleurs, lac, arbres | La vallée donne envie ✅ |
+| 1c. Se cacher soi-même | Déplacement libre en 3e personne pendant la cachette | On choisit sa cachette au mètre près |
+| 1d. Se peindre soi-même | Atelier de peinture au pinceau sur le sniper | Camouflage unique à chaque partie |
 | 2. Sensations | Sons, recul, éclairs, brouillard, menus propres, réglages | Le jeu « fait » vrai |
 | 3. Contenu | 3 cartes, tenues, progression | Assez pour 2 à 3 heures |
 | 4. Steam | Page Steam, succès, manette, Steam Deck, démo | Page « Bientôt disponible » |
