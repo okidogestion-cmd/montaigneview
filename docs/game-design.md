@@ -167,3 +167,14 @@ game/
 - **Langues :** français seulement, ou aussi anglais (indispensable pour vendre sur Steam) ?
 - **Prix visé :** petit jeu (5 à 10 €) ?
 - **Ton :** réaliste et tendu, ou plus léger et coloré ?
+
+## 10. Cible : application Android et iOS (décidé le 25/10/2026)
+
+Le jeu devient une **appli mobile** (même jeu : cachette, peinture, duel), plus un jeu Steam.
+
+- Rendu Godot « Mobile » ; ombres courtes (2 tranches, 90 m), anticrénelage 2×, pas d'occlusion ambiante,
+  pas de contours ; décor découpé en zones de 175 m ; herbe sur 40 m autour de la caméra.
+- Relief précalculé dans `game/data/relief_320_*.res` (lu au lancement : ~1,3 s au lieu de ~8 s).
+  À regénérer (supprimer ces fichiers puis lancer le jeu depuis Godot) si le relief change.
+- Étapes suivantes : commandes tactiles (joystick, glisser pour viser, boutons), export Android,
+  puis iOS (nécessite un Mac pour compiler et publier).

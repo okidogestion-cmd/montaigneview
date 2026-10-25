@@ -163,11 +163,6 @@ func _build_environment() -> void:
 	env.adjustment_enabled = true
 	env.adjustment_saturation = 1.12
 	env.adjustment_contrast = 1.05
-	# Ombre de contact douce au pied des rochers, arbres et du personnage.
-	env.ssao_enabled = true
-	env.ssao_radius = 1.2
-	env.ssao_intensity = 1.6
-	env.ssao_light_affect = 0.15
 	env.fog_enabled = true
 	env.fog_mode = Environment.FOG_MODE_DEPTH
 	env.fog_light_color = SKY
@@ -184,9 +179,10 @@ func _build_environment() -> void:
 	sun.light_energy = 0.42
 	sun.shadow_enabled = true
 	sun.shadow_bias = 0.05
-	sun.directional_shadow_max_distance = 220.0
-	sun.shadow_blur = 1.5
-	sun.directional_shadow_blend_splits = true
+	# Ombres seulement autour de la caméra, en deux tranches : léger pour les téléphones.
+	sun.directional_shadow_mode = DirectionalLight3D.SHADOW_PARALLEL_2_SPLITS
+	sun.directional_shadow_max_distance = 90.0
+	sun.shadow_blur = 1.0
 	add_child(sun)
 	sun.look_at_from_position(Vector3(-0.8, 0.62, 0.15) * 100, Vector3.ZERO)
 
@@ -346,7 +342,7 @@ func _paint_input(e: InputEvent) -> void:
 # ---------- Phase 1 : se cacher (on marche sur son île) ----------
 func update_zone_info() -> void:
 	var zones: Dictionary = WorldScript.ZONES
-	player_zone = WorldScript.zone_at(hider.pos.x, hider.pos.z, hider.pos.y)
+	player_zone = world.zone_of(hider.pos.x, hider.pos.z)
 	camo_score = paint.match_zone(player_zone)
 	var expo := "[color=#86d394]faible[/color]"
 	if hide_exposure > 0.6:
@@ -434,7 +430,7 @@ func start_fire() -> void:
 	hud.show_inset(false)
 	hud.fire_hud.visible = true
 	world.player.visible = false
-	player_zone = WorldScript.zone_at(hider.pos.x, hider.pos.z, hider.pos.y)
+	player_zone = world.zone_of(hider.pos.x, hider.pos.z)
 	camo_score = paint.match_zone(player_zone)
 	var eye: Vector3 = hider.eye()
 	enemy_spot = choose_enemy_spot(eye)
@@ -806,3 +802,5 @@ func _process_hide(dt: float) -> void:
 	inset_cam.position = ENEMY_VIEW
 	inset_cam.look_at(target)
 	inset_cam.fov = rad_to_deg(2 * atan(4.5 / ENEMY_VIEW.distance_to(target)))
+	if Engine.get_process_frames() % 4 == 0:
+		hud.inset_viewport.render_target_update_mode = SubViewport.UPDATE_ONCE

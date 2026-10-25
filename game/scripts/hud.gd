@@ -409,7 +409,8 @@ func set_swatch(zone: String) -> void:
 func show_inset(on: bool) -> void:
 	inset.visible = on
 	inset_label.visible = on
-	inset_viewport.render_target_update_mode = SubViewport.UPDATE_ALWAYS if on else SubViewport.UPDATE_DISABLED
+	# Mise à jour à la demande (main.gd la rafraîchit une image sur 4) : le monde est dessiné deux fois sinon.
+	inset_viewport.render_target_update_mode = SubViewport.UPDATE_ONCE if on else SubViewport.UPDATE_DISABLED
 
 
 # ---------- Phase de tir ----------

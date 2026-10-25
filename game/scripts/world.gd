@@ -24,9 +24,10 @@ const TOON := preload("res://shaders/toon.gdshader")
 const OUTLINE := preload("res://shaders/outline.gdshader")
 const WATER := preload("res://shaders/water.gdshader")
 const GRASS := preload("res://shaders/grass.gdshader")
-const GRASS_RADIUS := 55.0
+const GRASS_RADIUS := 40.0
 
 var heights := PackedFloat32Array()
+var zones := PackedByteArray()          # zone de chaque point de grille (index dans ZONE_KEYS)
 var rng := RandomNumberGenerator.new()
 var enemy_spots: Array = []
 var player_spots: Array = []
@@ -131,7 +132,7 @@ func toon(color := Color.WHITE, vertex_colors := false, outline := false, wind :
 		m.set_shader_parameter("wind", wind)
 		m.set_shader_parameter("wind_height", wind_height)
 		if outline:
-			m.next_pass = _outline
+			pass  # contours désactivés : ils dessinaient chaque arbre deux fois (trop lourd sur téléphone)
 		_materials[key] = m
 	return _materials[key]
 
@@ -215,9 +216,9 @@ func _build_meshes() -> void:
 	var leaf := Color("#5fae3e")
 	var leaf2 := Color("#4f9a37")
 	_bush_mesh = _merge([
-		[_sphere(1.0, 8, 5), _at(Vector3(0, 0.6, 0)), leaf],
-		[_sphere(0.7, 8, 5), _at(Vector3(0.9, 0.45, 0.2)), leaf2],
-		[_sphere(0.75, 8, 5), _at(Vector3(-0.7, 0.5, -0.3)), leaf2],
+		[_sphere(1.0, 7, 4), _at(Vector3(0, 0.6, 0)), leaf],
+		[_sphere(0.7, 7, 4), _at(Vector3(0.9, 0.45, 0.2)), leaf2],
+		[_sphere(0.75, 7, 4), _at(Vector3(-0.7, 0.5, -0.3)), leaf2],
 	])
 	# Sapin : tronc et trois étages.
 	var bark := Color("#7a5233")
@@ -235,10 +236,10 @@ func _build_meshes() -> void:
 	])
 	_round_tree_mesh = _merge([
 		[_cyl(0.24, 0.34, 2.6, 6), _at(Vector3(0, 1.3, 0)), bark],
-		[_sphere(1.9, 10, 6), _at(Vector3(0, 3.7, 0)), Color("#62b240")],
-		[_sphere(1.3, 10, 6), _at(Vector3(1.1, 3.2, 0.4)), Color("#56a339")],
-		[_sphere(1.4, 10, 6), _at(Vector3(-0.9, 3.3, -0.5)), Color("#56a339")],
-		[_sphere(1.1, 10, 6), _at(Vector3(0.2, 4.9, 0.3)), Color("#6dbf48")],
+		[_sphere(1.9, 8, 4), _at(Vector3(0, 3.7, 0)), Color("#62b240")],
+		[_sphere(1.3, 8, 4), _at(Vector3(1.1, 3.2, 0.4)), Color("#56a339")],
+		[_sphere(1.4, 8, 4), _at(Vector3(-0.9, 3.3, -0.5)), Color("#56a339")],
+		[_sphere(1.1, 8, 4), _at(Vector3(0.2, 4.9, 0.3)), Color("#6dbf48")],
 	])
 
 
@@ -270,12 +271,42 @@ func build() -> void:
 	enemy.add_child(enemy_hitbox)
 	_build_sprites()
 
-func _build_terrain() -> void:
+func _load_or_compute_relief() -> void:
+	# Le relief (hauteurs et zones) est calculé une seule fois puis rangé dans data/ :
+	# le jeu et l'appli n'ont plus qu'à le lire au lancement.
 	var w := SEG + 1
+	var hp := "res://data/relief_%d_hauteurs.res" % SEG
+	var zp := "res://data/relief_%d_zones.res" % SEG
+	if ResourceLoader.exists(hp) and ResourceLoader.exists(zp):
+		heights = (load(hp) as Image).get_data().to_float32_array()
+		zones = (load(zp) as Image).get_data()
+		if heights.size() == w * w and zones.size() == w * w:
+			return
 	heights.resize(w * w)
+	zones.resize(w * w)
 	for r in w:
 		for c in w:
-			heights[r * w + c] = height_fn(-S / 2 + c * CELL, -S / 2 + r * CELL)
+			var x := -S / 2 + c * CELL
+			var z := -S / 2 + r * CELL
+			var h := height_fn(x, z)
+			heights[r * w + c] = h
+			zones[r * w + c] = ZONE_KEYS.find(zone_at(x, z, h))
+	if not OS.has_feature("template"):
+		# Depuis le projet (pas depuis une appli exportée) : on enregistre pour les prochains lancements.
+		DirAccess.make_dir_recursive_absolute(ProjectSettings.globalize_path("res://data"))
+		ResourceSaver.save(Image.create_from_data(w, w, false, Image.FORMAT_RF, heights.to_byte_array()), hp)
+		ResourceSaver.save(Image.create_from_data(w, w, false, Image.FORMAT_R8, zones), zp)
+
+func zone_of(x: float, z: float) -> String:
+	# Zone du point de grille le plus proche (la même que celle dessinée sur le terrain).
+	var w := SEG + 1
+	var c := clampi(roundi((x + S / 2) / CELL), 0, SEG)
+	var r := clampi(roundi((z + S / 2) / CELL), 0, SEG)
+	return ZONE_KEYS[zones[r * w + c]]
+
+func _build_terrain() -> void:
+	var w := SEG + 1
+	_load_or_compute_relief()
 	var verts := PackedVector3Array()
 	var normals := PackedVector3Array()
 	var colors := PackedColorArray()
@@ -284,6 +315,9 @@ func _build_terrain() -> void:
 	normals.resize(w * w)
 	colors.resize(w * w)
 	var sand := Color("#e3d39a")
+	var zone_colors: Array[Color] = []
+	for k in ZONE_KEYS:
+		zone_colors.append(ZONES[k]["color"])
 	_grass_mask.resize(w * w * 4)
 	for r in w:
 		for c in w:
@@ -297,13 +331,14 @@ func _build_terrain() -> void:
 			var hd := heights[mini(r + 1, SEG) * w + c]
 			var n := Vector3(hl - hr, 2.0 * CELL, hu - hd).normalized()
 			normals[r * w + c] = n
-			var zone := zone_at(x, z, h)
-			var col: Color = ZONES[zone]["color"]
+			var zi := zones[r * w + c]
+			var col: Color = zone_colors[zi]
 			var gi := (r * w + c) * 4
-			_grass_mask[gi] = {"herbe": 255, "foret": 120}.get(zone, 0)
-			_grass_mask[gi + 2] = {"roche": 255, "neige": 40}.get(zone, 0)
-			_grass_mask[gi + 3] = 255 if zone == "neige" else 0
-			_grass_mask[gi + 1] = 255 if zone == "herbe" else 0
+			# Masque de l'herbe : herbe, fleurs, cailloux, bosses de neige (ordre neige, roche, herbe, forêt).
+			_grass_mask[gi] = [0, 0, 255, 120][zi]
+			_grass_mask[gi + 1] = [0, 0, 255, 0][zi]
+			_grass_mask[gi + 2] = [40, 255, 0, 0][zi]
+			_grass_mask[gi + 3] = [255, 0, 0, 0][zi]
 			if h < WATER_Y + 2.5:
 				col = sand  # plage autour du lac
 			var k := 0.94 + hash2(x * 0.3, z * 0.3) * 0.12
@@ -417,7 +452,7 @@ func _build_spots(cz: float, facing: int) -> Array:
 				x = sin(ang) * rr * 1.18
 				z = cz + facing * cos(ang) * rr
 				h = height_at(x, z)
-			var zone := zone_at(x, z, h)
+			var zone := zone_of(x, z)
 			var cover := _make_cover(zone)
 			cover.position = Vector3(x, h, z)
 			if facing < 0:
@@ -464,7 +499,7 @@ func _scatter() -> void:
 			elif r < 0.07:
 				beach[1].append([x, h + 0.12, z, 0.8 + rng.randf() * 0.6, rot, 1.0])
 			continue
-		var zn := zone_at(x, z, h)
+		var zn := zone_of(x, z)
 		if zn == "foret":
 			if r < 0.7:
 				pines.append([x, h - 0.3, z, sc, rot, 1.0])
@@ -503,6 +538,21 @@ func _multimesh(mesh: Mesh, m: Material, xforms: Array) -> MultiMeshInstance3D:
 	add_child(mmi)
 	return mmi
 
+const CHUNK := 175.0   # taille d'une zone de décor (m)
+
+func _multimesh_chunked(mesh: Mesh, m: Material, xforms: Array, shadows: bool) -> void:
+	# Le décor est découpé en zones : la carte graphique ignore celles hors de la vue.
+	var cells := {}
+	for t in xforms:
+		var key := Vector2i(floori(t.origin.x / CHUNK), floori(t.origin.z / CHUNK))
+		if not cells.has(key):
+			cells[key] = []
+		cells[key].append(t)
+	for key in cells:
+		var mmi := _multimesh(mesh, m, cells[key])
+		if not shadows:
+			mmi.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
+
 func _inst(mesh: Mesh, m: Material, list: Array, body: StaticBody3D, kind: String) -> void:
 	if list.is_empty():
 		return
@@ -512,6 +562,8 @@ func _inst(mesh: Mesh, m: Material, list: Array, body: StaticBody3D, kind: Strin
 		xforms.append(Transform3D(basis, Vector3(p[0], p[1], p[2])))
 		if kind == "pebble" or kind == "log":
 			continue  # petits détails de plage : pas de collision
+		if minf(Vector2(p[0], p[2] - MZ).length(), Vector2(p[0], p[2] + MZ).length()) > 260.0:
+			continue  # loin des deux îles de jeu : rien ne peut s'y cogner
 		# Collision : le décor arrête les balles.
 		var cs := CollisionShape3D.new()
 		var s: float = p[3]
@@ -527,7 +579,7 @@ func _inst(mesh: Mesh, m: Material, list: Array, body: StaticBody3D, kind: Strin
 			cs.shape = sph
 			cs.position = Vector3(p[0], p[1] + (0.4 * s if kind == "bush" else 0.0), p[2])
 		body.add_child(cs)
-	_multimesh(mesh, m, xforms)
+	_multimesh_chunked(mesh, m, xforms, kind == "tree" or kind == "round" or kind == "rock")
 
 
 # ---------- Herbe et fleurs (seulement pour le décor, n'arrêtent pas les balles) ----------
@@ -573,11 +625,11 @@ func _grass() -> void:
 	var mtex := ImageTexture.create_from_image(Image.create_from_data(w, w, false, Image.FORMAT_RGBA8, _grass_mask))
 	var fields := [
 		# [forme, teinte, canal du masque, densité, touffes par m², vent, garder les normales, taille min, taille max, aplatissement]
-		[_tuft_mesh(), Color.WHITE, 0, 1.0, 3.2, 0.12, false, 0.7, 1.25, 1.0],
+		[_tuft_mesh(), Color.WHITE, 0, 1.0, 2.0, 0.12, false, 0.8, 1.4, 1.0],
 		[_flower_mesh(Color("#fffbf0")), Color.WHITE, 1, 0.6, 0.12, 0.06, false, 0.9, 1.3, 1.0],
 		[_flower_mesh(Color("#ffd84a")), Color.WHITE, 1, 0.6, 0.1, 0.06, false, 0.9, 1.3, 1.0],
 		[_flower_mesh(Color("#ff8fb8")), Color.WHITE, 1, 0.6, 0.08, 0.06, false, 0.9, 1.3, 1.0],
-		[_rock_mesh, Color("#a8a39a"), 2, 1.0, 0.45, 0.0, true, 0.1, 0.45, 0.6],
+		[_rock_mesh, Color("#a8a39a"), 2, 1.0, 0.3, 0.0, true, 0.1, 0.45, 0.6],
 		[_rock_mesh, Color("#f4f8fc"), 3, 1.0, 0.12, 0.0, true, 0.3, 1.0, 0.35],
 	]
 	for f in fields:
