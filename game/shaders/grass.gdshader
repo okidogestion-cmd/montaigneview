@@ -37,7 +37,12 @@ float ground(vec2 xz) {
 }
 
 void vertex() {
-	vec3 origin = MODEL_MATRIX[3].xyz;
+	// Chaque touffe a une place fixe dans le monde : sa position de base, plus un nombre entier
+	// de « tapis » (2 × rayon). Quand la caméra avance, seules les touffes sorties du champ,
+	// déjà invisibles, sont recyclées de l'autre côté : rien ne bouge sous les yeux du joueur.
+	vec3 inst = MODEL_MATRIX[3].xyz;
+	vec2 rel = mod(inst.xz - cam_pos.xz + radius, 2.0 * radius) - radius;
+	vec3 origin = vec3(cam_pos.x + rel.x, 0.0, cam_pos.z + rel.y);
 	vec2 uv = ((origin.xz + half_size) / cell + 0.5) / grid;
 	float h = ground(origin.xz);
 	vec4 mk = texture(mask, uv);
@@ -46,7 +51,7 @@ void vertex() {
 	float d = length(origin.xz - cam_pos.xz);
 	float fade = (1.0 - smoothstep(radius * 0.7, radius, d)) * smoothstep(1.2, 1.8, d);  // rien dans les yeux
 	float show = step(rnd, m * density) * step(water_y + 0.8, h) * fade;
-	vec3 local = VERTEX - origin;
+	vec3 local = VERTEX - inst;
 	float lh = max(local.y, 0.0);
 	float t = TIME * 1.8 + origin.x * 0.21 + origin.z * 0.17;
 	local.x += (sin(t) + 0.4 * sin(t * 2.7)) * wind * lh * lh;

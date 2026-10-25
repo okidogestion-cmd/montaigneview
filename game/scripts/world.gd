@@ -604,14 +604,12 @@ func _grass() -> void:
 			xforms.append(Transform3D(Basis(Vector3.UP, rng.randf() * TAU).scaled(Vector3(s, s * f[9], s)), pos))
 		var mmi := _multimesh(f[0], m, xforms)
 		mmi.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
-		mmi.custom_aabb = AABB(Vector3(-GRASS_RADIUS, -50, -GRASS_RADIUS), Vector3(2 * GRASS_RADIUS, 400, 2 * GRASS_RADIUS))
+		mmi.custom_aabb = AABB(Vector3(-S, -50, -S), Vector3(2 * S, 450, 2 * S))   # le champ peut être partout autour de la caméra
 		_grass_fields.append(mmi)
 
 func update_grass(cam: Vector3) -> void:
-	# Le champ suit la caméra par pas de 4 m (les touffes ne « glissent » pas).
-	var snapped_pos := Vector3(snappedf(cam.x, 4.0), 0, snappedf(cam.z, 4.0))
+	# Le champ reste en place ; le shader recycle autour de la caméra les touffes trop éloignées.
 	for f in _grass_fields:
-		f.position = snapped_pos
 		(f.material_override as ShaderMaterial).set_shader_parameter("cam_pos", cam)
 
 
