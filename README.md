@@ -12,7 +12,8 @@ Moteur : **Godot 4**.
 ## Démarrer
 
 1. Installer [Godot 4](https://godotengine.org/download).
-2. Dans Godot : *Nouveau projet* → choisir le dossier `game/`.
+2. Dans Godot : *Importer* → `game/project.godot`, puis **F5** pour jouer au prototype « Duel des Cimes ».
+   Le code du jeu est dans `game/scripts/` (`main.gd` la partie, `world.gd` la vallée, `hud.gd` l'interface).
 3. Après chaque séance de travail : `git add -A`, `git commit -m "..."`, `git push`.
 
 ## Gros fichiers
