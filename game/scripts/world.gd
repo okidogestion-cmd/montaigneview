@@ -592,43 +592,78 @@ func update_grass(cam: Vector3) -> void:
 
 
 # ---------- Personnages ----------
-# Un personnage = une ou plusieurs poses (debout, accroupi, couché), une seule visible à la fois.
-# Toutes les poses partagent le même matériau de tenue.
+# Le sniper est fait de pièces rigides (jambes, buste, tête, bras, fusil, lunette).
+# Chaque pose (debout, accroupi, couché) ne fait que déplacer ces mêmes pièces.
+# Chaque sommet garde sa position « debout » (CUSTOM0) : la peinture suit le corps.
+# [nom, forme, taille, {pose: [position, rotation autour de x]}]
+const PARTS := [
+	["jambe_g", "box", Vector3(0.2, 0.85, 0.24), {
+		"debout": [Vector3(-0.13, 0.425, 0), 0.0], "accroupi": [Vector3(-0.15, 0.2, -0.2), -1.45], "couche": [Vector3(-0.13, 0.12, -0.62), PI / 2]}],
+	["jambe_d", "box", Vector3(0.2, 0.85, 0.24), {
+		"debout": [Vector3(0.13, 0.425, 0), 0.0], "accroupi": [Vector3(0.15, 0.2, -0.2), -1.45], "couche": [Vector3(0.13, 0.12, -0.62), PI / 2]}],
+	["buste", "box", Vector3(0.52, 0.62, 0.32), {
+		"debout": [Vector3(0, 1.16, 0), 0.0], "accroupi": [Vector3(0, 0.72, 0.05), 0.3], "couche": [Vector3(0, 0.17, 0.12), PI / 2]}],
+	["tete", "sphere", Vector3(0.21, 0.21, 0.21), {
+		"debout": [Vector3(0, 1.66, 0.02), 0.0], "accroupi": [Vector3(0, 1.2, 0.2), 0.3], "couche": [Vector3(0, 0.3, 0.62), PI / 2]}],
+	["bras_g", "box", Vector3(0.14, 0.5, 0.14), {
+		"debout": [Vector3(-0.3, 1.12, 0.14), -0.9], "accroupi": [Vector3(-0.3, 0.74, 0.3), -1.1], "couche": [Vector3(-0.25, 0.14, 0.62), -PI / 2]}],
+	["bras_d", "box", Vector3(0.14, 0.5, 0.14), {
+		"debout": [Vector3(0.3, 1.12, 0.14), -0.9], "accroupi": [Vector3(0.3, 0.74, 0.3), -1.1], "couche": [Vector3(0.25, 0.14, 0.62), -PI / 2]}],
+	["fusil", "tube", Vector3(0.035, 1.3, 0.035), {
+		"debout": [Vector3(0.12, 1.28, 0.45), PI / 2], "accroupi": [Vector3(0.12, 0.95, 0.6), PI / 2], "couche": [Vector3(0.12, 0.26, 1.05), PI / 2]}],
+	["lunette", "tube", Vector3(0.05, 0.3, 0.05), {
+		"debout": [Vector3(0.12, 1.37, 0.3), PI / 2], "accroupi": [Vector3(0.12, 1.04, 0.45), PI / 2], "couche": [Vector3(0.12, 0.35, 0.9), PI / 2]}],
+]
+const CAMO_SHADER := preload("res://shaders/camo.gdshader")
+
+static func part_transform(part: Array, pose: String) -> Transform3D:
+	var t: Array = part[3][pose]
+	return Transform3D(Basis(Vector3.RIGHT, t[1]), t[0])
+
+func _part_mesh(part: Array) -> ArrayMesh:
+	var prim: PrimitiveMesh
+	var size: Vector3 = part[2]
+	match part[1]:
+		"box":
+			var b := BoxMesh.new()
+			b.size = size
+			prim = b
+		"sphere":
+			prim = _sphere(size.x, 10, 6)
+		_:
+			prim = _cyl(size.x, size.x, size.y, 8)
+	var arrays := prim.get_mesh_arrays()
+	var verts: PackedVector3Array = arrays[Mesh.ARRAY_VERTEX]
+	var stand := part_transform(part, "debout")
+	var custom := PackedFloat32Array()
+	custom.resize(verts.size() * 4)
+	for i in verts.size():
+		var r := stand * verts[i]
+		custom[i * 4] = r.x
+		custom[i * 4 + 1] = r.y
+		custom[i * 4 + 2] = r.z
+	arrays[Mesh.ARRAY_CUSTOM0] = custom
+	var mesh := ArrayMesh.new()
+	mesh.add_surface_from_arrays(Mesh.PRIMITIVE_TRIANGLES, arrays, [], {}, Mesh.ARRAY_CUSTOM_RGBA_FLOAT << Mesh.ARRAY_FORMAT_CUSTOM0_SHIFT)
+	return mesh
+
 func _make_figure(poses: Array = ["accroupi"]) -> Node3D:
 	var g := Node3D.new()
 	var camo := ShaderMaterial.new()
-	camo.shader = TOON
-	camo.set_shader_parameter("albedo", ZONES["roche"]["color"])
-	var dark := mat(Color("#1b1d1e"))
-	for p in poses:
+	camo.shader = CAMO_SHADER
+	camo.set_shader_parameter("base_color", ZONES["roche"]["color"])
+	var meshes := PARTS.map(func(p): return _part_mesh(p))
+	for pose_name in poses:
 		var pose := Node3D.new()
-		pose.name = p
+		pose.name = pose_name
 		g.add_child(pose)
-		match p:
-			"debout":
-				_fig_box(pose, Vector3(0.2, 0.85, 0.24), camo, Vector3(-0.13, 0.425, 0))
-				_fig_box(pose, Vector3(0.2, 0.85, 0.24), camo, Vector3(0.13, 0.425, 0))
-				_fig_box(pose, Vector3(0.52, 0.62, 0.32), camo, Vector3(0, 1.16, 0))
-				_fig_head(pose, camo, Vector3(0, 1.66, 0.02))
-				for side in [-1, 1]:
-					var arm := _fig_box(pose, Vector3(0.14, 0.5, 0.14), camo, Vector3(0.3 * side, 1.12, 0.14))
-					arm.rotation.x = -0.9
-				_fig_tube(pose, 0.035, 1.3, dark, Vector3(0.12, 1.28, 0.45))
-				_fig_tube(pose, 0.05, 0.35, dark, Vector3(0.12, 1.37, 0.3))
-			"accroupi":
-				var torso := _fig_box(pose, Vector3(0.62, 0.8, 0.5), camo, Vector3(0, 0.55, 0))
-				torso.rotation.x = 0.25
-				_fig_box(pose, Vector3(0.6, 0.35, 0.7), camo, Vector3(0, 0.18, -0.15))
-				_fig_head(pose, camo, Vector3(0, 1.08, 0.08))
-				_fig_tube(pose, 0.035, 1.5, dark, Vector3(0.12, 0.92, 0.55))
-				_fig_tube(pose, 0.05, 0.35, dark, Vector3(0.12, 1.02, 0.35))
-			"couche":
-				_fig_box(pose, Vector3(0.5, 0.3, 0.8), camo, Vector3(0, 0.2, 0.15))
-				_fig_box(pose, Vector3(0.42, 0.22, 0.95), camo, Vector3(0, 0.13, -0.72))
-				_fig_box(pose, Vector3(0.5, 0.14, 0.4), camo, Vector3(0, 0.18, 0.75))
-				_fig_head(pose, camo, Vector3(0, 0.33, 0.68))
-				_fig_tube(pose, 0.035, 1.5, dark, Vector3(0.12, 0.28, 1.25))
-				_fig_tube(pose, 0.05, 0.35, dark, Vector3(0.12, 0.38, 1.05))
+		for i in PARTS.size():
+			var mi := MeshInstance3D.new()
+			mi.mesh = meshes[i]
+			mi.material_override = camo
+			mi.transform = part_transform(PARTS[i], pose_name)
+			mi.set_meta("part", i)
+			pose.add_child(mi)
 	g.set_meta("camo", camo)
 	set_stance(g, poses[0])
 	return g
@@ -638,33 +673,57 @@ func set_stance(fig: Node3D, stance: String) -> void:
 		if pose.get_class() == "Node3D":
 			pose.visible = pose.name == stance
 
-func _fig_head(g: Node3D, m: Material, pos: Vector3) -> void:
-	var head := MeshInstance3D.new()
-	head.mesh = _sphere(0.21, 10, 6)
-	head.material_override = m
-	head.position = pos
-	g.add_child(head)
+func pick_part(fig: Node3D, from: Vector3, dir: Vector3) -> Dictionary:
+	# Rayon de la souris contre les pièces visibles du sniper (sans moteur physique).
+	# Renvoie le point touché dans le repère « debout », celui de la peinture.
+	var best := {}
+	var best_t := INF
+	for pose in fig.get_children():
+		if not (pose is Node3D) or pose.get_class() != "Node3D" or not pose.visible:
+			continue
+		for mi in pose.get_children():
+			var part: Array = PARTS[mi.get_meta("part")]
+			var inv: Transform3D = mi.global_transform.affine_inverse()
+			var o: Vector3 = inv * from
+			var d: Vector3 = (inv.basis * dir).normalized()
+			var size: Vector3 = part[2]
+			var t := INF
+			if part[1] == "sphere":
+				var b := o.dot(d)
+				var c := o.dot(o) - size.x * size.x
+				var disc := b * b - c
+				if disc >= 0:
+					t = -b - sqrt(disc)
+			else:
+				var half := size / 2 if part[1] == "box" else Vector3(size.x, size.y / 2, size.x)
+				t = _ray_box(o, d, half)
+			if t > 0 and t < best_t:
+				best_t = t
+				var local := o + d * t
+				best = {"ref": part_transform(part, "debout") * local, "world": mi.global_transform * local}
+	return best
 
-func _fig_box(g: Node3D, size: Vector3, m: Material, pos: Vector3) -> MeshInstance3D:
-	var mi := MeshInstance3D.new()
-	var b := BoxMesh.new()
-	b.size = size
-	mi.mesh = b
-	mi.material_override = m
-	mi.position = pos
-	g.add_child(mi)
-	return mi
-
-func _fig_tube(g: Node3D, radius: float, length: float, m: Material, pos: Vector3) -> void:
-	var mi := MeshInstance3D.new()
-	mi.mesh = _cyl(radius, radius, length, 6)
-	mi.material_override = m
-	mi.rotation.x = PI / 2
-	mi.position = pos
-	g.add_child(mi)
+static func _ray_box(o: Vector3, d: Vector3, half: Vector3) -> float:
+	var tmin := -INF
+	var tmax := INF
+	for a in 3:
+		if absf(d[a]) < 1e-6:
+			if absf(o[a]) > half[a]:
+				return INF
+			continue
+		var t1 := (-half[a] - o[a]) / d[a]
+		var t2 := (half[a] - o[a]) / d[a]
+		tmin = maxf(tmin, minf(t1, t2))
+		tmax = minf(tmax, maxf(t1, t2))
+	if tmin > tmax or tmax < 0:
+		return INF
+	return tmin if tmin > 0 else tmax
 
 func set_camo(fig: Node3D, zone: String) -> void:
-	(fig.get_meta("camo") as ShaderMaterial).set_shader_parameter("albedo", ZONES[zone]["color"])
+	# Tenue unie (l'ennemi) : la couleur du terrain, sans coups de pinceau.
+	var m: ShaderMaterial = fig.get_meta("camo")
+	m.set_shader_parameter("base_color", ZONES[zone]["color"])
+	m.set_shader_parameter("stroke_count", 0)
 
 
 # ---------- Repères, éclair du canon, marqueur de fin ----------

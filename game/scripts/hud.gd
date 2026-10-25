@@ -8,6 +8,13 @@ signal camo_chosen(zone: String)
 signal ready_pressed
 signal menu_pressed
 signal again_pressed
+signal paint_color(color: Color)
+signal paint_size(index: int)
+signal paint_tool(tool: String)
+signal paint_pose(pose: String)
+signal paint_undo
+signal paint_clear
+signal paint_done
 
 const ZONES: Dictionary = preload("res://scripts/world.gd").ZONES
 const INK := Color("#0e1418")
@@ -72,6 +79,15 @@ var end_title: Label
 var end_text: Label
 var end_tips: Label
 
+var paint_hud: Control
+var paint_colors := []
+var paint_sizes := []
+var paint_tools := {}
+var paint_poses := {}
+var match_bars := {}
+var match_labels := {}
+var paint_info: Label
+
 var _toast_tween: Tween
 
 
@@ -98,6 +114,7 @@ func _ready() -> void:
 	_build_hide()
 	_build_fire()
 	_build_end()
+	_build_paint()
 	center_label = _label("", 52, PAPER)
 	center_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	center_label.set_anchors_preset(Control.PRESET_CENTER)
@@ -332,11 +349,12 @@ func _build_hide() -> void:
 	zone_info.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	r1.add_child(zone_info)
 	bv.add_child(r1)
-	keys_hint = _label("ZQSD : marcher   Maj : courir   C : s'accroupir   X : se coucher   1-4 : tenue   Clic droit (maintenu) : vue de tir   Entrée : prêt   Échap : souris", 13, MUTED)
+	keys_hint = _label("ZQSD : marcher   Maj : courir   C : s'accroupir   X : se coucher   Clic droit (maintenu) : vue de tir   Entrée : prêt   Échap : souris", 13, MUTED)
 	keys_hint.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 	bv.add_child(keys_hint)
 	var r2 := _hbox()
 	var sv := _vbox(5)
+	sv.visible = false  # la tenue se fait maintenant à l'atelier de peinture
 	sv.add_child(_small("Tenue"))
 	var sw := _hbox(8)
 	for k in ["neige", "roche", "herbe", "foret"]:
@@ -521,3 +539,166 @@ func hide_toast() -> void:
 func pulse(rect: ColorRect, from: float, secs: float) -> void:
 	rect.color.a = from
 	create_tween().tween_property(rect, "color:a", 0.0, secs).set_ease(Tween.EASE_OUT)
+
+
+# ---------- Atelier de peinture ----------
+const PaintScript := preload("res://scripts/paint.gd")
+
+func _section(title: String) -> VBoxContainer:
+	var v := _vbox(6)
+	v.add_child(_small(title))
+	return v
+
+func _build_paint() -> void:
+	paint_hud = _full(Control.new())
+	var top := _bar(true)
+	var tv := _vbox(2)
+	tv.add_child(_label("Atelier de peinture", 30, PAPER))
+	tv.add_child(_small("Peins ton sniper aux couleurs du terrain où tu comptes te cacher"))
+	top.add_child(tv)
+	paint_hud.add_child(top)
+
+	# Panneau de gauche : couleurs, pinceau, outils, posture.
+	var left := _panel()
+	left.set_anchors_preset(Control.PRESET_CENTER_LEFT)
+	left.grow_vertical = Control.GROW_DIRECTION_BOTH
+	left.position.x = 14
+	left.mouse_filter = Control.MOUSE_FILTER_STOP
+	var lv := _vbox(14)
+	var cs := _section("Couleurs")
+	var grid := GridContainer.new()
+	grid.columns = 4
+	grid.add_theme_constant_override("h_separation", 6)
+	grid.add_theme_constant_override("v_separation", 6)
+	for c in PaintScript.PALETTE:
+		var b := Button.new()
+		b.focus_mode = Control.FOCUS_NONE
+		b.custom_minimum_size = Vector2(38, 30)
+		b.add_theme_stylebox_override("normal", _style(c, Color(0, 0, 0, 0.4), 4, 0))
+		b.add_theme_stylebox_override("hover", _style(c.lightened(0.1), PAPER, 4, 0))
+		b.add_theme_stylebox_override("pressed", _style(c, PAPER, 4, 0))
+		b.pressed.connect(func(): paint_color.emit(c))
+		b.set_meta("color", c)
+		paint_colors.append(b)
+		grid.add_child(b)
+	cs.add_child(grid)
+	lv.add_child(cs)
+	var ss := _section("Pinceau")
+	var sh := _hbox(6)
+	for i in 3:
+		var b := _button(["Petit", "Moyen", "Gros"][i], Color(1, 1, 1, 0.06), PAPER, 15)
+		b.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+		b.pressed.connect(func(): paint_size.emit(i))
+		paint_sizes.append(b)
+		sh.add_child(b)
+	ss.add_child(sh)
+	lv.add_child(ss)
+	var ts := _section("Outils")
+	var th := _hbox(6)
+	for t in [["pinceau", "Pinceau"], ["taches", "Taches"], ["remplir", "Remplir"]]:
+		var b := _button(t[1], Color(1, 1, 1, 0.06), PAPER, 15)
+		b.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+		b.pressed.connect(func(): paint_tool.emit(t[0]))
+		paint_tools[t[0]] = b
+		th.add_child(b)
+	ts.add_child(th)
+	var uh := _hbox(6)
+	var undo := _button("Annuler", Color(1, 1, 1, 0.06), PAPER, 15)
+	undo.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	undo.pressed.connect(func(): paint_undo.emit())
+	uh.add_child(undo)
+	var clr := _button("Tout effacer", Color(1, 1, 1, 0.06), PAPER, 15)
+	clr.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	clr.pressed.connect(func(): paint_clear.emit())
+	uh.add_child(clr)
+	ts.add_child(uh)
+	lv.add_child(ts)
+	var ps := _section("Voir la posture")
+	var ph := _hbox(6)
+	for p in [["debout", "Debout"], ["accroupi", "Accroupi"], ["couche", "Couché"]]:
+		var b := _button(p[1], Color(1, 1, 1, 0.06), PAPER, 15)
+		b.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+		b.pressed.connect(func(): paint_pose.emit(p[0]))
+		paint_poses[p[0]] = b
+		ph.add_child(b)
+	ps.add_child(ph)
+	lv.add_child(ps)
+	left.add_child(lv)
+	paint_hud.add_child(left)
+
+	# Panneau de droite : ressemblance avec chaque terrain.
+	var right := _panel()
+	right.set_anchors_preset(Control.PRESET_CENTER_RIGHT)
+	right.grow_vertical = Control.GROW_DIRECTION_BOTH
+	right.grow_horizontal = Control.GROW_DIRECTION_BEGIN
+	right.position.x = -14
+	right.custom_minimum_size.x = 230
+	right.mouse_filter = Control.MOUSE_FILTER_STOP
+	var rv := _vbox(10)
+	rv.add_child(_small("Camouflage sur chaque terrain"))
+	for k in ["neige", "roche", "herbe", "foret"]:
+		var row := _vbox(3)
+		var lh := _hbox(6)
+		var name_l := _label(ZONES[k]["label"], 16, PAPER)
+		name_l.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+		lh.add_child(name_l)
+		var pct := _label("0 %", 16, PAPER)
+		lh.add_child(pct)
+		match_labels[k] = pct
+		row.add_child(lh)
+		var bg := _rect(Color(1, 1, 1, 0.14))
+		bg.custom_minimum_size = Vector2(200, 8)
+		var fill := _rect(ZONES[k]["color"])
+		fill.size = Vector2(0, 8)
+		bg.add_child(fill)
+		match_bars[k] = fill
+		row.add_child(bg)
+		rv.add_child(row)
+	paint_info = _label("", 14, MUTED)
+	paint_info.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	paint_info.custom_minimum_size.x = 200
+	rv.add_child(paint_info)
+	right.add_child(rv)
+	paint_hud.add_child(right)
+
+	var bottom := _bar(false)
+	var bh := _hbox()
+	var hint := _label("Clic gauche : peindre   Clic droit (glisser) : tourner autour   Molette : zoom", 14, MUTED)
+	hint.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	bh.add_child(hint)
+	var done := _button("TERMINÉ", BLAZE, Color("#1a0d04"), 24)
+	done.pressed.connect(func(): paint_done.emit())
+	bh.add_child(done)
+	bottom.add_child(bh)
+	paint_hud.add_child(bottom)
+	paint_hud.visible = false
+	root.add_child(paint_hud)
+
+func _mark(buttons: Dictionary, key) -> void:
+	for k in buttons:
+		var b: Button = buttons[k]
+		var on: bool = k == key
+		b.add_theme_stylebox_override("normal", _style(Color(1, 1, 1, 0.22) if on else Color(1, 1, 1, 0.06), BLAZE if on else LINE, 4, 10))
+
+func set_paint_state(color: Color, size_idx: int, tool: String, pose: String) -> void:
+	for b in paint_colors:
+		var c: Color = b.get_meta("color")
+		b.add_theme_stylebox_override("normal", _style(c, BLAZE if c == color else Color(0, 0, 0, 0.4), 4, 0))
+		var s: StyleBoxFlat = b.get_theme_stylebox("normal")
+		s.set_border_width_all(3 if c == color else 1)
+	var sizes := {}
+	for i in paint_sizes.size():
+		sizes[i] = paint_sizes[i]
+	_mark(sizes, size_idx)
+	_mark(paint_tools, tool)
+	_mark(paint_poses, pose)
+
+func set_matches(scores: Dictionary) -> void:
+	var best := ""
+	for k in scores:
+		var v: float = scores[k]
+		match_labels[k].text = "%d %%" % roundi(v * 100)
+		(match_bars[k] as ColorRect).size = Vector2(200 * v, 8)
+		if best == "" or v > scores[best]:
+			best = k
+	paint_info.text = "Le mieux : te cacher sur la %s. Mélanger deux ou trois teintes d'un même terrain donne un bonus (la silhouette se casse)." % ZONES[best]["label"].to_lower()

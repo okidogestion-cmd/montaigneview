@@ -38,14 +38,17 @@ trahit sa position. C'est un jeu d'observation et de patience, pas un jeu d'acti
 en 3e personne (ZQSD + souris, Maj pour courir) et on se met **debout**, **accroupi** (C) ou
 **couché** (X) où l'on veut. Clic droit maintenu = vue de tir depuis la cachette, pour vérifier
 qu'on voit encore l'île d'en face. L'ennemi repère plus ou moins vite selon :
-- la tenue (assortie au terrain ou non) ;
+- le camouflage peint (voir ci-dessous) ;
 - la posture (debout ×1,8, accroupi ×1, couché ×0,55 ; couché dans l'herbe ×0,7 en plus) ;
 - ce qu'il voit vraiment de ton corps (rayons depuis sa cachette : à couvert ×0,35, à découvert ×1).
 
-**À faire ensuite :**
-- **Se peindre soi-même :** un atelier où l'on peint directement son sniper au pinceau
-  (palette de couleurs, taches, rayures), comme une vraie peinture de camouflage.
-  L'ennemi repère d'autant plus vite que les couleurs peintes diffèrent du terrain autour.
+**Se peindre soi-même (fait le 25/10/2026) :** après « Jouer », un atelier sur ton île. On peint
+directement le sniper en 3D (16 couleurs, pinceau petit / moyen / gros, taches, remplir, annuler),
+en tournant autour au clic droit ; la peinture suit le corps dans les trois postures.
+Un score par terrain dit à quel point on s'y fond : des points répartis sur le corps sont comparés aux
+teintes du terrain (claire, normale, ombre), avec **+12 %** si l'on mélange au moins deux teintes
+du même terrain (la silhouette se casse). Pendant le duel, la vitesse de repérage passe de
+« bonne tenue » à « mauvaise tenue » selon ce score sur le terrain où l'on se cache.
 
 ### 3.2 Visée
 - 3 zooms : **x1** (vue libre avec point de visée), **x4** et **x10** (lunette ronde avec réticule).
@@ -152,7 +155,7 @@ game/
 | 1. Prototype Godot | Refaire le prototype web à l'identique dans Godot, avec des formes simples | Une partie complète jouable ✅ |
 | 1b. Décors Wind Waker | Ombrage cartoon, ciel, herbe, fleurs, lac, arbres | La vallée donne envie ✅ |
 | 1c. Se cacher soi-même | Déplacement libre en 3e personne, debout / accroupi / couché, vue de tir | On choisit sa cachette au mètre près ✅ |
-| 1d. Se peindre soi-même | Atelier de peinture au pinceau sur le sniper | Camouflage unique à chaque partie |
+| 1d. Se peindre soi-même | Atelier de peinture au pinceau sur le sniper, score de camouflage par terrain | Camouflage unique à chaque partie ✅ |
 | 2. Sensations | Sons, recul, éclairs, brouillard, menus propres, réglages | Le jeu « fait » vrai |
 | 3. Contenu | 3 cartes, tenues, progression | Assez pour 2 à 3 heures |
 | 4. Steam | Page Steam, succès, manette, Steam Deck, démo | Page « Bientôt disponible » |

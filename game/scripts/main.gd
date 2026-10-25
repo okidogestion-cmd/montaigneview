@@ -5,6 +5,7 @@ extends Node3D
 const WorldScript := preload("res://scripts/world.gd")
 const HudScript := preload("res://scripts/hud.gd")
 const HiderScript := preload("res://scripts/hider.gd")
+const PaintScript := preload("res://scripts/paint.gd")
 
 const LEVELS := {
 	"facile":    {"first": 22.0, "interval": [9.0, 13.0], "rate_good": 0.006, "rate_bad": 0.02,  "acc": 0.6,  "camo": 0.35, "glint": 0.02,  "shot_reveal": 0.18},
@@ -20,11 +21,11 @@ const SKY := Color("#b3dbf2")   # couleur de l'horizon, reprise par le brouillar
 const FOG_NEAR := 200.0
 const FOG_FAR := 1100.0
 const ENEMY_VIEW := Vector3(0, 92, -125)   # d'où la petite lunette ennemie te regarde pendant la cachette
-const CAMO_KEYS := {KEY_1: "neige", KEY_2: "roche", KEY_3: "herbe", KEY_4: "foret"}
 
 var world
 var hud
 var hider
+var paint
 var camera: Camera3D
 var inset_cam: Camera3D
 var env: Environment
@@ -40,7 +41,6 @@ var base_yaw := 0.0
 var zoom_idx := 0
 var recoil := 0.0
 var player_zone := "roche"
-var player_camo := "roche"
 var enemy_spot = null
 var enemy_camo := "roche"
 var hide_left := HIDE_TIME
@@ -63,6 +63,18 @@ var ai_reveal := 0.0
 var ai_next := 0.0
 var fx: Array = []
 var menu_t := 0.0
+# Atelier de peinture
+var brush_color := Color("#928e86")
+var brush_size := 1
+var brush_tool := "pinceau"
+var ws_pose := "debout"
+var ws_yaw := PI
+var ws_pitch := 0.15
+var ws_dist := 3.2
+var painting := false
+var orbiting := false
+var matches_dirty := true
+var camo_score := 0.0       # ressemblance de ta peinture avec le terrain où tu te caches
 
 
 func _ready() -> void:
@@ -85,11 +97,18 @@ func _ready() -> void:
 	inset_cam.far = 3000
 	hud.inset_viewport.add_child(inset_cam)
 	inset_cam.current = true
-	hud.play_pressed.connect(start_hide)
-	hud.again_pressed.connect(start_hide)
+	hud.play_pressed.connect(start_paint)
+	hud.again_pressed.connect(start_paint)
 	hud.menu_pressed.connect(to_menu)
 	hud.level_chosen.connect(_on_level)
-	hud.camo_chosen.connect(set_camo)
+	paint = PaintScript.new(world.player.get_meta("camo"), WorldScript.PARTS, Callable(WorldScript, "part_transform"))
+	hud.paint_color.connect(func(c): brush_color = c; _paint_state())
+	hud.paint_size.connect(func(i): brush_size = i; _paint_state())
+	hud.paint_tool.connect(func(t): brush_tool = t; _paint_state())
+	hud.paint_pose.connect(_on_paint_pose)
+	hud.paint_undo.connect(func(): paint.undo(); matches_dirty = true)
+	hud.paint_clear.connect(func(): paint.clear(); matches_dirty = true)
+	hud.paint_done.connect(start_hide)
 	hud.ready_pressed.connect(_on_ready_pressed)
 	hud.set_level(level)
 	bang_near = _make_bang(5000.0)
@@ -195,6 +214,7 @@ func to_menu() -> void:
 	phase = "menu"
 	Input.mouse_mode = Input.MOUSE_MODE_VISIBLE
 	hud.menu.visible = true
+	hud.paint_hud.visible = false
 	hud.hide_hud.visible = false
 	hud.fire_hud.visible = false
 	hud.end_panel.visible = false
@@ -212,25 +232,98 @@ func to_menu() -> void:
 	hud.center_label.text = ""
 
 
-# ---------- Phase 1 : se cacher (on marche sur son île) ----------
-func set_camo(k: String) -> void:
-	player_camo = k
-	world.set_camo(world.player, k)
-	hud.set_swatch(k)
-	update_zone_info()
+# ---------- Atelier de peinture ----------
+func start_paint() -> void:
+	gid += 1
+	phase = "paint"
+	Input.mouse_mode = Input.MOUSE_MODE_VISIBLE
+	hud.menu.visible = false
+	hud.end_panel.visible = false
+	hud.fire_hud.visible = false
+	hud.hide_hud.visible = false
+	hud.paint_hud.visible = true
+	hud.set_scope(false)
+	hud.dot.visible = false
+	hud.show_inset(false)
+	hud.center_label.text = ""
+	world.player.visible = true
+	world.enemy.visible = false
+	world.end_marker.visible = false
+	hider.reset(0.0, WorldScript.MZ - 105.0)
+	ws_pose = "debout"
+	hider.set_stance(ws_pose)
+	ws_yaw = PI
+	ws_pitch = 0.15
+	ws_dist = 3.2
+	set_fov(50)
+	set_fog(FOG_NEAR, FOG_FAR)
+	matches_dirty = true
+	_paint_state()
 
+func _paint_state() -> void:
+	hud.set_paint_state(brush_color, brush_size, brush_tool, ws_pose)
+
+func _on_paint_pose(p: String) -> void:
+	ws_pose = p
+	hider.set_stance(p)
+	_paint_state()
+
+func _place_workshop_camera() -> void:
+	var center: Vector3 = hider.pos + Vector3(0, {"debout": 1.0, "accroupi": 0.7, "couche": 0.3}[ws_pose], 0)
+	camera.position = center + Vector3(sin(ws_yaw) * cos(ws_pitch), sin(ws_pitch), cos(ws_yaw) * cos(ws_pitch)) * ws_dist
+	camera.look_at(center)
+
+func _paint_at(screen: Vector2, stroke: bool) -> void:
+	var hit: Dictionary = world.pick_part(world.player, camera.project_ray_origin(screen), camera.project_ray_normal(screen))
+	if hit.is_empty():
+		paint.hide_cursor()
+		return
+	paint.set_cursor(hit.ref, brush_size)
+	if stroke:
+		if paint.is_full():
+			hud.toast("La peinture est pleine : utilise « Remplir » ou un plus gros pinceau.")
+			return
+		paint.dab(hit.ref, brush_color, brush_size, brush_tool)
+		matches_dirty = true
+
+func _paint_input(e: InputEvent) -> void:
+	if e is InputEventMouseButton:
+		if e.button_index == MOUSE_BUTTON_LEFT:
+			painting = e.pressed
+			if e.pressed:
+				if brush_tool == "remplir":
+					paint.fill(brush_color)
+					matches_dirty = true
+					painting = false
+				else:
+					paint.begin()
+					_paint_at(e.position, true)
+		elif e.button_index == MOUSE_BUTTON_RIGHT:
+			orbiting = e.pressed
+		elif e.pressed and e.button_index == MOUSE_BUTTON_WHEEL_UP:
+			ws_dist = maxf(1.4, ws_dist - 0.25)
+		elif e.pressed and e.button_index == MOUSE_BUTTON_WHEEL_DOWN:
+			ws_dist = minf(6.0, ws_dist + 0.25)
+	elif e is InputEventMouseMotion:
+		if orbiting:
+			ws_yaw -= e.relative.x * 0.008
+			ws_pitch = clampf(ws_pitch + e.relative.y * 0.006, -0.3, 1.2)
+		_paint_at(e.position, painting)
+
+
+# ---------- Phase 1 : se cacher (on marche sur son île) ----------
 func update_zone_info() -> void:
 	var zones: Dictionary = WorldScript.ZONES
 	player_zone = WorldScript.zone_at(hider.pos.x, hider.pos.z, hider.pos.y)
-	var ok := player_zone == player_camo
+	camo_score = paint.match_zone(player_zone)
 	var expo := "[color=#86d394]faible[/color]"
 	if hide_exposure > 0.6:
 		expo = "[color=#ef4f4f]forte[/color]"
 	elif hide_exposure > 0.25:
 		expo = "[color=#e9c84a]moyenne[/color]"
-	var txt := "Terrain : [color=#ff7a2f][b]%s[/b][/color]   ·   Tenue : %s   ·   %s   ·   Vu depuis l'île d'en face : %s" % [
-		zones[player_zone]["label"],
-		"[color=#86d394]assortie[/color]" if ok else "[color=#ef4f4f]voyante[/color]",
+	var camo_col := "#86d394" if camo_score > 0.7 else ("#e9c84a" if camo_score > 0.4 else "#ef4f4f")
+	var txt := "Terrain : [color=#ff7a2f][b]%s[/b][/color]   ·   Camouflage : [color=%s]%d %%[/color]   ·   %s   ·   Vu depuis l'île d'en face : %s" % [
+		zones[player_zone]["label"], camo_col, roundi(camo_score * 100),
 		hider.info().label, expo]
 	if hide_exposure == 0.0:
 		txt += "\n[color=#a3ada7]Bien caché… mais vois-tu encore l'île d'en face ? Maintiens le clic droit pour vérifier.[/color]"
@@ -244,6 +337,8 @@ func start_hide() -> void:
 	hud.end_panel.visible = false
 	hud.fire_hud.visible = false
 	hud.hide_hud.visible = true
+	hud.paint_hud.visible = false
+	paint.hide_cursor()
 	hud.set_scope(false)
 	hud.dot.visible = false
 	hud.show_inset(true)
@@ -252,7 +347,6 @@ func start_hide() -> void:
 	world.enemy.visible = false
 	world.end_marker.visible = false
 	hider.reset(0.0, WorldScript.MZ - 105.0)
-	set_camo("roche")
 	hide_left = HIDE_TIME
 	hide_exposure = 1.0
 	expo_t = 0.0
@@ -307,6 +401,7 @@ func start_fire() -> void:
 	hud.fire_hud.visible = true
 	world.player.visible = false
 	player_zone = WorldScript.zone_at(hider.pos.x, hider.pos.z, hider.pos.y)
+	camo_score = paint.match_zone(player_zone)
 	var eye: Vector3 = hider.eye()
 	enemy_spot = choose_enemy_spot(eye)
 	world.enemy.visible = true
@@ -345,7 +440,7 @@ func start_fire() -> void:
 func detect_rate() -> float:
 	# Vitesse à laquelle l'ennemi te repère : tenue, posture, ce qu'il voit de toi.
 	var L := D()
-	var rate: float = L.rate_good if player_camo == player_zone else L.rate_bad
+	var rate: float = lerpf(L.rate_good, L.rate_bad, 1.0 - camo_score)
 	rate *= hider.info().detect
 	rate *= lerpf(0.35, 1.0, fire_exposure)
 	if hider.stance == "couche" and player_zone == "herbe":
@@ -464,8 +559,8 @@ func finish(won: bool) -> void:
 	var start := ("Tu l'as trouvé en %d s avec %d balle%s. " % [roundi(fight_time), shots_fired, "s" if shots_fired > 1 else ""]) if won else "Le voici, dans la lunette. "
 	hud.end_text.text = start + "Il était caché sur la %s, en tenue %s." % [ez.to_lower(), ec.to_lower()]
 	var tips: Array[String] = []
-	if player_zone != player_camo:
-		tips.append("Ta tenue %s se voyait sur la %s." % [zones[player_camo]["label"].to_lower(), zones[player_zone]["label"].to_lower()])
+	if camo_score < 0.5:
+		tips.append("Ta peinture ne ressemblait qu'à %d %% à la %s : repeins-toi à l'atelier avec ses couleurs." % [roundi(camo_score * 100), zones[player_zone]["label"].to_lower()])
 	if hider.stance == "debout":
 		tips.append("Debout, on te voyait de loin : accroupis-toi (C) ou couche-toi (X).")
 	if fire_exposure > 0.6:
@@ -501,6 +596,9 @@ func _look(rel: Vector2) -> void:
 	pitch = clampf(pitch - rel.y * k, -0.9, 0.7)
 
 func _unhandled_input(e: InputEvent) -> void:
+	if phase == "paint":
+		_paint_input(e)
+		return
 	var captured := Input.mouse_mode == Input.MOUSE_MODE_CAPTURED
 	var playing := phase in ["hide", "reveal", "fire"]
 	if e is InputEventMouseMotion:
@@ -530,8 +628,6 @@ func _unhandled_input(e: InputEvent) -> void:
 			elif e.physical_keycode == KEY_X or e.physical_keycode == KEY_CTRL:
 				hider.toggle("couche")
 				update_zone_info()
-			elif CAMO_KEYS.has(e.physical_keycode):
-				set_camo(CAMO_KEYS[e.physical_keycode])
 			elif e.keycode == KEY_ENTER or e.keycode == KEY_KP_ENTER:
 				start_fire()
 				return
@@ -608,7 +704,15 @@ func _process(dt: float) -> void:
 			ai_shoot()
 	if phase != "reveal":
 		hud.fog_overlay.color.a = 0
-	if phase != "hide":
+	if phase == "paint":
+		_place_workshop_camera()
+		if matches_dirty and not painting:
+			matches_dirty = false
+			var scores := {}
+			for k in WorldScript.ZONE_KEYS:
+				scores[k] = paint.match_zone(k)
+			hud.set_matches(scores)
+	elif phase != "hide":
 		recoil *= exp(-dt * 7)
 		camera.rotation = Vector3(pitch + sy + recoil, yaw + sx, 0)
 	world.update_grass(camera.global_position)
