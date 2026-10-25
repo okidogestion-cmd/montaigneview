@@ -34,10 +34,15 @@ trahit sa position. C'est un jeu d'observation et de patience, pas un jeu d'acti
 - Chaque cachette se trouve dans une zone et a son couvert (rocher, buisson, sapin).
 - Tenue qui correspond au terrain = l'ennemi te repère **3 fois moins vite**.
 
-**Direction choisie le 25/10/2026, à faire après les décors :**
-- **Se cacher soi-même :** pendant la phase cachette, on contrôle son sniper en 3e personne
-  (ZQSD + souris) et on se couche n'importe où : dans l'herbe, contre un rocher, sous un sapin.
-  Les repères fixes disparaissent.
+**Se cacher soi-même (fait le 25/10/2026) :** pendant la cachette (60 s), on marche sur son île
+en 3e personne (ZQSD + souris, Maj pour courir) et on se met **debout**, **accroupi** (C) ou
+**couché** (X) où l'on veut. Clic droit maintenu = vue de tir depuis la cachette, pour vérifier
+qu'on voit encore l'île d'en face. L'ennemi repère plus ou moins vite selon :
+- la tenue (assortie au terrain ou non) ;
+- la posture (debout ×1,8, accroupi ×1, couché ×0,55 ; couché dans l'herbe ×0,7 en plus) ;
+- ce qu'il voit vraiment de ton corps (rayons depuis sa cachette : à couvert ×0,35, à découvert ×1).
+
+**À faire ensuite :**
 - **Se peindre soi-même :** un atelier où l'on peint directement son sniper au pinceau
   (palette de couleurs, taches, rayures), comme une vraie peinture de camouflage.
   L'ennemi repère d'autant plus vite que les couleurs peintes diffèrent du terrain autour.
@@ -80,15 +85,16 @@ trahit sa position. C'est un jeu d'observation et de patience, pas un jeu d'acti
 
 ## 4. Le monde
 
-- Une vallée de 1,4 km de côté. Deux montagnes face à face à environ **460 m** l'une de l'autre,
-  entourées d'autres sommets pour le décor.
-- 15 cachettes par montagne (5 directions × 3 hauteurs).
+- **Un archipel** (choisi le 25/10/2026) : deux îles-montagnes face à face à environ **460 m**
+  l'une de l'autre, séparées par la mer, entourées d'autres îles pour le décor. La mer s'étend
+  jusqu'à l'horizon (bleu profond, turquoise près des côtes, lignes blanches qui bougent, écume sur les plages).
+- 15 cachettes par île pour l'ennemi (5 directions × 3 hauteurs) ; le joueur, lui, se cache où il veut.
 - Décor : sapins, rochers, buissons, avec des clairières autour des cachettes.
 - Lumière de jour, brouillard léger à l'horizon.
 - **Style visuel : façon Zelda Wind Waker** (choisi le 25/10/2026). Ombrage cartoon à deux tons
   avec ombres bleutées, contours noirs sur le décor proche (qui s'effacent au loin pour ne pas
   trahir les snipers), ciel peint avec gros nuages, herbe qui bouge au vent, fleurs, cailloux,
-  lac avec écume dessinée, arbres ronds et sapins à étages. Ça va avec l'idée de « repérer une couleur qui détonne ».
+  mer avec écume dessinée, arbres ronds et sapins à étages. Ça va avec l'idée de « repérer une couleur qui détonne ».
 
 ## 5. Commandes (PC)
 
@@ -145,7 +151,7 @@ game/
 |---|---|---|
 | 1. Prototype Godot | Refaire le prototype web à l'identique dans Godot, avec des formes simples | Une partie complète jouable ✅ |
 | 1b. Décors Wind Waker | Ombrage cartoon, ciel, herbe, fleurs, lac, arbres | La vallée donne envie ✅ |
-| 1c. Se cacher soi-même | Déplacement libre en 3e personne pendant la cachette | On choisit sa cachette au mètre près |
+| 1c. Se cacher soi-même | Déplacement libre en 3e personne, debout / accroupi / couché, vue de tir | On choisit sa cachette au mètre près ✅ |
 | 1d. Se peindre soi-même | Atelier de peinture au pinceau sur le sniper | Camouflage unique à chaque partie |
 | 2. Sensations | Sons, recul, éclairs, brouillard, menus propres, réglages | Le jeu « fait » vrai |
 | 3. Contenu | 3 cartes, tenues, progression | Assez pour 2 à 3 heures |

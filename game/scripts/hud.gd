@@ -5,7 +5,6 @@ extends CanvasLayer
 signal play_pressed
 signal level_chosen(level: String)
 signal camo_chosen(zone: String)
-signal hide_zoom_pressed
 signal ready_pressed
 signal menu_pressed
 signal again_pressed
@@ -56,7 +55,7 @@ var level_buttons := {}
 var hide_hud: Control
 var hide_timer: Label
 var zone_info: RichTextLabel
-var hide_zoom: Button
+var keys_hint: Label
 var swatches := {}
 var inset: SubViewportContainer
 var inset_viewport: SubViewport
@@ -286,13 +285,13 @@ func _build_hide() -> void:
 	var tv := _vbox(2)
 	tv.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	tv.add_child(_label("Cache-toi", 30, PAPER))
-	tv.add_child(_small("Ta montagne, vue depuis celle de l'ennemi"))
+	tv.add_child(_small("Trouve une cachette sur ton île. L'ennemi regarde depuis l'île d'en face."))
 	th.add_child(tv)
 	var tr := _vbox(2)
 	var tl := _small("Temps")
 	tl.horizontal_alignment = HORIZONTAL_ALIGNMENT_RIGHT
 	tr.add_child(tl)
-	hide_timer = _label("45", 30, PAPER)
+	hide_timer = _label("60", 30, PAPER)
 	hide_timer.horizontal_alignment = HORIZONTAL_ALIGNMENT_RIGHT
 	tr.add_child(hide_timer)
 	th.add_child(tr)
@@ -332,10 +331,10 @@ func _build_hide() -> void:
 	zone_info.add_theme_font_size_override("bold_font_size", 17)
 	zone_info.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	r1.add_child(zone_info)
-	hide_zoom = _button("x1", Color(1, 1, 1, 0.08), PAPER, 17)
-	hide_zoom.pressed.connect(func(): hide_zoom_pressed.emit())
-	r1.add_child(hide_zoom)
 	bv.add_child(r1)
+	keys_hint = _label("ZQSD : marcher   Maj : courir   C : s'accroupir   X : se coucher   1-4 : tenue   Clic droit (maintenu) : vue de tir   Entrée : prêt   Échap : souris", 13, MUTED)
+	keys_hint.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	bv.add_child(keys_hint)
 	var r2 := _hbox()
 	var sv := _vbox(5)
 	sv.add_child(_small("Tenue"))
@@ -343,7 +342,7 @@ func _build_hide() -> void:
 	for k in ["neige", "roche", "herbe", "foret"]:
 		var b := Button.new()
 		b.focus_mode = Control.FOCUS_NONE
-		b.text = ZONES[k]["label"]
+		b.text = "%d %s" % [["neige", "roche", "herbe", "foret"].find(k) + 1, ZONES[k]["label"]]
 		b.icon = _swatch_icon(ZONES[k]["color"])
 		b.icon_alignment = HORIZONTAL_ALIGNMENT_CENTER
 		b.vertical_icon_alignment = VERTICAL_ALIGNMENT_TOP
@@ -356,6 +355,7 @@ func _build_hide() -> void:
 	r2.add_child(sv)
 	r2.add_child(_spacer())
 	var ready_btn := _button("PRÊT", BLAZE, Color("#1a0d04"), 24)
+	ready_btn.text = "PRÊT (Entrée)"
 	ready_btn.size_flags_vertical = Control.SIZE_SHRINK_END
 	ready_btn.pressed.connect(func(): ready_pressed.emit())
 	r2.add_child(ready_btn)

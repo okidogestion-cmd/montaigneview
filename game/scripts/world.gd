@@ -14,7 +14,7 @@ const MZ := 230.0          # centre des deux montagnes sur l'axe z (+ joueur, - 
 const S := 1400.0          # taille de la vallée
 const SEG := 200           # finesse du relief
 const CELL := S / SEG
-const WATER_Y := 6.0       # niveau du lac
+const WATER_Y := 26.0      # niveau de la mer : le fond de la vallée est sous l'eau, les montagnes sont des îles
 const PEAKS := [
 	[0, -MZ, 130, 190], [0, MZ, 130, 190], [-270, -340, 95, 150], [290, -360, 110, 160],
 	[-300, 310, 90, 150], [310, 330, 85, 140], [0, -580, 160, 230], [0, 580, 150, 230],
@@ -30,7 +30,6 @@ var heights := PackedFloat32Array()
 var rng := RandomNumberGenerator.new()
 var enemy_spots: Array = []
 var player_spots: Array = []
-var markers: Array[Sprite3D] = []
 var player: Node3D
 var enemy: Node3D
 var enemy_hitbox: StaticBody3D
@@ -82,6 +81,9 @@ static func height_fn(x: float, z: float) -> float:
 		var r: float = p[3]
 		h += p[2] * exp(-1.6 * (dx * dx * 0.7 + dz * dz) / (r * r))
 	h += fbm(x * 0.012, z * 0.012) * 38.0 + fbm(x * 0.05, z * 0.05) * 6.0
+	# Au bord de la carte, le sol plonge : la mer s'étend jusqu'à l'horizon.
+	var edge := maxf(absf(x), absf(z))
+	h = lerpf(h, -60.0, smoothstep(540.0, 690.0, edge))
 	return h
 
 static func zone_at(x: float, z: float, h: float) -> String:
@@ -241,7 +243,7 @@ func build() -> void:
 	player_spots = _build_spots(MZ, -1)
 	_scatter()
 	_grass()
-	player = _make_figure()
+	player = _make_figure(["debout", "accroupi", "couche"])
 	add_child(player)
 	player.visible = false
 	enemy = _make_figure()
@@ -327,7 +329,7 @@ func _build_terrain() -> void:
 
 func _build_water() -> void:
 	var plane := PlaneMesh.new()
-	plane.size = Vector2(S, S)
+	plane.size = Vector2(9000, 9000)
 	plane.subdivide_width = 1
 	plane.subdivide_depth = 1
 	var m := ShaderMaterial.new()
@@ -397,6 +399,12 @@ func _build_spots(cz: float, facing: int) -> Array:
 			var x := sin(ang) * rr * 1.18
 			var z := cz + facing * cos(ang) * rr
 			var h := height_at(x, z)
+			while h < WATER_Y + 4.0 and rr > 40.0:
+				# Trop près de la mer : on remonte vers le sommet.
+				rr -= 8.0
+				x = sin(ang) * rr * 1.18
+				z = cz + facing * cos(ang) * rr
+				h = height_at(x, z)
 			var zone := zone_at(x, z, h)
 			var cover := _make_cover(zone)
 			cover.position = Vector3(x, h, z)
@@ -584,24 +592,58 @@ func update_grass(cam: Vector3) -> void:
 
 
 # ---------- Personnages ----------
-func _make_figure() -> Node3D:
+# Un personnage = une ou plusieurs poses (debout, accroupi, couché), une seule visible à la fois.
+# Toutes les poses partagent le même matériau de tenue.
+func _make_figure(poses: Array = ["accroupi"]) -> Node3D:
 	var g := Node3D.new()
 	var camo := ShaderMaterial.new()
 	camo.shader = TOON
 	camo.set_shader_parameter("albedo", ZONES["roche"]["color"])
 	var dark := mat(Color("#1b1d1e"))
-	var torso := _fig_box(g, Vector3(0.62, 0.8, 0.5), camo, Vector3(0, 0.55, 0))
-	torso.rotation.x = 0.25
-	_fig_box(g, Vector3(0.6, 0.35, 0.7), camo, Vector3(0, 0.18, -0.15))
+	for p in poses:
+		var pose := Node3D.new()
+		pose.name = p
+		g.add_child(pose)
+		match p:
+			"debout":
+				_fig_box(pose, Vector3(0.2, 0.85, 0.24), camo, Vector3(-0.13, 0.425, 0))
+				_fig_box(pose, Vector3(0.2, 0.85, 0.24), camo, Vector3(0.13, 0.425, 0))
+				_fig_box(pose, Vector3(0.52, 0.62, 0.32), camo, Vector3(0, 1.16, 0))
+				_fig_head(pose, camo, Vector3(0, 1.66, 0.02))
+				for side in [-1, 1]:
+					var arm := _fig_box(pose, Vector3(0.14, 0.5, 0.14), camo, Vector3(0.3 * side, 1.12, 0.14))
+					arm.rotation.x = -0.9
+				_fig_tube(pose, 0.035, 1.3, dark, Vector3(0.12, 1.28, 0.45))
+				_fig_tube(pose, 0.05, 0.35, dark, Vector3(0.12, 1.37, 0.3))
+			"accroupi":
+				var torso := _fig_box(pose, Vector3(0.62, 0.8, 0.5), camo, Vector3(0, 0.55, 0))
+				torso.rotation.x = 0.25
+				_fig_box(pose, Vector3(0.6, 0.35, 0.7), camo, Vector3(0, 0.18, -0.15))
+				_fig_head(pose, camo, Vector3(0, 1.08, 0.08))
+				_fig_tube(pose, 0.035, 1.5, dark, Vector3(0.12, 0.92, 0.55))
+				_fig_tube(pose, 0.05, 0.35, dark, Vector3(0.12, 1.02, 0.35))
+			"couche":
+				_fig_box(pose, Vector3(0.5, 0.3, 0.8), camo, Vector3(0, 0.2, 0.15))
+				_fig_box(pose, Vector3(0.42, 0.22, 0.95), camo, Vector3(0, 0.13, -0.72))
+				_fig_box(pose, Vector3(0.5, 0.14, 0.4), camo, Vector3(0, 0.18, 0.75))
+				_fig_head(pose, camo, Vector3(0, 0.33, 0.68))
+				_fig_tube(pose, 0.035, 1.5, dark, Vector3(0.12, 0.28, 1.25))
+				_fig_tube(pose, 0.05, 0.35, dark, Vector3(0.12, 0.38, 1.05))
+	g.set_meta("camo", camo)
+	set_stance(g, poses[0])
+	return g
+
+func set_stance(fig: Node3D, stance: String) -> void:
+	for pose in fig.get_children():
+		if pose.get_class() == "Node3D":
+			pose.visible = pose.name == stance
+
+func _fig_head(g: Node3D, m: Material, pos: Vector3) -> void:
 	var head := MeshInstance3D.new()
 	head.mesh = _sphere(0.21, 10, 6)
-	head.material_override = camo
-	head.position = Vector3(0, 1.08, 0.08)
+	head.material_override = m
+	head.position = pos
 	g.add_child(head)
-	_fig_tube(g, 0.035, 1.5, dark, Vector3(0.12, 0.92, 0.55))
-	_fig_tube(g, 0.05, 0.35, dark, Vector3(0.12, 1.02, 0.35))
-	g.set_meta("camo", camo)
-	return g
 
 func _fig_box(g: Node3D, size: Vector3, m: Material, pos: Vector3) -> MeshInstance3D:
 	var mi := MeshInstance3D.new()
@@ -658,12 +700,6 @@ func _sprite(tex: Texture2D, color: Color, size: float) -> Sprite3D:
 
 func _build_sprites() -> void:
 	var ring := _ring_texture()
-	for s in player_spots:
-		var sp := _sprite(ring, Color("#ff7a2f"), 9)
-		sp.position = s.fig + Vector3(0, 5, 0)
-		sp.layers = 2  # invisible dans la lunette ennemie
-		sp.set_meta("spot", s)
-		markers.append(sp)
 	flash_sprite = _sprite(_glow_texture(), Color.WHITE, 6)
 	flash_sprite.visible = false
 	end_marker = _sprite(ring, Color("#ef4f4f"), 1.6)
