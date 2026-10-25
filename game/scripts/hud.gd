@@ -92,6 +92,7 @@ var menu_hint: Label
 var ready_btn: Button
 var fire_keys: Label
 var paint_hint: Label
+var _rotate_msg: Control
 
 var _toast_tween: Tween
 
@@ -733,9 +734,27 @@ func set_touch_mode(on: bool) -> void:
 	for l in fire_hud.find_children("*", "Label", true, false):
 		(l as Label).text = (l as Label).text.replace(" (MAJ / CLIC DROIT)", "").replace(" (MOLETTE / Z)", "")
 	paint_hint.text = "Un doigt sur le sniper : peindre   ·   Un doigt à côté : tourner autour   ·   Deux doigts : zoomer"
+	_rotate_msg = _full(_rect(INK))
+	_rotate_msg.mouse_filter = Control.MOUSE_FILTER_STOP
+	var rl := _label("Tourne ton téléphone
+en mode paysage", 40, PAPER)
+	rl.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	rl.set_anchors_preset(Control.PRESET_CENTER)
+	rl.grow_horizontal = Control.GROW_DIRECTION_BOTH
+	rl.grow_vertical = Control.GROW_DIRECTION_BOTH
+	_rotate_msg.add_child(rl)
+	_rotate_msg.visible = false
+	root.add_child(_rotate_msg)
 
 func over_paint_panel(pos: Vector2) -> bool:
 	for p in paint_panels:
 		if p.is_visible_in_tree() and p.get_global_rect().has_point(pos):
 			return true
 	return false
+
+func _process(_dt: float) -> void:
+	# Téléphone tenu debout : on demande de le tourner (le jeu se joue en paysage).
+	if _rotate_msg == null:
+		return
+	var s := root.get_viewport_rect().size
+	_rotate_msg.visible = s.y > s.x * 1.05

@@ -120,8 +120,9 @@ func _ready() -> void:
 	hud = HudScript.new()
 	add_child(hud)
 	# Commandes tactiles : sur téléphone, ou sur PC avec « -- --tactile » (la souris fait le doigt).
-	touch_mode = OS.has_feature("mobile") or "--tactile" in OS.get_cmdline_user_args()
-	if touch_mode and not OS.has_feature("mobile"):
+	var on_phone := OS.has_feature("mobile") or OS.has_feature("web_ios") or OS.has_feature("web_android")
+	touch_mode = on_phone or "--tactile" in OS.get_cmdline_user_args()
+	if touch_mode and not on_phone:
 		Input.emulate_touch_from_mouse = true
 	touch = TouchScript.new()
 	hud.root.add_child(touch)

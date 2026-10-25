@@ -4,11 +4,12 @@ shader_type spatial;
 // dans le repère de la pose « debout » (CUSTOM0) : la peinture suit le corps
 // qu'il soit debout, accroupi ou couché.
 
-const int MAX_STROKES = 600;
+// Les coups de pinceau sont rangés dans une petite image (une colonne par coup) :
+// ligne 0 = position + rayon, ligne 1 = couleur. Une image passe partout, y compris dans
+// Safari sur iPhone, où la taille des listes envoyées aux shaders est très limitée.
 
 uniform vec4 base_color : source_color = vec4(0.57, 0.56, 0.53, 1.0);
-uniform vec4 strokes[MAX_STROKES];        // xyz : position, w : rayon
-uniform vec4 stroke_colors[MAX_STROKES];  // couleur sRGB
+uniform sampler2D stroke_tex : filter_nearest, repeat_disable;
 uniform int stroke_count = 0;
 uniform vec4 cursor = vec4(0.0, 0.0, 0.0, -1.0);  // cercle du pinceau (atelier)
 uniform float band = 0.5;
@@ -26,9 +27,9 @@ void vertex() {
 void fragment() {
 	vec3 c = base_color.rgb;
 	for (int i = 0; i < stroke_count; i++) {
-		vec4 s = strokes[i];
+		vec4 s = texelFetch(stroke_tex, ivec2(i, 0), 0);
 		if (distance(ref_pos, s.xyz) < s.w) {
-			c = pow(stroke_colors[i].rgb, vec3(2.2));
+			c = pow(texelFetch(stroke_tex, ivec2(i, 1), 0).rgb, vec3(2.2));
 		}
 	}
 	if (cursor.w > 0.0) {

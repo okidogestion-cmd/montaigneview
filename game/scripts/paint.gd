@@ -22,6 +22,7 @@ var sample_colors: Array[Color] = []
 var _last := Vector3.INF
 var _rng := RandomNumberGenerator.new()
 var _match_cache := {}                 # score par terrain, recalculé seulement quand la peinture change
+var _stroke_tex: ImageTexture
 
 
 func _init(mat: ShaderMaterial, parts: Array, part_transform: Callable) -> void:
@@ -155,15 +156,29 @@ func refresh() -> void:
 	_apply()
 
 func _apply() -> void:
-	var pos := []
-	var cols := []
-	for s in strokes:
-		pos.append(s[0])
-		var c: Color = s[1]
-		cols.append(Vector4(c.r, c.g, c.b, 1.0))
+	# Les coups vont dans une petite image MAX × 2 lue par le shader camo.
+	var data := PackedFloat32Array()
+	data.resize(MAX * 2 * 4)
+	for i in strokes.size():
+		var v: Vector4 = strokes[i][0]
+		var c: Color = strokes[i][1]
+		var a := i * 4
+		var b := (MAX + i) * 4
+		data[a] = v.x
+		data[a + 1] = v.y
+		data[a + 2] = v.z
+		data[a + 3] = v.w
+		data[b] = c.r
+		data[b + 1] = c.g
+		data[b + 2] = c.b
+		data[b + 3] = 1.0
+	var img := Image.create_from_data(MAX, 2, false, Image.FORMAT_RGBAF, data.to_byte_array())
+	if _stroke_tex == null:
+		_stroke_tex = ImageTexture.create_from_image(img)
+		material.set_shader_parameter("stroke_tex", _stroke_tex)
+	else:
+		_stroke_tex.update(img)
 	material.set_shader_parameter("base_color", base)
-	material.set_shader_parameter("strokes", pos)
-	material.set_shader_parameter("stroke_colors", cols)
 	material.set_shader_parameter("stroke_count", strokes.size())
 
 func set_cursor(ref: Vector3, size_idx: int) -> void:

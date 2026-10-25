@@ -186,3 +186,11 @@ Le jeu devient une **appli mobile** (même jeu : cachette, peinture, duel), plus
 - **Duel :** glisser pour viser, boutons TIRER, Zoom, Souffle (maintenu).
 - Appli en paysage (capteur). Sur PC, le mode tactile s'active avec l'argument `-- --tactile`
   (la souris fait office de doigt). Code : `game/scripts/touch_controls.gd`.
+
+### Version web pour iPhone (25/10/2026)
+- L'utilisateur a un iPhone : on essaie d'abord la **version web** dans Safari (pas de Mac nécessaire).
+- Export « Web » (préréglage dans `game/export_presets.cfg`, sans threads : marche sans en-têtes spéciaux),
+  rendu « Compatibility » (WebGL 2). La peinture passe par une petite texture (limites des shaders sur iPhone).
+- Construire : `godot --headless --path game --export-release "Web" ../build/web/index.html`
+- Essayer sur le téléphone (même Wi-Fi) : `node tools/serveur_web.js`, puis ouvrir l'adresse affichée dans Safari.
+- Le mode tactile s'active seul sur iPhone / Android ; message « Tourne ton téléphone » en portrait.
