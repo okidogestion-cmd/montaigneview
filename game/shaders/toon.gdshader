@@ -8,6 +8,7 @@ uniform float wind = 0.0;          // balancement (herbe, arbres)
 uniform float wind_height = 7.0;   // hauteur où le balancement est maximal
 uniform float patches = 0.0;       // taches de couleur peintes sur le sol
 uniform float band = 0.5;          // seuil ombre / lumière
+uniform float rim_strength = 0.35; // liseré de lumière (0 pour le sol)
 
 varying vec3 world_pos;
 
@@ -45,6 +46,8 @@ void fragment() {
 
 void light() {
 	float ndl = dot(NORMAL, LIGHT) * ATTENUATION;
-	float lit = smoothstep(band - 0.04, band + 0.04, ndl * 0.5 + 0.5);
-	DIFFUSE_LIGHT += LIGHT_COLOR * lit;
+	float lit = smoothstep(band - 0.07, band + 0.07, ndl * 0.5 + 0.5);
+	// Liseré de lumière sur les bords tournés vers le soleil : les volumes se détachent.
+	float rim = pow(1.0 - clamp(dot(NORMAL, VIEW), 0.0, 1.0), 3.0) * lit * rim_strength;
+	DIFFUSE_LIGHT += LIGHT_COLOR * (lit + rim);
 }

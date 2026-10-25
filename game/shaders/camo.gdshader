@@ -38,5 +38,7 @@ void fragment() {
 
 void light() {
 	float ndl = dot(NORMAL, LIGHT) * ATTENUATION;
-	DIFFUSE_LIGHT += LIGHT_COLOR * smoothstep(band - 0.04, band + 0.04, ndl * 0.5 + 0.5);
+	float lit = smoothstep(band - 0.07, band + 0.07, ndl * 0.5 + 0.5);
+	float rim = pow(1.0 - clamp(dot(NORMAL, VIEW), 0.0, 1.0), 3.0) * lit * 0.35;
+	DIFFUSE_LIGHT += LIGHT_COLOR * (lit + rim);
 }

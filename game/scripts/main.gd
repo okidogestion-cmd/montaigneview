@@ -97,8 +97,8 @@ func _ready() -> void:
 	inset_cam.far = 3000
 	hud.inset_viewport.add_child(inset_cam)
 	inset_cam.current = true
-	hud.play_pressed.connect(start_paint)
-	hud.again_pressed.connect(start_paint)
+	hud.play_pressed.connect(start_hide)
+	hud.again_pressed.connect(start_hide)
 	hud.menu_pressed.connect(to_menu)
 	hud.level_chosen.connect(_on_level)
 	paint = PaintScript.new(world.player.get_meta("camo"), WorldScript.PARTS, Callable(WorldScript, "part_transform"))
@@ -108,7 +108,7 @@ func _ready() -> void:
 	hud.paint_pose.connect(_on_paint_pose)
 	hud.paint_undo.connect(func(): paint.undo(); matches_dirty = true)
 	hud.paint_clear.connect(func(): paint.clear(); matches_dirty = true)
-	hud.paint_done.connect(start_hide)
+	hud.paint_done.connect(start_fire)
 	hud.ready_pressed.connect(_on_ready_pressed)
 	hud.set_level(level)
 	bang_near = _make_bang(5000.0)
@@ -121,7 +121,7 @@ func _on_level(lv: String) -> void:
 
 func _on_ready_pressed() -> void:
 	if phase == "hide":
-		start_fire()
+		start_paint()
 
 func _build_environment() -> void:
 	env = Environment.new()
@@ -135,9 +135,17 @@ func _build_environment() -> void:
 	env.ambient_light_source = Environment.AMBIENT_SOURCE_COLOR
 	env.ambient_light_color = Color("#9fb4dc")
 	env.ambient_light_energy = 0.85
-	env.tonemap_mode = Environment.TONE_MAPPER_LINEAR
+	env.tonemap_mode = Environment.TONE_MAPPER_FILMIC
+	env.tonemap_exposure = 1.12
+	env.tonemap_white = 6.0
 	env.adjustment_enabled = true
-	env.adjustment_saturation = 1.04
+	env.adjustment_saturation = 1.12
+	env.adjustment_contrast = 1.05
+	# Ombre de contact douce au pied des rochers, arbres et du personnage.
+	env.ssao_enabled = true
+	env.ssao_radius = 1.2
+	env.ssao_intensity = 1.6
+	env.ssao_light_affect = 0.15
 	env.fog_enabled = true
 	env.fog_mode = Environment.FOG_MODE_DEPTH
 	env.fog_light_color = SKY
@@ -154,7 +162,8 @@ func _build_environment() -> void:
 	sun.light_energy = 0.42
 	sun.shadow_enabled = true
 	sun.shadow_bias = 0.05
-	sun.directional_shadow_max_distance = 260.0
+	sun.directional_shadow_max_distance = 220.0
+	sun.shadow_blur = 1.5
 	sun.directional_shadow_blend_splits = true
 	add_child(sun)
 	sun.look_at_from_position(Vector3(-0.8, 0.62, 0.15) * 100, Vector3.ZERO)
@@ -249,12 +258,13 @@ func start_paint() -> void:
 	world.player.visible = true
 	world.enemy.visible = false
 	world.end_marker.visible = false
-	hider.reset(0.0, WorldScript.MZ - 105.0)
-	ws_pose = "debout"
-	hider.set_stance(ws_pose)
-	ws_yaw = PI
-	ws_pitch = 0.15
+	# On peint sur place, dans la cachette et la posture choisies : le terrain autour sert de modèle.
+	ws_pose = hider.stance
+	world.animate_figure(world.player, ws_pose, 0.0, 0.0)
+	ws_yaw = hider.facing + 0.6   # de trois quarts face
+	ws_pitch = 0.6 if ws_pose == "couche" else 0.15
 	ws_dist = 3.2
+	hud.toast("Peins-toi aux couleurs du terrain autour de ta cachette.", 3.5)
 	set_fov(50)
 	set_fog(FOG_NEAR, FOG_FAR)
 	matches_dirty = true
@@ -358,7 +368,7 @@ func start_hide() -> void:
 
 # ---------- Visibilité ----------
 func ray(from: Vector3, to: Vector3, exclude: Array[RID] = []) -> Dictionary:
-	var q := PhysicsRayQueryParameters3D.create(from, to)
+	var q := PhysicsRayQueryParameters3D.create(from, to, 1)  # décor seulement, pas le corps du joueur
 	q.exclude = exclude
 	return get_world_3d().direct_space_state.intersect_ray(q)
 
@@ -397,6 +407,8 @@ func start_fire() -> void:
 	phase = "reveal"
 	reveal_t = 0.0
 	hud.hide_hud.visible = false
+	hud.paint_hud.visible = false
+	paint.hide_cursor()
 	hud.show_inset(false)
 	hud.fire_hud.visible = true
 	world.player.visible = false
@@ -504,7 +516,7 @@ func shoot() -> void:
 func ai_shoot() -> void:
 	var L := D()
 	var p := minf(0.92, ai_reveal * L.acc)
-	var tip: Vector3 = world.enemy.to_global(Vector3(0.12, 0.95, 1.4))
+	var tip: Vector3 = world.enemy.to_global(Vector3(0.08, 1.04, 1.2))
 	world.flash_sprite.position = tip
 	world.flash_sprite.visible = true
 	get_tree().create_timer(0.11).timeout.connect(func(): world.flash_sprite.visible = false)
@@ -629,7 +641,7 @@ func _unhandled_input(e: InputEvent) -> void:
 				hider.toggle("couche")
 				update_zone_info()
 			elif e.keycode == KEY_ENTER or e.keycode == KEY_KP_ENTER:
-				start_fire()
+				start_paint()
 				return
 		if e.keycode == KEY_SHIFT and phase != "hide":
 			breath_held = e.pressed
@@ -728,18 +740,23 @@ func _process(dt: float) -> void:
 			f.m.queue_free()
 			fx.remove_at(i)
 
-func _process_hide(dt: float) -> void:
-	hide_left -= dt
-	hud.hide_timer.text = str(maxi(0, ceili(hide_left)))
-	if hide_left <= 0:
-		start_fire()
+func _physics_process(dt: float) -> void:
+	if phase != "hide":
 		return
 	var input := Vector2.ZERO
 	if Input.mouse_mode == Input.MOUSE_MODE_CAPTURED:
 		# Touches physiques W A S D = Z Q S D sur un clavier AZERTY.
 		input.y = float(Input.is_physical_key_pressed(KEY_W)) - float(Input.is_physical_key_pressed(KEY_S))
 		input.x = float(Input.is_physical_key_pressed(KEY_D)) - float(Input.is_physical_key_pressed(KEY_A))
-	hider.move(dt, input, Input.is_physical_key_pressed(KEY_SHIFT))
+	hider.physics_step(dt, input, Input.is_physical_key_pressed(KEY_SHIFT))
+
+func _process_hide(dt: float) -> void:
+	hide_left -= dt
+	hud.hide_timer.text = str(maxi(0, ceili(hide_left)))
+	if hide_left <= 0:
+		start_paint()
+		return
+	hider.update_visual()
 	# Clic droit maintenu : on regarde par la lunette depuis sa cachette.
 	var preview := Input.is_mouse_button_pressed(MOUSE_BUTTON_RIGHT)
 	world.player.visible = not preview
@@ -749,7 +766,7 @@ func _process_hide(dt: float) -> void:
 		hider.first_person(camera)
 	else:
 		set_fov(HIDE_FOV)
-		hider.place_camera(camera)
+		hider.place_camera(camera, dt)
 	# Ce que voit l'ennemi : recalculé quatre fois par seconde.
 	expo_t -= dt
 	if expo_t <= 0:

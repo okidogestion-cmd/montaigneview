@@ -4,7 +4,7 @@ extends RefCounted
 
 const MAX := 600                       # même limite que le shader camo
 const SIZES := [0.045, 0.09, 0.17]     # rayon du pinceau : petit, moyen, gros
-const DEFAULT_BASE := Color("#928e86")
+const DEFAULT_BASE := Color("#8f8a6c")   # toile kaki
 const PALETTE := [
 	Color("#eef3f9"), Color("#c9d3dc"), Color("#b9b2a5"), Color("#928e86"),
 	Color("#6d6a64"), Color("#e3d39a"), Color("#a0855c"), Color("#7a5233"),
@@ -27,19 +27,22 @@ func _init(mat: ShaderMaterial, parts: Array, part_transform: Callable) -> void:
 	material = mat
 	_rng.seed = 7
 	_build_samples(parts, part_transform)
+	_set_default()
 	refresh()
 
 func _build_samples(parts: Array, part_transform: Callable) -> void:
 	# Environ 900 points par m² de surface, sur la pose debout.
 	for part in parts:
+		if part.size() > 5 and part[5] != null:
+			continue  # pièce à couleur fixe (fusil) : pas peinte, pas comptée
 		var size: Vector3 = part[2]
 		var t: Transform3D = part_transform.call(part, "debout")
 		var area := 0.0
 		match part[1]:
 			"box":
 				area = 2 * (size.x * size.y + size.y * size.z + size.x * size.z)
-			"sphere":
-				area = 4 * PI * size.x * size.x
+			"sphere", "capsule":
+				area = 4 * PI * size.x * size.x + (TAU * size.x * (size.y - 2 * size.x) if part[1] == "capsule" else 0.0)
 			_:
 				area = TAU * size.x * size.y
 		for i in maxi(4, int(area * 900)):
@@ -51,6 +54,15 @@ func _build_samples(parts: Array, part_transform: Callable) -> void:
 					p[axis] = size[axis] / 2 * (1 if _rng.randf() < 0.5 else -1)
 				"sphere":
 					p = Vector3(_rng.randfn(), _rng.randfn(), _rng.randfn()).normalized() * size.x
+				"capsule":
+					var hh: float = size.y / 2 - size.x
+					var side := TAU * size.x * 2 * hh
+					if _rng.randf() * area < side:
+						var a := _rng.randf() * TAU
+						p = Vector3(cos(a) * size.x, _rng.randf_range(-hh, hh), sin(a) * size.x)
+					else:
+						p = Vector3(_rng.randfn(), _rng.randfn(), _rng.randfn()).normalized() * size.x
+						p.y += hh if p.y > 0 else -hh
 				_:
 					var a := _rng.randf() * TAU
 					p = Vector3(cos(a) * size.x, (_rng.randf() - 0.5) * size.y, sin(a) * size.x)
@@ -110,7 +122,20 @@ func fill(color: Color) -> void:
 	refresh()
 
 func clear() -> void:
-	fill(DEFAULT_BASE)
+	_snapshot()
+	_set_default()
+	refresh()
+
+func _set_default() -> void:
+	# Tenue de départ : toile kaki, visage, bottes et chapeau. À repeindre pour se camoufler.
+	base = DEFAULT_BASE
+	strokes = [
+		[Vector4(0, 1.69, 0.13, 0.12), Color("#e2b48a")],     # visage
+		[Vector4(-0.11, 0.07, 0.05, 0.21), Color("#3b2e25")],  # bottes
+		[Vector4(0.11, 0.07, 0.05, 0.21), Color("#3b2e25")],
+		[Vector4(0, 1.84, 0.02, 0.29), Color("#6b5a40")],      # chapeau
+		[Vector4(0, 1.2, -0.25, 0.26), Color("#5e5a45")],      # sac
+	]
 
 func undo() -> void:
 	if history.is_empty():

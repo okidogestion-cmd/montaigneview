@@ -302,7 +302,7 @@ func _build_hide() -> void:
 	var tv := _vbox(2)
 	tv.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	tv.add_child(_label("Cache-toi", 30, PAPER))
-	tv.add_child(_small("Trouve une cachette sur ton île. L'ennemi regarde depuis l'île d'en face."))
+	tv.add_child(_small("Trouve une cachette sur ton île, puis tu te peindras sur place. L'ennemi regarde depuis l'île d'en face."))
 	th.add_child(tv)
 	var tr := _vbox(2)
 	var tl := _small("Temps")

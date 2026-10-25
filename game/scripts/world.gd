@@ -12,7 +12,7 @@ const ZONES := {
 }
 const MZ := 230.0          # centre des deux montagnes sur l'axe z (+ joueur, - ennemi)
 const S := 1400.0          # taille de la vallée
-const SEG := 200           # finesse du relief
+const SEG := 320           # finesse du relief (4,4 m entre deux points)
 const CELL := S / SEG
 const WATER_Y := 26.0      # niveau de la mer : le fond de la vallée est sous l'eau, les montagnes sont des îles
 const PEAKS := [
@@ -63,15 +63,20 @@ static func vnoise(x: float, z: float) -> float:
 	var d := hash2(xi + 1, zi + 1)
 	return a + (b - a) * u + (c - a) * v + (a - b - c + d) * u * v
 
+static var _noise: FastNoiseLite
+
 static func fbm(x: float, z: float) -> float:
-	var s := 0.0
-	var a := 1.0
-	var f := 1.0
-	for i in 4:
-		s += a * (vnoise(x * f, z * f) - 0.5)
-		a *= 0.5
-		f *= 2.03
-	return s
+	# Bruit fractal (4 octaves) calculé par le moteur : bien plus rapide qu'en script.
+	if _noise == null:
+		_noise = FastNoiseLite.new()
+		_noise.noise_type = FastNoiseLite.TYPE_VALUE_CUBIC
+		_noise.seed = 20261025
+		_noise.frequency = 1.0
+		_noise.fractal_type = FastNoiseLite.FRACTAL_FBM
+		_noise.fractal_octaves = 4
+		_noise.fractal_lacunarity = 2.03
+		_noise.fractal_gain = 0.5
+	return _noise.get_noise_2d(x, z) * 0.47
 
 static func height_fn(x: float, z: float) -> float:
 	var h := 0.0
@@ -315,6 +320,7 @@ func _build_terrain() -> void:
 	m.shader = TOON
 	m.set_shader_parameter("use_vertex_color", true)
 	m.set_shader_parameter("patches", 0.24)
+	m.set_shader_parameter("rim_strength", 0.0)
 	var mi := MeshInstance3D.new()
 	mi.mesh = mesh
 	mi.material_override = m
@@ -592,33 +598,52 @@ func update_grass(cam: Vector3) -> void:
 
 
 # ---------- Personnages ----------
-# Le sniper est fait de pièces rigides (jambes, buste, tête, bras, fusil, lunette).
-# Chaque pose (debout, accroupi, couché) ne fait que déplacer ces mêmes pièces.
-# Chaque sommet garde sa position « debout » (CUSTOM0) : la peinture suit le corps.
-# [nom, forme, taille, {pose: [position, rotation autour de x]}]
+# Le sniper est fait de pièces rigides arrondies. Chaque pose (debout, accroupi, couché)
+# ne fait que déplacer ces mêmes pièces. Chaque sommet garde sa position « debout »
+# (CUSTOM0) : la peinture suit le corps. Les pièces à couleur fixe (fusil) ne se peignent pas.
+# [nom, forme, taille, {pose: [position, rotation (euler)]}, balancement, couleur fixe]
+#   capsule : taille = (rayon, hauteur totale, rayon) ; tube : (rayon, hauteur, rayon) ; sphère : (rayon, …)
 const PARTS := [
-	["jambe_g", "box", Vector3(0.2, 0.85, 0.24), {
-		"debout": [Vector3(-0.13, 0.425, 0), 0.0], "accroupi": [Vector3(-0.15, 0.2, -0.2), -1.45], "couche": [Vector3(-0.13, 0.12, -0.62), PI / 2]}],
-	["jambe_d", "box", Vector3(0.2, 0.85, 0.24), {
-		"debout": [Vector3(0.13, 0.425, 0), 0.0], "accroupi": [Vector3(0.15, 0.2, -0.2), -1.45], "couche": [Vector3(0.13, 0.12, -0.62), PI / 2]}],
-	["buste", "box", Vector3(0.52, 0.62, 0.32), {
-		"debout": [Vector3(0, 1.16, 0), 0.0], "accroupi": [Vector3(0, 0.72, 0.05), 0.3], "couche": [Vector3(0, 0.17, 0.12), PI / 2]}],
-	["tete", "sphere", Vector3(0.21, 0.21, 0.21), {
-		"debout": [Vector3(0, 1.66, 0.02), 0.0], "accroupi": [Vector3(0, 1.2, 0.2), 0.3], "couche": [Vector3(0, 0.3, 0.62), PI / 2]}],
-	["bras_g", "box", Vector3(0.14, 0.5, 0.14), {
-		"debout": [Vector3(-0.3, 1.12, 0.14), -0.9], "accroupi": [Vector3(-0.3, 0.74, 0.3), -1.1], "couche": [Vector3(-0.25, 0.14, 0.62), -PI / 2]}],
-	["bras_d", "box", Vector3(0.14, 0.5, 0.14), {
-		"debout": [Vector3(0.3, 1.12, 0.14), -0.9], "accroupi": [Vector3(0.3, 0.74, 0.3), -1.1], "couche": [Vector3(0.25, 0.14, 0.62), -PI / 2]}],
-	["fusil", "tube", Vector3(0.035, 1.3, 0.035), {
-		"debout": [Vector3(0.12, 1.28, 0.45), PI / 2], "accroupi": [Vector3(0.12, 0.95, 0.6), PI / 2], "couche": [Vector3(0.12, 0.26, 1.05), PI / 2]}],
-	["lunette", "tube", Vector3(0.05, 0.3, 0.05), {
-		"debout": [Vector3(0.12, 1.37, 0.3), PI / 2], "accroupi": [Vector3(0.12, 1.04, 0.45), PI / 2], "couche": [Vector3(0.12, 0.35, 0.9), PI / 2]}],
+	["jambe_g", "capsule", Vector3(0.1, 0.86, 0.1), {
+		"debout": [Vector3(-0.11, 0.47, 0), Vector3.ZERO], "accroupi": [Vector3(-0.12, 0.2, -0.28), Vector3(1.35, 0, 0)], "couche": [Vector3(-0.12, 0.11, -0.68), Vector3(PI / 2, 0, 0)]}, "leg_l", null],
+	["jambe_d", "capsule", Vector3(0.1, 0.86, 0.1), {
+		"debout": [Vector3(0.11, 0.47, 0), Vector3.ZERO], "accroupi": [Vector3(0.13, 0.42, 0.18), Vector3(-0.75, 0, 0)], "couche": [Vector3(0.12, 0.11, -0.68), Vector3(PI / 2, 0, 0)]}, "leg_r", null],
+	["botte_g", "box", Vector3(0.17, 0.13, 0.28), {
+		"debout": [Vector3(-0.11, 0.065, 0.05), Vector3.ZERO], "accroupi": [Vector3(-0.12, 0.08, -0.62), Vector3(1.35, 0, 0)], "couche": [Vector3(-0.12, 0.1, -1.13), Vector3(PI / 2, 0, 0)]}, "leg_l", null],
+	["botte_d", "box", Vector3(0.17, 0.13, 0.28), {
+		"debout": [Vector3(0.11, 0.065, 0.05), Vector3.ZERO], "accroupi": [Vector3(0.13, 0.07, 0.42), Vector3.ZERO], "couche": [Vector3(0.12, 0.1, -1.13), Vector3(PI / 2, 0, 0)]}, "leg_r", null],
+	["buste", "capsule", Vector3(0.21, 0.66, 0.21), {
+		"debout": [Vector3(0, 1.18, 0), Vector3.ZERO], "accroupi": [Vector3(0, 0.82, 0.06), Vector3(0.3, 0, 0)], "couche": [Vector3(0, 0.2, 0.02), Vector3(PI / 2, 0, 0)]}, "", null],
+	["tete", "sphere", Vector3(0.17, 0.17, 0.17), {
+		"debout": [Vector3(0, 1.67, 0.02), Vector3.ZERO], "accroupi": [Vector3(0, 1.3, 0.2), Vector3(0.3, 0, 0)], "couche": [Vector3(0, 0.33, 0.52), Vector3(PI / 2 - 0.5, 0, 0)]}, "", null],
+	["chapeau", "tube", Vector3(0.26, 0.035, 0.26), {
+		"debout": [Vector3(0, 1.79, 0.02), Vector3.ZERO], "accroupi": [Vector3(0, 1.41, 0.25), Vector3(0.3, 0, 0)], "couche": [Vector3(0, 0.42, 0.62), Vector3(PI / 2 - 0.5, 0, 0)]}, "", null],
+	["calotte", "tube", Vector3(0.15, 0.13, 0.15), {
+		"debout": [Vector3(0, 1.86, 0.02), Vector3.ZERO], "accroupi": [Vector3(0, 1.47, 0.27), Vector3(0.3, 0, 0)], "couche": [Vector3(0, 0.47, 0.67), Vector3(PI / 2 - 0.5, 0, 0)]}, "", null],
+	["bras_g", "capsule", Vector3(0.075, 0.62, 0.075), {
+		"debout": [Vector3(-0.3, 1.16, 0), Vector3(0, 0, -0.12)], "accroupi": [Vector3(-0.2, 1.0, 0.3), Vector3(-1.25, 0, 0)], "couche": [Vector3(-0.24, 0.16, 0.6), Vector3(PI / 2, 0, 0)]}, "arm_l", null],
+	["bras_d", "capsule", Vector3(0.075, 0.62, 0.075), {
+		"debout": [Vector3(0.3, 1.16, 0), Vector3(0, 0, 0.12)], "accroupi": [Vector3(0.2, 1.0, 0.3), Vector3(-1.25, 0, 0)], "couche": [Vector3(0.24, 0.16, 0.6), Vector3(PI / 2, 0, 0)]}, "arm_r", null],
+	["sac", "box", Vector3(0.34, 0.4, 0.17), {
+		"debout": [Vector3(0, 1.2, -0.25), Vector3.ZERO], "accroupi": [Vector3(0, 0.86, -0.18), Vector3(0.3, 0, 0)], "couche": [Vector3(0, 0.38, -0.02), Vector3(PI / 2, 0, 0)]}, "", null],
+	["fusil", "tube", Vector3(0.028, 1.15, 0.028), {
+		"debout": [Vector3(0.04, 1.2, -0.37), Vector3(0, 0, 0.8)], "accroupi": [Vector3(0.08, 1.04, 0.62), Vector3(PI / 2, 0, 0)], "couche": [Vector3(0.1, 0.24, 1.05), Vector3(PI / 2, 0, 0)]}, "", Color("#2b2f33")],
+	["lunette", "tube", Vector3(0.045, 0.3, 0.045), {
+		"debout": [Vector3(-0.03, 1.3, -0.43), Vector3(0, 0, 0.8)], "accroupi": [Vector3(0.08, 1.12, 0.5), Vector3(PI / 2, 0, 0)], "couche": [Vector3(0.1, 0.32, 0.92), Vector3(PI / 2, 0, 0)]}, "", Color("#1d2023")],
+	["crosse", "box", Vector3(0.07, 0.36, 0.11), {
+		"debout": [Vector3(0.36, 0.86, -0.37), Vector3(0, 0, 0.8)], "accroupi": [Vector3(0.08, 1.0, 0.08), Vector3(PI / 2, 0, 0)], "couche": [Vector3(0.1, 0.2, 0.5), Vector3(PI / 2, 0, 0)]}, "", Color("#8a5a3a")],
 ]
 const CAMO_SHADER := preload("res://shaders/camo.gdshader")
+const SWING := {"leg_l": 1.0, "leg_r": -1.0, "arm_l": -0.8, "arm_r": 0.8}
+# Pivots (hanche, épaule) dans le repère de la pose « debout ».
+const PIVOTS := {"leg_l": Vector3(-0.11, 0.88, 0), "leg_r": Vector3(0.11, 0.88, 0), "arm_l": Vector3(-0.3, 1.43, 0), "arm_r": Vector3(0.3, 1.43, 0)}
 
 static func part_transform(part: Array, pose: String) -> Transform3D:
 	var t: Array = part[3][pose]
-	return Transform3D(Basis(Vector3.RIGHT, t[1]), t[0])
+	return Transform3D(Basis.from_euler(t[1]), t[0])
+
+static func paintable(part: Array) -> bool:
+	return part[5] == null
 
 func _part_mesh(part: Array) -> ArrayMesh:
 	var prim: PrimitiveMesh
@@ -629,9 +654,16 @@ func _part_mesh(part: Array) -> ArrayMesh:
 			b.size = size
 			prim = b
 		"sphere":
-			prim = _sphere(size.x, 10, 6)
+			prim = _sphere(size.x, 16, 10)
+		"capsule":
+			var c := CapsuleMesh.new()
+			c.radius = size.x
+			c.height = size.y
+			c.radial_segments = 14
+			c.rings = 6
+			prim = c
 		_:
-			prim = _cyl(size.x, size.x, size.y, 8)
+			prim = _cyl(size.x, size.x, size.y, 14)
 	var arrays := prim.get_mesh_arrays()
 	var verts: PackedVector3Array = arrays[Mesh.ARRAY_VERTEX]
 	var stand := part_transform(part, "debout")
@@ -658,11 +690,18 @@ func _make_figure(poses: Array = ["accroupi"]) -> Node3D:
 		pose.name = pose_name
 		g.add_child(pose)
 		for i in PARTS.size():
+			var part: Array = PARTS[i]
 			var mi := MeshInstance3D.new()
 			mi.mesh = meshes[i]
-			mi.material_override = camo
-			mi.transform = part_transform(PARTS[i], pose_name)
+			mi.material_override = camo if paintable(part) else toon(part[5])
+			mi.transform = part_transform(part, pose_name)
 			mi.set_meta("part", i)
+			mi.set_meta("base", mi.transform)
+			if part[4] != "":
+				# Pivot de balancement (hanche, épaule) exprimé dans la pose courante.
+				var pivot_stand: Vector3 = PIVOTS[part[4]]
+				var local := part_transform(part, "debout").affine_inverse() * pivot_stand
+				mi.set_meta("pivot", mi.transform * local)
 			pose.add_child(mi)
 	g.set_meta("camo", camo)
 	set_stance(g, poses[0])
@@ -673,8 +712,25 @@ func set_stance(fig: Node3D, stance: String) -> void:
 		if pose.get_class() == "Node3D":
 			pose.visible = pose.name == stance
 
+func animate_figure(fig: Node3D, stance: String, phase: float, amount: float) -> void:
+	# Marche procédurale : jambes et bras se balancent autour de la hanche et de l'épaule,
+	# le corps rebondit légèrement. amount = 0 (immobile) à 1 (course).
+	var pose := fig.get_node_or_null(stance) as Node3D
+	if pose == null:
+		return
+	var swing: float = {"debout": 0.65, "accroupi": 0.25, "couche": 0.12}[stance] * amount
+	for mi in pose.get_children():
+		var part: Array = PARTS[mi.get_meta("part")]
+		if part[4] == "" or not mi.has_meta("pivot"):
+			continue
+		var base: Transform3D = mi.get_meta("base")
+		var pivot: Vector3 = mi.get_meta("pivot")
+		var a: float = sin(phase) * swing * SWING[part[4]]
+		mi.transform = Transform3D(Basis(Vector3.RIGHT, a), pivot) * Transform3D(Basis.IDENTITY, -pivot) * base
+	pose.position.y = absf(sin(phase)) * 0.05 * amount if stance == "debout" else 0.0
+
 func pick_part(fig: Node3D, from: Vector3, dir: Vector3) -> Dictionary:
-	# Rayon de la souris contre les pièces visibles du sniper (sans moteur physique).
+	# Rayon de la souris contre les pièces visibles (sans moteur physique).
 	# Renvoie le point touché dans le repère « debout », celui de la peinture.
 	var best := {}
 	var best_t := INF
@@ -688,17 +744,24 @@ func pick_part(fig: Node3D, from: Vector3, dir: Vector3) -> Dictionary:
 			var d: Vector3 = (inv.basis * dir).normalized()
 			var size: Vector3 = part[2]
 			var t := INF
-			if part[1] == "sphere":
-				var b := o.dot(d)
-				var c := o.dot(o) - size.x * size.x
-				var disc := b * b - c
-				if disc >= 0:
-					t = -b - sqrt(disc)
-			else:
-				var half := size / 2 if part[1] == "box" else Vector3(size.x, size.y / 2, size.x)
-				t = _ray_box(o, d, half)
+			match part[1]:
+				"sphere":
+					var b := o.dot(d)
+					var c := o.dot(o) - size.x * size.x
+					var disc := b * b - c
+					if disc >= 0:
+						t = -b - sqrt(disc)
+				"capsule":
+					t = _ray_capsule(o, d, size.x, size.y / 2 - size.x)
+				"box":
+					t = _ray_box(o, d, size / 2)
+				_:
+					t = _ray_box(o, d, Vector3(size.x, size.y / 2, size.x))
 			if t > 0 and t < best_t:
 				best_t = t
+				if not paintable(part):
+					best = {}  # le fusil cache ce qui est derrière, mais ne se peint pas
+					continue
 				var local := o + d * t
 				best = {"ref": part_transform(part, "debout") * local, "world": mi.global_transform * local}
 	return best
@@ -718,6 +781,34 @@ static func _ray_box(o: Vector3, d: Vector3, half: Vector3) -> float:
 	if tmin > tmax or tmax < 0:
 		return INF
 	return tmin if tmin > 0 else tmax
+
+static func _ray_capsule(ro: Vector3, rd: Vector3, r: float, hh: float) -> float:
+	# Intersection rayon / capsule d'axe y (segment de -hh à +hh, rayon r).
+	var pa := Vector3(0, -hh, 0)
+	var pb := Vector3(0, hh, 0)
+	var ba := pb - pa
+	var oa := ro - pa
+	var baba := ba.dot(ba)
+	var bard := ba.dot(rd)
+	var baoa := ba.dot(oa)
+	var rdoa := rd.dot(oa)
+	var oaoa := oa.dot(oa)
+	var a := baba - bard * bard
+	var b := baba * rdoa - baoa * bard
+	var c := baba * oaoa - baoa * baoa - r * r * baba
+	var h := b * b - a * c
+	if h >= 0.0 and absf(a) > 1e-9:
+		var t := (-b - sqrt(h)) / a
+		var y := baoa + t * bard
+		if y > 0.0 and y < baba:
+			return t
+		var oc := oa if y <= 0.0 else ro - pb
+		b = rd.dot(oc)
+		c = oc.dot(oc) - r * r
+		h = b * b - c
+		if h > 0.0:
+			return -b - sqrt(h)
+	return INF
 
 func set_camo(fig: Node3D, zone: String) -> void:
 	# Tenue unie (l'ennemi) : la couleur du terrain, sans coups de pinceau.
