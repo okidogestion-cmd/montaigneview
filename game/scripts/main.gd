@@ -122,6 +122,9 @@ func _ready() -> void:
 	# Commandes tactiles : sur téléphone, ou sur PC avec « -- --tactile » (la souris fait le doigt).
 	var on_phone := OS.has_feature("mobile") or OS.has_feature("web_ios") or OS.has_feature("web_android")
 	touch_mode = on_phone or "--tactile" in OS.get_cmdline_user_args()
+	if OS.has_feature("web") and not touch_mode:
+		# Version web : « ?tactile » dans l'adresse pour essayer les commandes tactiles à la souris.
+		touch_mode = str(JavaScriptBridge.eval("window.location.search")).contains("tactile")
 	if touch_mode and not on_phone:
 		Input.emulate_touch_from_mouse = true
 	touch = TouchScript.new()
