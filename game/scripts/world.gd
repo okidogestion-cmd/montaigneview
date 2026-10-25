@@ -43,6 +43,7 @@ var _rock_mesh: Mesh
 var _bush_mesh: Mesh
 var _pine_mesh: Mesh
 var _round_tree_mesh: Mesh
+var _log_mesh: Mesh
 
 
 # ---------- Bruit et relief ----------
@@ -227,6 +228,11 @@ func _build_meshes() -> void:
 		[_cyl(0.0, 0.95, 2.1, 8), _at(Vector3(0, 5.6, 0)), Color("#3f8749")],
 	])
 	# Arbre rond (feuillu, comme dans Wind Waker).
+	# Bois flotté : un tronc couché, avec une branche cassée.
+	_log_mesh = _merge([
+		[_cyl(0.16, 0.2, 2.6, 7), Transform3D(Basis(Vector3.FORWARD, PI / 2), Vector3(0, 0.1, 0)), Color("#b9a58a")],
+		[_cyl(0.05, 0.08, 0.7, 5), Transform3D(Basis(Vector3.FORWARD, 0.6), Vector3(0.5, 0.35, 0)), Color("#a8937a")],
+	])
 	_round_tree_mesh = _merge([
 		[_cyl(0.24, 0.34, 2.6, 6), _at(Vector3(0, 1.3, 0)), bark],
 		[_sphere(1.9, 10, 6), _at(Vector3(0, 3.7, 0)), Color("#62b240")],
@@ -439,27 +445,35 @@ func _scatter() -> void:
 	var rounds := []
 	var rocks := [[], []]
 	var bushes := []
-	for i in 9000:
+	var beach := [[], []]   # galets et bois flotté sur les plages
+	for i in 18000:
 		var x := (rng.randf() * 2 - 1) * 640
 		var z := (rng.randf() * 2 - 1) * 640
 		if _near_spot(x, z, 144):
 			continue
 		var h := height_at(x, z)
-		if h < WATER_Y + 1.5:
+		if h < WATER_Y + 0.3:
 			continue
-		var zn := zone_at(x, z, h)
 		var r := rng.randf()
 		var sc := 0.8 + rng.randf() * 0.6
 		var rot := rng.randf() * TAU
+		if h < WATER_Y + 2.5:
+			# Plage
+			if r < 0.05:
+				beach[0].append([x, h + 0.05, z, 0.3 + rng.randf() * 0.7, rot, 0.6])
+			elif r < 0.07:
+				beach[1].append([x, h + 0.12, z, 0.8 + rng.randf() * 0.6, rot, 1.0])
+			continue
+		var zn := zone_at(x, z, h)
 		if zn == "foret":
 			if r < 0.7:
 				pines.append([x, h - 0.3, z, sc, rot, 1.0])
 			elif r < 0.78:
 				bushes.append([x, h, z, sc, rot, 0.9])
 		elif zn == "herbe":
-			if r < 0.06:
+			if r < 0.07:
 				bushes.append([x, h, z, sc + 0.1, rot, 0.85])
-			elif r < 0.09:
+			elif r < 0.105:
 				rounds.append([x, h - 0.3, z, sc, rot, 1.0])
 		elif zn == "roche":
 			if r < 0.12:
@@ -473,6 +487,8 @@ func _scatter() -> void:
 	_inst(_rock_mesh, toon(Color("#86837c"), false, true), rocks[0], body, "rock")
 	_inst(_rock_mesh, toon(Color("#e3eaf2"), false, true), rocks[1], body, "rock")
 	_inst(_bush_mesh, toon(Color.WHITE, true, true, 0.05, 1.5), bushes, body, "bush")
+	_inst(_rock_mesh, toon(Color("#b8ad98"), false, false), beach[0], body, "pebble")
+	_inst(_log_mesh, toon(Color.WHITE, true, true), beach[1], body, "log")
 
 func _multimesh(mesh: Mesh, m: Material, xforms: Array) -> MultiMeshInstance3D:
 	var mm := MultiMesh.new()
@@ -494,6 +510,8 @@ func _inst(mesh: Mesh, m: Material, list: Array, body: StaticBody3D, kind: Strin
 	for p in list:
 		var basis := Basis(Vector3.UP, p[4]).scaled(Vector3(p[3], p[3] * p[5], p[3]))
 		xforms.append(Transform3D(basis, Vector3(p[0], p[1], p[2])))
+		if kind == "pebble" or kind == "log":
+			continue  # petits détails de plage : pas de collision
 		# Collision : le décor arrête les balles.
 		var cs := CollisionShape3D.new()
 		var s: float = p[3]
@@ -556,9 +574,9 @@ func _grass() -> void:
 	var fields := [
 		# [forme, teinte, canal du masque, densité, touffes par m², vent, garder les normales, taille min, taille max, aplatissement]
 		[_tuft_mesh(), Color.WHITE, 0, 1.0, 3.2, 0.12, false, 0.7, 1.25, 1.0],
-		[_flower_mesh(Color("#fffbf0")), Color.WHITE, 1, 0.5, 0.05, 0.06, false, 0.9, 1.3, 1.0],
-		[_flower_mesh(Color("#ffd84a")), Color.WHITE, 1, 0.5, 0.05, 0.06, false, 0.9, 1.3, 1.0],
-		[_flower_mesh(Color("#ff8fb8")), Color.WHITE, 1, 0.5, 0.04, 0.06, false, 0.9, 1.3, 1.0],
+		[_flower_mesh(Color("#fffbf0")), Color.WHITE, 1, 0.6, 0.12, 0.06, false, 0.9, 1.3, 1.0],
+		[_flower_mesh(Color("#ffd84a")), Color.WHITE, 1, 0.6, 0.1, 0.06, false, 0.9, 1.3, 1.0],
+		[_flower_mesh(Color("#ff8fb8")), Color.WHITE, 1, 0.6, 0.08, 0.06, false, 0.9, 1.3, 1.0],
 		[_rock_mesh, Color("#a8a39a"), 2, 1.0, 0.45, 0.0, true, 0.1, 0.45, 0.6],
 		[_rock_mesh, Color("#f4f8fc"), 3, 1.0, 0.12, 0.0, true, 0.3, 1.0, 0.35],
 	]

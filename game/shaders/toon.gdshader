@@ -12,6 +12,8 @@ uniform float rim_strength = 0.35; // liseré de lumière (0 pour le sol)
 
 varying vec3 world_pos;
 
+#include "res://shaders/clouds.gdshaderinc"
+
 float hash(vec2 p) { return fract(sin(dot(p, vec2(127.1, 311.7))) * 43758.5453); }
 float vnoise(vec2 p) {
 	vec2 i = floor(p), f = fract(p);
@@ -49,5 +51,5 @@ void light() {
 	float lit = smoothstep(band - 0.07, band + 0.07, ndl * 0.5 + 0.5);
 	// Liseré de lumière sur les bords tournés vers le soleil : les volumes se détachent.
 	float rim = pow(1.0 - clamp(dot(NORMAL, VIEW), 0.0, 1.0), 3.0) * lit * rim_strength;
-	DIFFUSE_LIGHT += LIGHT_COLOR * (lit + rim);
+	DIFFUSE_LIGHT += LIGHT_COLOR * (lit + rim) * cloud_shadow(world_pos.xz, TIME);
 }

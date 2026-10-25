@@ -17,6 +17,8 @@ uniform float water_y = 26.0;
 
 varying vec3 world_pos;
 
+#include "res://shaders/clouds.gdshaderinc"
+
 vec2 rand2(vec2 p) {
 	p = vec2(dot(p, vec2(127.1, 311.7)), dot(p, vec2(269.5, 183.3)));
 	return fract(sin(p) * 43758.5453);
@@ -62,5 +64,6 @@ void fragment() {
 	c = mix(c, foam, max(shore, lines));
 	// Brume de l'horizon
 	c = mix(c, horizon, smoothstep(600.0, 2600.0, dist) * 0.85);
+	c *= mix(0.78, 1.0, (cloud_shadow(world_pos.xz, TIME) - 0.55) / 0.45);
 	ALBEDO = c;
 }

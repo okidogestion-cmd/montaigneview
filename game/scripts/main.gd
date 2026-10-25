@@ -6,6 +6,7 @@ const WorldScript := preload("res://scripts/world.gd")
 const HudScript := preload("res://scripts/hud.gd")
 const HiderScript := preload("res://scripts/hider.gd")
 const PaintScript := preload("res://scripts/paint.gd")
+const LifeScript := preload("res://scripts/life.gd")
 
 const LEVELS := {
 	"facile":    {"first": 22.0, "interval": [9.0, 13.0], "rate_good": 0.006, "rate_bad": 0.02,  "acc": 0.6,  "camo": 0.35, "glint": 0.02,  "shot_reveal": 0.18},
@@ -26,6 +27,7 @@ var world
 var hud
 var hider
 var paint
+var life
 var camera: Camera3D
 var inset_cam: Camera3D
 var env: Environment
@@ -79,10 +81,29 @@ var camo_score := 0.0       # ressemblance de ta peinture avec le terrain où tu
 
 func _ready() -> void:
 	randomize()
+	# Écran de chargement pendant la construction de l'archipel (quelques secondes).
+	var loading := CanvasLayer.new()
+	var bg := ColorRect.new()
+	bg.color = Color("#0e1418")
+	bg.set_anchors_preset(Control.PRESET_FULL_RECT)
+	loading.add_child(bg)
+	var msg := Label.new()
+	msg.text = "Chargement de l'archipel…"
+	msg.add_theme_font_size_override("font_size", 32)
+	msg.add_theme_color_override("font_color", Color("#ecf0e8"))
+	msg.set_anchors_preset(Control.PRESET_CENTER)
+	msg.grow_horizontal = Control.GROW_DIRECTION_BOTH
+	msg.grow_vertical = Control.GROW_DIRECTION_BOTH
+	bg.add_child(msg)
+	add_child(loading)
+	await RenderingServer.frame_post_draw
 	_build_environment()
 	world = WorldScript.new()
 	add_child(world)
 	world.build()
+	life = LifeScript.new()
+	add_child(life)
+	life.setup(world)
 	hider = HiderScript.new(world)
 	camera = Camera3D.new()
 	camera.near = 0.1
@@ -114,6 +135,7 @@ func _ready() -> void:
 	bang_near = _make_bang(5000.0)
 	bang_far = _make_bang(900.0)
 	to_menu()
+	loading.queue_free()
 
 func _on_level(lv: String) -> void:
 	level = lv
@@ -608,6 +630,8 @@ func _look(rel: Vector2) -> void:
 	pitch = clampf(pitch - rel.y * k, -0.9, 0.7)
 
 func _unhandled_input(e: InputEvent) -> void:
+	if hud == null:
+		return
 	if phase == "paint":
 		_paint_input(e)
 		return
@@ -658,6 +682,8 @@ func _unhandled_input(e: InputEvent) -> void:
 
 # ---------- Boucle ----------
 func _process(dt: float) -> void:
+	if hud == null:
+		return
 	dt = minf(dt, 0.05)
 	var sx := 0.0
 	var sy := 0.0
@@ -728,6 +754,7 @@ func _process(dt: float) -> void:
 		recoil *= exp(-dt * 7)
 		camera.rotation = Vector3(pitch + sy + recoil, yaw + sx, 0)
 	world.update_grass(camera.global_position)
+	life.update(dt, camera.global_position)
 
 	for i in range(fx.size() - 1, -1, -1):
 		var f: Dictionary = fx[i]
@@ -741,6 +768,8 @@ func _process(dt: float) -> void:
 			fx.remove_at(i)
 
 func _physics_process(dt: float) -> void:
+	if hud == null:
+		return
 	if phase != "hide":
 		return
 	var input := Vector2.ZERO
@@ -756,7 +785,7 @@ func _process_hide(dt: float) -> void:
 	if hide_left <= 0:
 		start_paint()
 		return
-	hider.update_visual()
+	hider.update_visual(dt)
 	# Clic droit maintenu : on regarde par la lunette depuis sa cachette.
 	var preview := Input.is_mouse_button_pressed(MOUSE_BUTTON_RIGHT)
 	world.player.visible = not preview

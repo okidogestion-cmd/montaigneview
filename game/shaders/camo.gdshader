@@ -14,9 +14,13 @@ uniform vec4 cursor = vec4(0.0, 0.0, 0.0, -1.0);  // cercle du pinceau (atelier)
 uniform float band = 0.5;
 
 varying vec3 ref_pos;
+varying vec3 world_pos;
+
+#include "res://shaders/clouds.gdshaderinc"
 
 void vertex() {
 	ref_pos = CUSTOM0.xyz;
+	world_pos = (MODEL_MATRIX * vec4(VERTEX, 1.0)).xyz;
 }
 
 void fragment() {
@@ -40,5 +44,5 @@ void light() {
 	float ndl = dot(NORMAL, LIGHT) * ATTENUATION;
 	float lit = smoothstep(band - 0.07, band + 0.07, ndl * 0.5 + 0.5);
 	float rim = pow(1.0 - clamp(dot(NORMAL, VIEW), 0.0, 1.0), 3.0) * lit * 0.35;
-	DIFFUSE_LIGHT += LIGHT_COLOR * (lit + rim);
+	DIFFUSE_LIGHT += LIGHT_COLOR * (lit + rim) * cloud_shadow(world_pos.xz, TIME);
 }

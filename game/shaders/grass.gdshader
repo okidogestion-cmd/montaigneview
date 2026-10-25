@@ -19,6 +19,9 @@ uniform vec4 tint : source_color = vec4(1.0);
 uniform float band = 0.5;
 
 varying float shade;
+varying vec3 world_pos;
+
+#include "res://shaders/clouds.gdshaderinc"
 
 // Même découpage en triangles que le maillage du terrain : la touffe pose exactement sur le sol.
 float ground(vec2 xz) {
@@ -54,6 +57,7 @@ void vertex() {
 		NORMAL = vec3(0.0, 1.0, 0.0);
 	}
 	shade = 0.9 + rnd * 0.2;
+	world_pos = VERTEX;
 }
 
 void fragment() {
@@ -64,5 +68,5 @@ void fragment() {
 
 void light() {
 	float ndl = dot(NORMAL, LIGHT) * ATTENUATION;
-	DIFFUSE_LIGHT += LIGHT_COLOR * smoothstep(band - 0.04, band + 0.04, ndl * 0.5 + 0.5);
+	DIFFUSE_LIGHT += LIGHT_COLOR * smoothstep(band - 0.04, band + 0.04, ndl * 0.5 + 0.5) * cloud_shadow(world_pos.xz, TIME);
 }

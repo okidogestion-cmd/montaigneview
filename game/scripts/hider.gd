@@ -29,6 +29,8 @@ var _cam_pos := Vector3.ZERO
 var _cam_dist := 4.2
 var _cam_h := 1.65
 var _first_frame := true
+var _prev_pos := Vector3.ZERO   # position à l'image physique précédente (pour lisser l'affichage)
+var _vis := Vector3.ZERO        # position affichée, lissée
 
 
 func _init(w) -> void:
@@ -52,6 +54,8 @@ func reset(x: float, z: float) -> void:
 	body.velocity = Vector3.ZERO
 	pos = body.global_position
 	facing = PI
+	_prev_pos = pos
+	_vis = pos
 	cam_yaw = 0.0
 	cam_pitch = -0.25
 	_first_frame = true
@@ -84,6 +88,7 @@ func forward() -> Vector3:
 
 # ---------- Physique (appelée à chaque image physique) ----------
 func physics_step(dt: float, input: Vector2, running: bool) -> void:
+	_prev_pos = pos
 	if input.length() > 1.0:
 		input = input.normalized()
 	var fwd := Vector3(-sin(cam_yaw), 0, -cos(cam_yaw))
@@ -123,7 +128,13 @@ func speed_ratio() -> float:
 
 
 # ---------- Affichage (à chaque image) ----------
+func display_pos() -> Vector3:
+	# Entre deux images physiques (60 par seconde), on dessine le personnage là où il
+	# devrait être à cet instant : plus d'à-coups, quelle que soit la fréquence de l'écran.
+	return _prev_pos.lerp(pos, Engine.get_physics_interpolation_fraction())
+
 func _apply() -> void:
+	var p := _vis if not _first_frame else pos
 	var basis := Basis(Vector3.UP, facing)
 	if stance == "couche":
 		# Couché, le corps suit la pente.
@@ -131,9 +142,12 @@ func _apply() -> void:
 		var hf: float = world.height_at(pos.x + f.x * 0.9, pos.z + f.z * 0.9)
 		var hb: float = world.height_at(pos.x - f.x * 0.9, pos.z - f.z * 0.9)
 		basis = basis * Basis(Vector3.RIGHT, -atan2(hf - hb, 1.8))
-	world.player.transform = Transform3D(basis, pos)
+	world.player.transform = Transform3D(basis, p)
 
-func update_visual() -> void:
+func update_visual(dt: float) -> void:
+	var d := display_pos()
+	# Petites bosses du sol adoucies en hauteur seulement.
+	_vis = Vector3(d.x, lerpf(_vis.y, d.y, 1.0 - exp(-dt * 22.0)) if not _first_frame else d.y, d.z)
 	_apply()
 	world.animate_figure(world.player, stance, walk_phase, speed_ratio())
 
@@ -151,7 +165,7 @@ func body_points() -> Array[Vector3]:
 func place_camera(cam: Camera3D, dt: float) -> void:
 	# Caméra lissée au-dessus de l'épaule ; elle se rapproche si un décor passe derrière.
 	_cam_h = lerpf(_cam_h, info().cam_h, 1.0 - exp(-dt * 8.0))
-	var target := pos + Vector3(0, _cam_h, 0)
+	var target := _vis + Vector3(0, _cam_h, 0)
 	var rot := Basis.from_euler(Vector3(cam_pitch, cam_yaw, 0))
 	var back := rot.z
 	var shoulder := rot.x * 0.45
@@ -160,7 +174,7 @@ func place_camera(cam: Camera3D, dt: float) -> void:
 	var hit: Dictionary = world.get_world_3d().direct_space_state.intersect_ray(q)
 	if not hit.is_empty():
 		want = maxf(0.6, target.distance_to(hit.position) - 0.35)
-	_cam_dist = want if want < _cam_dist else lerpf(_cam_dist, want, 1.0 - exp(-dt * 4.0))
+	_cam_dist = lerpf(_cam_dist, want, 1.0 - exp(-dt * (25.0 if want < _cam_dist else 4.0)))
 	var desired := target + (shoulder + back * _cam_dist)
 	var ground: float = world.height_at(desired.x, desired.z) + 0.4
 	desired.y = maxf(desired.y, ground)

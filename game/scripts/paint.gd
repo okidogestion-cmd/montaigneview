@@ -21,6 +21,7 @@ var samples: Array[Vector3] = []       # points répartis sur le corps
 var sample_colors: Array[Color] = []
 var _last := Vector3.INF
 var _rng := RandomNumberGenerator.new()
+var _match_cache := {}                 # score par terrain, recalculé seulement quand la peinture change
 
 
 func _init(mat: ShaderMaterial, parts: Array, part_transform: Callable) -> void:
@@ -111,6 +112,7 @@ func _add(p: Vector3, r: float, color: Color) -> void:
 	if is_full():
 		return
 	strokes.append([Vector4(p.x, p.y, p.z, r), color])
+	_match_cache.clear()
 	for i in samples.size():
 		if samples[i].distance_to(p) < r:
 			sample_colors[i] = color
@@ -146,6 +148,7 @@ func undo() -> void:
 	refresh()
 
 func refresh() -> void:
+	_match_cache.clear()
 	sample_colors.resize(samples.size())
 	for i in samples.size():
 		sample_colors[i] = color_at(samples[i])
@@ -182,6 +185,8 @@ const PATTERN_BONUS := 0.12   # motif d'au moins deux teintes du terrain : la si
 
 func match_zone(zone: String) -> float:
 	# 1 = le sniper se fond complètement dans ce terrain, 0 = rien à voir.
+	if _match_cache.has(zone):
+		return _match_cache[zone]
 	var pal: Array = ZONE_PALETTES[zone]
 	var total := 0.0
 	var used := []
@@ -203,7 +208,9 @@ func match_zone(zone: String) -> float:
 	var score := total / n
 	if used.filter(func(u): return u > n * 0.15).size() >= 2:
 		score += PATTERN_BONUS
-	return clampf(score, 0.0, 1.0)
+	score = clampf(score, 0.0, 1.0)
+	_match_cache[zone] = score
+	return score
 
 func has_pattern(zone: String) -> bool:
 	var before := match_zone(zone)
