@@ -1,0 +1,33 @@
+# Godot 4
+.godot/
+.import/
+export.cfg
+export_credentials.cfg
+*.translation
+
+# Mono / C#
+.mono/
+data_*/
+mono_crash.*.json
+
+# Builds exportés
+build/
+builds/
+exports/
+*.exe
+*.pck
+*.zip
+
+# Steamworks (identifiants et sorties locales)
+steam_appid.txt
+steamcmd/
+steam/sdk/
+steam/output/
+
+# Système / éditeurs
+.DS_Store
+Thumbs.db
+desktop.ini
+.vscode/
+.idea/
+*.tmp
