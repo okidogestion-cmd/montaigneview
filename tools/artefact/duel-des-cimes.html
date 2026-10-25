@@ -1,0 +1,96 @@
+<title>Duel des Cimes</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Big+Shoulders+Stencil+Display:wght@900&family=Barlow+Semi+Condensed:wght@500;600&display=swap" rel="stylesheet">
+<style>
+/* Écran de jeu plein cadre : la scène Godot occupe tout, un écran de chargement sombre par-dessus au démarrage. Un seul univers, sombre. */
+:root {
+  --ink: #0e1418; --panel: #172128; --line: #2c3a43; --paper: #ecf0e8; --muted: #a3ada7; --blaze: #ff7a2f;
+  --display: 'Big Shoulders Stencil Display', Impact, 'Arial Narrow', sans-serif;
+  --ui: 'Barlow Semi Condensed', 'Arial Narrow', system-ui, sans-serif;
+  color-scheme: dark;
+}
+html, body { height: 100%; margin: 0; overflow: hidden; background: var(--ink); color: var(--paper); font-family: var(--ui);
+  touch-action: none; user-select: none; -webkit-user-select: none; -webkit-touch-callout: none; }
+#canvas { position: fixed; inset: 0; width: 100%; height: 100%; display: block; outline: none; background: var(--ink); }
+#loader { position: fixed; inset: 0; display: grid; place-items: center; background: var(--ink);
+  padding-left: max(16px, env(safe-area-inset-left, 0px)); padding-right: max(16px, env(safe-area-inset-right, 0px)); padding-block: 24px; }
+.card { width: min(420px, 100%); display: grid; gap: 14px; }
+h1 { margin: 0; font-family: var(--display); font-weight: 900; font-size: clamp(44px, 9vw, 64px); line-height: .9; text-wrap: balance; letter-spacing: .01em; }
+h1 span { color: var(--blaze); }
+.pitch { margin: 0; color: var(--muted); font-size: 17px; line-height: 1.35; }
+.bar { height: 8px; border-radius: 4px; background: var(--panel); border: 1px solid var(--line); overflow: hidden; }
+.bar b { display: block; height: 100%; width: 0; background: var(--blaze); transition: width .2s; }
+.status { margin: 0; font-size: 14px; color: var(--muted); font-variant-numeric: tabular-nums; letter-spacing: .04em; text-transform: uppercase; }
+.hint { margin: 0; font-size: 14px; color: var(--muted); line-height: 1.4; }
+.error { color: #ef8f7f; text-transform: none; letter-spacing: 0; }
+@media (prefers-reduced-motion: reduce) { .bar b { transition: none; } }
+</style>
+
+<canvas id="canvas" tabindex="0">Ton navigateur ne peut pas afficher le jeu.</canvas>
+
+<div id="loader">
+  <div class="card">
+    <h1>Duel des <span>Cimes</span></h1>
+    <p class="pitch">Deux îles, deux snipers. Cache-toi, peins-toi aux couleurs du terrain, et trouve l'autre avant qu'il te trouve.</p>
+    <div class="bar"><b id="progress"></b></div>
+    <p class="status" id="status">Chargement du moteur…</p>
+    <p class="hint">Sur téléphone, tourne l'écran en paysage. Sur ordinateur : ZQSD, souris, Maj pour courir.</p>
+  </div>
+</div>
+
+<script>
+// Le moteur Godot (40 Mo) est publié compressé (index.wasm.gz, 10 Mo) :
+// on le décompresse ici, dans le navigateur, au moment où Godot le demande.
+(function () {
+  const nativeFetch = window.fetch.bind(window);
+  window.fetch = function (input, init) {
+    const url = typeof input === 'string' ? input : input.url;
+    if (/index\.pck(\?|$)/.test(url)) {
+      // Les données du jeu sont publiées sous un nom en .wasm (seuls certains types de fichiers sont servis).
+      return nativeFetch('donnees-pck.wasm', init).then((res) => new Response(res.body, { status: res.status, headers: { 'Content-Type': 'application/octet-stream' } }));
+    }
+    if (/index\.wasm(\?|$)/.test(url)) {
+      return nativeFetch('moteur-gz.wasm', init).then((res) => {
+        if (!res.ok) throw new Error('Moteur introuvable (' + res.status + ')');
+        const body = res.body.pipeThrough(new DecompressionStream('gzip'));
+        return new Response(body, { status: 200, headers: { 'Content-Type': 'application/wasm' } });
+      });
+    }
+    return nativeFetch(input, init);
+  };
+})();
+</script>
+<script src="index.js"></script>
+<script>
+const GODOT_CONFIG = {"args":[],"canvasResizePolicy":2,"executable":"index","experimentalVK":false,"fileSizes":{"index.pck":648500,"index.wasm":39514754},"focusCanvas":true,"gdextensionLibs":[]};
+(function () {
+  const loader = document.getElementById('loader');
+  const bar = document.getElementById('progress');
+  const status = document.getElementById('status');
+  function fail(err) {
+    console.error(err);
+    status.classList.add('error');
+    status.textContent = 'Le jeu n\'a pas pu démarrer : ' + (err && err.message ? err.message : err);
+  }
+  if (typeof DecompressionStream === 'undefined') {
+    fail(new Error('ce navigateur est trop ancien (mets à jour Safari ou Chrome).'));
+    return;
+  }
+  const missing = Engine.getMissingFeatures({ threads: false });
+  if (missing.length) {
+    fail(new Error('il manque ' + missing.join(', ')));
+    return;
+  }
+  const engine = new Engine(GODOT_CONFIG);
+  engine.startGame({
+    onProgress(current, total) {
+      if (current > 0 && total > 0) {
+        bar.style.width = Math.round(current / total * 100) + '%';
+        status.textContent = 'Chargement… ' + Math.round(current / total * 100) + ' %';
+      }
+    },
+  }).then(() => { loader.hidden = true; }, fail);
+})();
+</script>

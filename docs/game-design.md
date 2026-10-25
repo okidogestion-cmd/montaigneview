@@ -194,3 +194,13 @@ Le jeu devient une **appli mobile** (même jeu : cachette, peinture, duel), plus
 - Construire : `godot --headless --path game --export-release "Web" ../build/web/index.html`
 - Essayer sur le téléphone (même Wi-Fi) : `node tools/serveur_web.js`, puis ouvrir l'adresse affichée dans Safari.
 - Le mode tactile s'active seul sur iPhone / Android ; message « Tourne ton téléphone » en portrait.
+
+### Le jeu dans l'artefact Claude « Duel des Cimes » (26/10/2026)
+- Lien : https://claude.ai/artifact/8ZHppVb8s62V5codCvUcuv (privé par défaut ; partage via le menu Partager).
+- Page : `tools/artefact/duel-des-cimes.html`. Fichiers publiés à côté : `index.js`, les deux worklets audio,
+  `donnees-pck.wasm` (= `index.pck`) et `moteur-gz.wasm` (= `index.wasm` compressé en gzip, ~10 Mo :
+  un artefact accepte 15 Mo par fichier et ne sert ni `.pck` ni `.gz`). La page redirige les requêtes de Godot
+  vers ces fichiers et décompresse le moteur dans le navigateur.
+- Pour mettre à jour : exporter la version web, compresser `index.wasm` en gzip, puis republier la page
+  avec ces fichiers sur le même lien (mettre à jour la taille de `index.pck` dans GODOT_CONFIG).
+- Vérifié par l'utilisateur le 26/10/2026 : le jeu démarre dans l'artefact.
