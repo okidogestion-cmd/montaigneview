@@ -87,6 +87,11 @@ var paint_poses := {}
 var match_bars := {}
 var match_labels := {}
 var paint_info: Label
+var paint_panels: Array[Control] = []
+var menu_hint: Label
+var ready_btn: Button
+var fire_keys: Label
+var paint_hint: Label
 
 var _toast_tween: Tween
 
@@ -277,7 +282,8 @@ func _build_menu() -> void:
 	var play := _button("JOUER", BLAZE, Color("#1a0d04"), 28)
 	play.pressed.connect(func(): play_pressed.emit())
 	v.add_child(play)
-	var hint := _label("Souris pour viser, clic gauche ou Espace pour tirer, clic droit ou Maj pour retenir ta respiration, molette ou Z pour zoomer, Échap pour libérer la souris.", 14, MUTED)
+	menu_hint = _label("Souris pour viser, clic gauche ou Espace pour tirer, clic droit ou Maj pour retenir ta respiration, molette ou Z pour zoomer, Échap pour libérer la souris.", 14, MUTED)
+	var hint := menu_hint
 	hint.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 	v.add_child(hint)
 	root.add_child(menu)
@@ -372,7 +378,7 @@ func _build_hide() -> void:
 	sv.add_child(sw)
 	r2.add_child(sv)
 	r2.add_child(_spacer())
-	var ready_btn := _button("PRÊT", BLAZE, Color("#1a0d04"), 24)
+	ready_btn = _button("PRÊT", BLAZE, Color("#1a0d04"), 24)
 	ready_btn.text = "PRÊT (Entrée)"
 	ready_btn.size_flags_vertical = Control.SIZE_SHRINK_END
 	ready_btn.pressed.connect(func(): ready_pressed.emit())
@@ -456,7 +462,8 @@ func _build_fire() -> void:
 	zv.add_child(zoom_label)
 	bh.add_child(zv)
 	bh.add_child(_spacer())
-	var keys := _label("Clic gauche ou Espace : tirer\nÉchap : libérer la souris", 14, MUTED)
+	fire_keys = _label("Clic gauche ou Espace : tirer\nÉchap : libérer la souris", 14, MUTED)
+	var keys := fire_keys
 	keys.horizontal_alignment = HORIZONTAL_ALIGNMENT_RIGHT
 	bh.add_child(keys)
 	bottom.add_child(bh)
@@ -626,6 +633,7 @@ func _build_paint() -> void:
 	lv.add_child(ps)
 	left.add_child(lv)
 	paint_hud.add_child(left)
+	paint_panels.append(left)
 
 	# Panneau de droite : ressemblance avec chaque terrain.
 	var right := _panel()
@@ -661,10 +669,12 @@ func _build_paint() -> void:
 	rv.add_child(paint_info)
 	right.add_child(rv)
 	paint_hud.add_child(right)
+	paint_panels.append(right)
 
 	var bottom := _bar(false)
 	var bh := _hbox()
-	var hint := _label("Clic gauche : peindre   Clic droit (glisser) : tourner autour   Molette : zoom", 14, MUTED)
+	paint_hint = _label("Clic gauche : peindre   Clic droit (glisser) : tourner autour   Molette : zoom", 14, MUTED)
+	var hint := paint_hint
 	hint.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	bh.add_child(hint)
 	var done := _button("TERMINÉ", BLAZE, Color("#1a0d04"), 24)
@@ -703,3 +713,29 @@ func set_matches(scores: Dictionary) -> void:
 		if best == "" or v > scores[best]:
 			best = k
 	paint_info.text = "Le mieux : te cacher sur la %s. Mélanger deux ou trois teintes d'un même terrain donne un bonus (la silhouette se casse)." % ZONES[best]["label"].to_lower()
+
+
+# ---------- Mode tactile ----------
+func set_touch_mode(on: bool) -> void:
+	# Au doigt : les aides parlent de doigts, et les boutons ronds de touch_controls.gd
+	# remplacent le bouton « Prêt » et les touches du clavier.
+	if not on:
+		return
+	menu_hint.text = "Glisse le doigt pour regarder et viser. Les gros boutons ronds servent à s'accroupir, se coucher, tirer, zoomer et retenir son souffle."
+	keys_hint.text = "Pouce gauche : marcher (à fond : courir)   ·   Glisser à droite : regarder   ·   Viser (maintenu) : vue de tir"
+	ready_btn.visible = false
+	fire_keys.visible = false
+	# La petite lunette ennemie passe en haut à gauche : la droite est aux gros boutons.
+	inset.set_anchors_preset(Control.PRESET_TOP_LEFT)
+	inset.position = Vector2(14, 92)
+	inset_label.set_anchors_preset(Control.PRESET_TOP_LEFT)
+	inset_label.position = Vector2(58, 298)
+	for l in fire_hud.find_children("*", "Label", true, false):
+		(l as Label).text = (l as Label).text.replace(" (MAJ / CLIC DROIT)", "").replace(" (MOLETTE / Z)", "")
+	paint_hint.text = "Un doigt sur le sniper : peindre   ·   Un doigt à côté : tourner autour   ·   Deux doigts : zoomer"
+
+func over_paint_panel(pos: Vector2) -> bool:
+	for p in paint_panels:
+		if p.is_visible_in_tree() and p.get_global_rect().has_point(pos):
+			return true
+	return false

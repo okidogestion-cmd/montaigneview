@@ -178,3 +178,11 @@ Le jeu devient une **appli mobile** (même jeu : cachette, peinture, duel), plus
   À regénérer (supprimer ces fichiers puis lancer le jeu depuis Godot) si le relief change.
 - Étapes suivantes : commandes tactiles (joystick, glisser pour viser, boutons), export Android,
   puis iOS (nécessite un Mac pour compiler et publier).
+
+### Commandes tactiles (faites le 25/10/2026)
+- **Cachette :** joystick sous le pouce gauche (poussé à fond : course), glisser à droite pour regarder,
+  boutons ronds Accroupi, Couché, Viser (maintenu : vue de tir), PRÊT.
+- **Peinture :** un doigt sur le sniper peint, un doigt à côté tourne autour, deux doigts zooment.
+- **Duel :** glisser pour viser, boutons TIRER, Zoom, Souffle (maintenu).
+- Appli en paysage (capteur). Sur PC, le mode tactile s'active avec l'argument `-- --tactile`
+  (la souris fait office de doigt). Code : `game/scripts/touch_controls.gd`.

@@ -7,6 +7,7 @@ const HudScript := preload("res://scripts/hud.gd")
 const HiderScript := preload("res://scripts/hider.gd")
 const PaintScript := preload("res://scripts/paint.gd")
 const LifeScript := preload("res://scripts/life.gd")
+const TouchScript := preload("res://scripts/touch_controls.gd")
 
 const LEVELS := {
 	"facile":    {"first": 22.0, "interval": [9.0, 13.0], "rate_good": 0.006, "rate_bad": 0.02,  "acc": 0.6,  "camo": 0.35, "glint": 0.02,  "shot_reveal": 0.18},
@@ -28,6 +29,8 @@ var hud
 var hider
 var paint
 var life
+var touch
+var touch_mode := false   # téléphone / tablette (ou PC lancé avec -- --tactile)
 var camera: Camera3D
 var inset_cam: Camera3D
 var env: Environment
@@ -75,6 +78,9 @@ var ws_pitch := 0.15
 var ws_dist := 3.2
 var painting := false
 var orbiting := false
+var _fingers := {}          # doigts posés pendant la peinture (index → position)
+var _paint_finger := -1
+var _pinch := -1.0
 var matches_dirty := true
 var camo_score := 0.0       # ressemblance de ta peinture avec le terrain où tu te caches
 
@@ -113,6 +119,15 @@ func _ready() -> void:
 	camera.make_current()
 	hud = HudScript.new()
 	add_child(hud)
+	# Commandes tactiles : sur téléphone, ou sur PC avec « -- --tactile » (la souris fait le doigt).
+	touch_mode = OS.has_feature("mobile") or "--tactile" in OS.get_cmdline_user_args()
+	if touch_mode and not OS.has_feature("mobile"):
+		Input.emulate_touch_from_mouse = true
+	touch = TouchScript.new()
+	hud.root.add_child(touch)
+	touch.tapped.connect(_on_touch_tap)
+	touch.set_mode("")
+	hud.set_touch_mode(touch_mode)
 	inset_cam = Camera3D.new()
 	inset_cam.near = 0.3
 	inset_cam.far = 3000
@@ -136,6 +151,27 @@ func _ready() -> void:
 	bang_far = _make_bang(900.0)
 	to_menu()
 	loading.queue_free()
+
+func capture_mouse() -> void:
+	# Sur PC on capture la souris pour viser ; au doigt, jamais.
+	if not touch_mode:
+		Input.mouse_mode = Input.MOUSE_MODE_CAPTURED
+
+func _on_touch_tap(name: String) -> void:
+	match name:
+		"pret":
+			if phase == "hide":
+				start_paint()
+		"accroupi":
+			hider.toggle("accroupi")
+			update_zone_info()
+		"couche":
+			hider.toggle("couche")
+			update_zone_info()
+		"tirer":
+			shoot()
+		"zoom":
+			cycle_zoom()
 
 func _on_level(lv: String) -> void:
 	level = lv
@@ -238,6 +274,7 @@ func bang(stream: AudioStreamWAV, vol: float, delay := 0.0) -> void:
 # ---------- Menu ----------
 func to_menu() -> void:
 	gid += 1
+	touch.set_mode("")
 	phase = "menu"
 	Input.mouse_mode = Input.MOUSE_MODE_VISIBLE
 	hud.menu.visible = true
@@ -262,6 +299,7 @@ func to_menu() -> void:
 # ---------- Atelier de peinture ----------
 func start_paint() -> void:
 	gid += 1
+	touch.set_mode("")
 	phase = "paint"
 	Input.mouse_mode = Input.MOUSE_MODE_VISIBLE
 	hud.menu.visible = false
@@ -314,7 +352,57 @@ func _paint_at(screen: Vector2, stroke: bool) -> void:
 		paint.dab(hit.ref, brush_color, brush_size, brush_tool)
 		matches_dirty = true
 
+func _paint_touch(e: InputEvent) -> void:
+	# Au doigt : un doigt sur le sniper peint, un doigt à côté tourne autour, deux doigts zooment.
+	if e is InputEventScreenTouch:
+		if e.pressed:
+			if hud.over_paint_panel(e.position):
+				return  # doigt sur les couleurs ou les outils
+			_fingers[e.index] = e.position
+			if _fingers.size() == 1:
+				var hit: Dictionary = world.pick_part(world.player, camera.project_ray_origin(e.position), camera.project_ray_normal(e.position))
+				if not hit.is_empty() and brush_tool == "remplir":
+					paint.fill(brush_color)
+					matches_dirty = true
+				elif not hit.is_empty():
+					_paint_finger = e.index
+					painting = true
+					paint.begin()
+					_paint_at(e.position, true)
+			else:
+				# Deuxième doigt : on arrête de peindre, on passe au zoom.
+				_paint_finger = -1
+				painting = false
+		else:
+			_fingers.erase(e.index)
+			if e.index == _paint_finger:
+				_paint_finger = -1
+				painting = false
+				paint.hide_cursor()
+		_pinch = -1.0
+	elif e is InputEventScreenDrag:
+		if not _fingers.has(e.index):
+			return
+		var before: Vector2 = _fingers[e.index]
+		_fingers[e.index] = e.position
+		if e.index == _paint_finger:
+			_paint_at(e.position, true)
+		elif _fingers.size() >= 2:
+			var pts: Array = _fingers.values()
+			var d: float = (pts[0] as Vector2).distance_to(pts[1])
+			if _pinch > 0.0:
+				ws_dist = clampf(ws_dist * _pinch / maxf(d, 1.0), 1.4, 6.0)
+			_pinch = d
+		else:
+			var rel: Vector2 = e.position - before
+			ws_yaw -= rel.x * 0.008
+			ws_pitch = clampf(ws_pitch + rel.y * 0.006, -0.3, 1.2)
+
 func _paint_input(e: InputEvent) -> void:
+	if touch_mode:
+		if e is InputEventScreenTouch or e is InputEventScreenDrag:
+			_paint_touch(e)
+		return
 	if e is InputEventMouseButton:
 		if e.button_index == MOUSE_BUTTON_LEFT:
 			painting = e.pressed
@@ -359,8 +447,9 @@ func update_zone_info() -> void:
 
 func start_hide() -> void:
 	gid += 1
+	touch.set_mode("hide" if touch_mode else "")
 	phase = "hide"
-	Input.mouse_mode = Input.MOUSE_MODE_CAPTURED
+	capture_mouse()
 	hud.menu.visible = false
 	hud.end_panel.visible = false
 	hud.fire_hud.visible = false
@@ -422,6 +511,7 @@ func choose_enemy_spot(eye: Vector3):
 
 func start_fire() -> void:
 	gid += 1
+	touch.set_mode("fire" if touch_mode else "")
 	phase = "reveal"
 	reveal_t = 0.0
 	hud.hide_hud.visible = false
@@ -465,7 +555,7 @@ func start_fire() -> void:
 	hud.breath_bar.value = breath
 	hud.set_eye(0)
 	hud.center_label.text = "Le brouillard se lève…"
-	Input.mouse_mode = Input.MOUSE_MODE_CAPTURED
+	capture_mouse()
 
 func detect_rate() -> float:
 	# Vitesse à laquelle l'ennemi te repère : tenue, posture, ce qu'il voit de toi.
@@ -574,6 +664,7 @@ func show_enemy() -> void:
 
 func finish(won: bool) -> void:
 	gid += 1
+	touch.set_mode("")
 	phase = "end"
 	breath_held = false
 	Input.mouse_mode = Input.MOUSE_MODE_VISIBLE
@@ -631,6 +722,8 @@ func _unhandled_input(e: InputEvent) -> void:
 	if phase == "paint":
 		_paint_input(e)
 		return
+	if touch_mode and (e is InputEventMouseButton or e is InputEventMouseMotion):
+		return  # au doigt, tout passe par touch_controls.gd
 	var captured := Input.mouse_mode == Input.MOUSE_MODE_CAPTURED
 	var playing := phase in ["hide", "reveal", "fire"]
 	if e is InputEventMouseMotion:
@@ -641,7 +734,7 @@ func _unhandled_input(e: InputEvent) -> void:
 	elif e is InputEventMouseButton:
 		if playing and not captured:
 			if e.pressed:
-				Input.mouse_mode = Input.MOUSE_MODE_CAPTURED
+				capture_mouse()
 			return
 		if e.button_index in [MOUSE_BUTTON_WHEEL_UP, MOUSE_BUTTON_WHEEL_DOWN]:
 			if e.pressed:
@@ -703,6 +796,8 @@ func _process(dt: float) -> void:
 		var L := D()
 		fight_time += dt
 		cool = maxf(0, cool - dt)
+		if touch_mode:
+			breath_held = touch.held("souffle")
 		var holding := breath_held and breath > 0 and gasp <= 0
 		if holding:
 			breath = maxf(0, breath - dt * 28)
@@ -747,6 +842,8 @@ func _process(dt: float) -> void:
 				scores[k] = paint.match_zone(k)
 			hud.set_matches(scores)
 	elif phase != "hide":
+		if touch_mode and phase in ["fire", "reveal"]:
+			_look(touch.consume_look())
 		recoil *= exp(-dt * 7)
 		camera.rotation = Vector3(pitch + sy + recoil, yaw + sx, 0)
 	world.update_grass(camera.global_position)
@@ -773,7 +870,11 @@ func _physics_process(dt: float) -> void:
 		# Touches physiques W A S D = Z Q S D sur un clavier AZERTY.
 		input.y = float(Input.is_physical_key_pressed(KEY_W)) - float(Input.is_physical_key_pressed(KEY_S))
 		input.x = float(Input.is_physical_key_pressed(KEY_D)) - float(Input.is_physical_key_pressed(KEY_A))
-	hider.physics_step(dt, input, Input.is_physical_key_pressed(KEY_SHIFT))
+	var running := Input.is_physical_key_pressed(KEY_SHIFT)
+	if touch_mode:
+		input = touch.move
+		running = touch.move.length() > 0.92   # joystick poussé à fond : on court
+	hider.physics_step(dt, input, running)
 
 func _process_hide(dt: float) -> void:
 	hide_left -= dt
@@ -783,7 +884,9 @@ func _process_hide(dt: float) -> void:
 		return
 	hider.update_visual(dt)
 	# Clic droit maintenu : on regarde par la lunette depuis sa cachette.
-	var preview := Input.is_mouse_button_pressed(MOUSE_BUTTON_RIGHT)
+	if touch_mode:
+		hider.look(touch.consume_look() * 0.9)
+	var preview: bool = Input.is_mouse_button_pressed(MOUSE_BUTTON_RIGHT) or (touch_mode and touch.held("viser"))
 	world.player.visible = not preview
 	hud.dot.visible = preview
 	if preview:
