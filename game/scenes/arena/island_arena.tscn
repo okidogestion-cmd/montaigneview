@@ -1,0 +1,46 @@
+[gd_scene load_steps=7 format=3]
+
+[ext_resource type="Script" path="res://scripts/arena/island_arena.gd" id="1_arena"]
+[ext_resource type="Resource" path="res://config/game_config.tres" id="2_cfg"]
+[ext_resource type="Shader" path="res://shaders/sky.gdshader" id="3_sky"]
+
+[sub_resource type="ShaderMaterial" id="ShaderMaterial_sky"]
+shader = ExtResource("3_sky")
+shader_parameter/top_color = Color(0.25, 0.6, 0.9, 1)
+shader_parameter/horizon_color = Color(0.73, 0.89, 0.97, 1)
+shader_parameter/cloud_color = Color(1, 0.953, 0.847, 1)
+shader_parameter/cloud_shade = Color(0.78, 0.8, 0.9, 1)
+shader_parameter/cloud_cover = 0.5
+
+[sub_resource type="Sky" id="Sky_main"]
+sky_material = SubResource("ShaderMaterial_sky")
+
+[sub_resource type="Environment" id="Environment_main"]
+background_mode = 2
+sky = SubResource("Sky_main")
+ambient_light_source = 2
+ambient_light_color = Color(0.66, 0.76, 0.9, 1)
+ambient_light_energy = 0.8
+tonemap_mode = 0
+fog_enabled = true
+fog_mode = 1
+fog_light_color = Color(0.73, 0.89, 0.97, 1)
+fog_density = 1.0
+fog_sky_affect = 0.0
+fog_depth_curve = 1.0
+fog_depth_begin = 160.0
+fog_depth_end = 1300.0
+
+[node name="IslandArena" type="Node3D"]
+script = ExtResource("1_arena")
+config = ExtResource("2_cfg")
+
+[node name="WorldEnvironment" type="WorldEnvironment" parent="."]
+environment = SubResource("Environment_main")
+
+[node name="Sun" type="DirectionalLight3D" parent="."]
+light_color = Color(1, 0.88, 0.74, 1)
+light_energy = 0.62
+shadow_enabled = true
+shadow_bias = 0.04
+directional_shadow_max_distance = 160.0

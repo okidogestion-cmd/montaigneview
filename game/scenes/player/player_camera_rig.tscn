@@ -1,0 +1,16 @@
+[gd_scene load_steps=3 format=3]
+
+[ext_resource type="Script" path="res://scripts/player/player_camera_rig.gd" id="1_rig"]
+[ext_resource type="Resource" path="res://config/game_config.tres" id="2_cfg"]
+
+[node name="CameraRig" type="Node3D"]
+script = ExtResource("1_rig")
+config = ExtResource("2_cfg")
+
+[node name="SpringArm3D" type="SpringArm3D" parent="."]
+collision_mask = 1
+margin = 0.2
+
+[node name="Camera3D" type="Camera3D" parent="SpringArm3D"]
+near = 0.1
+far = 2500.0
