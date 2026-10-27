@@ -21,6 +21,7 @@ const PEAKS := [
 	[-560, 0, 120, 200], [560, 0, 120, 200],
 ]
 const TOON := preload("res://shaders/toon.gdshader")
+const TERRAIN := preload("res://shaders/terrain.gdshader")
 const OUTLINE := preload("res://shaders/outline.gdshader")
 const WATER := preload("res://shaders/water.gdshader")
 const GRASS := preload("res://shaders/grass.gdshader")
@@ -122,8 +123,9 @@ func height_at(x: float, z: float) -> float:
 
 
 # ---------- Matériaux ----------
-func toon(color := Color.WHITE, vertex_colors := false, outline := false, wind := 0.0, wind_height := 7.0) -> ShaderMaterial:
-	var key := "%s|%s|%s|%s|%s" % [color.to_html(), vertex_colors, outline, wind, wind_height]
+## detail : nom d'une texture de sol (« roche », « neige »…) projetée sur l'objet, ou "" pour une couleur unie.
+func toon(color := Color.WHITE, vertex_colors := false, outline := false, wind := 0.0, wind_height := 7.0, detail := "") -> ShaderMaterial:
+	var key := "%s|%s|%s|%s|%s|%s" % [color.to_html(), vertex_colors, outline, wind, wind_height, detail]
 	if not _materials.has(key):
 		var m := ShaderMaterial.new()
 		m.shader = TOON
@@ -131,6 +133,9 @@ func toon(color := Color.WHITE, vertex_colors := false, outline := false, wind :
 		m.set_shader_parameter("use_vertex_color", vertex_colors)
 		m.set_shader_parameter("wind", wind)
 		m.set_shader_parameter("wind_height", wind_height)
+		if detail != "":
+			m.set_shader_parameter("use_detail", true)
+			m.set_shader_parameter("detail_tex", load("res://art/sol_%s.jpg" % detail))
 		if outline:
 			pass  # contours désactivés : ils dessinaient chaque arbre deux fois (trop lourd sur téléphone)
 		_materials[key] = m
@@ -310,10 +315,15 @@ func _build_terrain() -> void:
 	var verts := PackedVector3Array()
 	var normals := PackedVector3Array()
 	var colors := PackedColorArray()
+	# Poids des textures de sol (terrain.gdshader) : UV = neige, roche ; UV2 = herbe, forêt ; aucun = sable.
+	var uv1 := PackedVector2Array()
+	var uv2 := PackedVector2Array()
 	var idx := PackedInt32Array()
 	verts.resize(w * w)
 	normals.resize(w * w)
 	colors.resize(w * w)
+	uv1.resize(w * w)
+	uv2.resize(w * w)
 	var sand := Color("#e3d39a")
 	var zone_colors: Array[Color] = []
 	for k in ZONE_KEYS:
@@ -341,6 +351,9 @@ func _build_terrain() -> void:
 			_grass_mask[gi + 3] = [255, 0, 0, 0][zi]
 			if h < WATER_Y + 2.5:
 				col = sand  # plage autour du lac
+			else:
+				uv1[r * w + c] = Vector2(1 if zi == 0 else 0, 1 if zi == 1 else 0)
+				uv2[r * w + c] = Vector2(1 if zi == 2 else 0, 1 if zi == 3 else 0)
 			var k := 0.94 + hash2(x * 0.3, z * 0.3) * 0.12
 			if n.y < 0.8:
 				k *= 0.86  # pentes raides un peu plus sombres : falaises
@@ -354,14 +367,16 @@ func _build_terrain() -> void:
 	arrays[Mesh.ARRAY_VERTEX] = verts
 	arrays[Mesh.ARRAY_NORMAL] = normals
 	arrays[Mesh.ARRAY_COLOR] = colors
+	arrays[Mesh.ARRAY_TEX_UV] = uv1
+	arrays[Mesh.ARRAY_TEX_UV2] = uv2
 	arrays[Mesh.ARRAY_INDEX] = idx
 	var mesh := ArrayMesh.new()
 	mesh.add_surface_from_arrays(Mesh.PRIMITIVE_TRIANGLES, arrays)
 	var m := ShaderMaterial.new()
-	m.shader = TOON
-	m.set_shader_parameter("use_vertex_color", true)
-	m.set_shader_parameter("patches", 0.24)
-	m.set_shader_parameter("rim_strength", 0.0)
+	m.shader = TERRAIN
+	for k in ["neige", "roche", "herbe", "foret", "sable"]:
+		m.set_shader_parameter("tex_" + k, load("res://art/sol_%s.jpg" % k))
+	m.set_shader_parameter("patches", 0.12)
 	var mi := MeshInstance3D.new()
 	mi.mesh = mesh
 	mi.material_override = m
@@ -418,7 +433,7 @@ func _make_cover(zone: String) -> Node3D:
 	match zone:
 		"neige", "roche":
 			var col := Color("#e3eaf2") if zone == "neige" else Color("#86837c")
-			_part(g, _rock_mesh, toon(col, false, true), Vector3(0, 0.35, 0), Vector3(1.8, 1, 1.5))
+			_part(g, _rock_mesh, toon(col, false, true, 0.0, 7.0, zone), Vector3(0, 0.35, 0), Vector3(1.8, 1, 1.5))
 			_box(body, Vector3(0, 0.35, 0), Vector3(3.2, 1.8, 2.7))
 		"herbe":
 			_part(g, _bush_mesh, toon(Color.WHITE, true, true, 0.05, 1.5), Vector3.ZERO, Vector3(1.4, 1, 1.3))
@@ -519,10 +534,10 @@ func _scatter() -> void:
 	add_child(body)
 	_inst(_pine_mesh, toon(Color.WHITE, true, true, 0.12), pines, body, "tree")
 	_inst(_round_tree_mesh, toon(Color.WHITE, true, true, 0.1), rounds, body, "round")
-	_inst(_rock_mesh, toon(Color("#86837c"), false, true), rocks[0], body, "rock")
-	_inst(_rock_mesh, toon(Color("#e3eaf2"), false, true), rocks[1], body, "rock")
+	_inst(_rock_mesh, toon(Color("#86837c"), false, true, 0.0, 7.0, "roche"), rocks[0], body, "rock")
+	_inst(_rock_mesh, toon(Color("#e3eaf2"), false, true, 0.0, 7.0, "neige"), rocks[1], body, "rock")
 	_inst(_bush_mesh, toon(Color.WHITE, true, true, 0.05, 1.5), bushes, body, "bush")
-	_inst(_rock_mesh, toon(Color("#b8ad98"), false, false), beach[0], body, "pebble")
+	_inst(_rock_mesh, toon(Color("#b8ad98"), false, false, 0.0, 7.0, "roche"), beach[0], body, "pebble")
 	_inst(_log_mesh, toon(Color.WHITE, true, true), beach[1], body, "log")
 
 func _multimesh(mesh: Mesh, m: Material, xforms: Array) -> MultiMeshInstance3D:

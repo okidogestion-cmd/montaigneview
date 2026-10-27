@@ -214,3 +214,10 @@ Le jeu devient une **appli mobile** (même jeu : cachette, peinture, duel), plus
   son angle de vue sur la largeur (`main.gd` → `_on_orientation`). Orientation de l'appli : capteur (`orientation=6`).
 - Mise à jour de l'artefact : seul `donnees-pck.wasm` change (`godot --headless --path game --export-pack "Web" index.pck`),
   le moteur publié reste le même tant que la version de Godot (4.7.2) ne change pas.
+
+### Textures du décor (27/10/2026)
+- Cinq textures de sol peintes, créées avec Higgsfield (≈ 1,25 crédit) : `game/art/sol_{herbe,foret,roche,neige,sable}.jpg`.
+  Elles sont enregistrées en **cartes de détail** (gris 0,5 = couleur de la zone inchangée) : la couleur moyenne du sol
+  reste celle de la zone, donc le score de camouflage ne change pas.
+- Sol : `shaders/terrain.gdshader` (poids des terrains dans UV / UV2, roche projetée aussi sur les falaises).
+  Rochers : `toon.gdshader` avec `use_detail` (paramètre `detail` de `world.toon()`).
