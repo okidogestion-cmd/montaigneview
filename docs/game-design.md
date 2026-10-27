@@ -221,3 +221,11 @@ Le jeu devient une **appli mobile** (même jeu : cachette, peinture, duel), plus
   reste celle de la zone, donc le score de camouflage ne change pas.
 - Sol : `shaders/terrain.gdshader` (poids des terrains dans UV / UV2, roche projetée aussi sur les falaises).
   Rochers : `toon.gdshader` avec `use_detail` (paramètre `detail` de `world.toon()`).
+
+### Nouveau sniper (27/10/2026)
+- Le chapeau de cowboy est remplacé par une **capuche** ; ajout des yeux, du cou, des mains (gants), d'un gilet à deux
+  poches, d'une ceinture, de semelles, d'un tapis roulé sur le sac, et d'un vrai fusil (boîtier, canon, frein de bouche,
+  lunette, crosse en bois, chargeur, bipied).
+- `world.gd` → `PARTS` : une pièce peut avoir une **pièce parente** (7e valeur) ; elle n'a alors que la pose « debout »,
+  donnée dans le repère de sa parente, et la suit dans toutes les poses et la marche.
+- Tenue de départ (`paint.gd` → `_set_default`) : capuche olive, visage, pantalon olive, bottes, sac.

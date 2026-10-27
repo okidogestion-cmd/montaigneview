@@ -130,14 +130,22 @@ func clear() -> void:
 	refresh()
 
 func _set_default() -> void:
-	# Tenue de départ : toile kaki, visage, bottes et chapeau. À repeindre pour se camoufler.
+	# Tenue de départ : toile kaki, capuche et gilet plus foncés, visage, bottes. À repeindre pour se camoufler.
 	base = DEFAULT_BASE
 	strokes = [
-		[Vector4(0, 1.69, 0.13, 0.12), Color("#e2b48a")],     # visage
-		[Vector4(-0.11, 0.07, 0.05, 0.21), Color("#3b2e25")],  # bottes
-		[Vector4(0.11, 0.07, 0.05, 0.21), Color("#3b2e25")],
-		[Vector4(0, 1.84, 0.02, 0.29), Color("#6b5a40")],      # chapeau
-		[Vector4(0, 1.2, -0.25, 0.26), Color("#5e5a45")],      # sac
+		[Vector4(0, 1.71, -0.04, 0.215), Color("#77744f")],   # capuche
+		[Vector4(0, 1.665, 0.19, 0.16), Color("#e2b48a")],    # visage (après la capuche : il reste visible)
+		[Vector4(-0.12, 0.82, 0, 0.19), Color("#7a7457")],     # pantalon
+		[Vector4(0.12, 0.82, 0, 0.19), Color("#7a7457")],
+		[Vector4(-0.12, 0.62, 0, 0.19), Color("#7a7457")],
+		[Vector4(0.12, 0.62, 0, 0.19), Color("#7a7457")],
+		[Vector4(-0.12, 0.42, 0, 0.19), Color("#7a7457")],
+		[Vector4(0.12, 0.42, 0, 0.19), Color("#7a7457")],
+		[Vector4(-0.12, 0.22, 0, 0.19), Color("#7a7457")],
+		[Vector4(0.12, 0.22, 0, 0.19), Color("#7a7457")],
+		[Vector4(-0.12, 0.07, 0.05, 0.21), Color("#3b2e25")],  # bottes
+		[Vector4(0.12, 0.07, 0.05, 0.21), Color("#3b2e25")],
+		[Vector4(0, 1.25, -0.27, 0.3), Color("#5e5a45")],     # sac et tapis
 	]
 
 func undo() -> void:

@@ -684,37 +684,53 @@ func update_grass(cam: Vector3) -> void:
 # Le sniper est fait de pièces rigides arrondies. Chaque pose (debout, accroupi, couché)
 # ne fait que déplacer ces mêmes pièces. Chaque sommet garde sa position « debout »
 # (CUSTOM0) : la peinture suit le corps. Les pièces à couleur fixe (fusil) ne se peignent pas.
-# [nom, forme, taille, {pose: [position, rotation (euler)]}, balancement, couleur fixe]
+# [nom, forme, taille, {pose: [position, rotation (euler)]}, balancement, couleur fixe, (pièce parente)]
 #   capsule : taille = (rayon, hauteur totale, rayon) ; tube : (rayon, hauteur, rayon) ; sphère : (rayon, …)
+#   Une pièce avec une pièce parente (7e valeur) n'a que la pose « debout », donnée dans le repère
+#   de sa parente : elle la suit dans toutes les poses (yeux sur la tête, mains au bout des bras…).
 const PARTS := [
-	["jambe_g", "capsule", Vector3(0.1, 0.86, 0.1), {
-		"debout": [Vector3(-0.11, 0.47, 0), Vector3.ZERO], "accroupi": [Vector3(-0.12, 0.2, -0.28), Vector3(1.35, 0, 0)], "couche": [Vector3(-0.12, 0.11, -0.68), Vector3(PI / 2, 0, 0)]}, "leg_l", null],
-	["jambe_d", "capsule", Vector3(0.1, 0.86, 0.1), {
-		"debout": [Vector3(0.11, 0.47, 0), Vector3.ZERO], "accroupi": [Vector3(0.13, 0.42, 0.18), Vector3(-0.75, 0, 0)], "couche": [Vector3(0.12, 0.11, -0.68), Vector3(PI / 2, 0, 0)]}, "leg_r", null],
-	["botte_g", "box", Vector3(0.17, 0.13, 0.28), {
-		"debout": [Vector3(-0.11, 0.065, 0.05), Vector3.ZERO], "accroupi": [Vector3(-0.12, 0.08, -0.62), Vector3(1.35, 0, 0)], "couche": [Vector3(-0.12, 0.1, -1.13), Vector3(PI / 2, 0, 0)]}, "leg_l", null],
-	["botte_d", "box", Vector3(0.17, 0.13, 0.28), {
-		"debout": [Vector3(0.11, 0.065, 0.05), Vector3.ZERO], "accroupi": [Vector3(0.13, 0.07, 0.42), Vector3.ZERO], "couche": [Vector3(0.12, 0.1, -1.13), Vector3(PI / 2, 0, 0)]}, "leg_r", null],
-	["buste", "capsule", Vector3(0.21, 0.66, 0.21), {
+	["jambe_g", "capsule", Vector3(0.11, 0.86, 0.11), {
+		"debout": [Vector3(-0.12, 0.47, 0), Vector3.ZERO], "accroupi": [Vector3(-0.12, 0.2, -0.28), Vector3(1.35, 0, 0)], "couche": [Vector3(-0.12, 0.11, -0.68), Vector3(PI / 2, 0, 0)]}, "leg_l", null],
+	["jambe_d", "capsule", Vector3(0.11, 0.86, 0.11), {
+		"debout": [Vector3(0.12, 0.47, 0), Vector3.ZERO], "accroupi": [Vector3(0.13, 0.42, 0.18), Vector3(-0.75, 0, 0)], "couche": [Vector3(0.12, 0.11, -0.68), Vector3(PI / 2, 0, 0)]}, "leg_r", null],
+	["botte_g", "box", Vector3(0.18, 0.14, 0.3), {
+		"debout": [Vector3(-0.12, 0.07, 0.05), Vector3.ZERO], "accroupi": [Vector3(-0.12, 0.08, -0.62), Vector3(1.35, 0, 0)], "couche": [Vector3(-0.12, 0.1, -1.13), Vector3(PI / 2, 0, 0)]}, "leg_l", null],
+	["botte_d", "box", Vector3(0.18, 0.14, 0.3), {
+		"debout": [Vector3(0.12, 0.07, 0.05), Vector3.ZERO], "accroupi": [Vector3(0.13, 0.07, 0.42), Vector3.ZERO], "couche": [Vector3(0.12, 0.1, -1.13), Vector3(PI / 2, 0, 0)]}, "leg_r", null],
+	["buste", "capsule", Vector3(0.23, 0.7, 0.23), {
 		"debout": [Vector3(0, 1.18, 0), Vector3.ZERO], "accroupi": [Vector3(0, 0.82, 0.06), Vector3(0.3, 0, 0)], "couche": [Vector3(0, 0.2, 0.02), Vector3(PI / 2, 0, 0)]}, "", null],
 	["tete", "sphere", Vector3(0.17, 0.17, 0.17), {
 		"debout": [Vector3(0, 1.67, 0.02), Vector3.ZERO], "accroupi": [Vector3(0, 1.3, 0.2), Vector3(0.3, 0, 0)], "couche": [Vector3(0, 0.33, 0.52), Vector3(PI / 2 - 0.5, 0, 0)]}, "", null],
-	["chapeau", "tube", Vector3(0.26, 0.035, 0.26), {
-		"debout": [Vector3(0, 1.79, 0.02), Vector3.ZERO], "accroupi": [Vector3(0, 1.41, 0.25), Vector3(0.3, 0, 0)], "couche": [Vector3(0, 0.42, 0.62), Vector3(PI / 2 - 0.5, 0, 0)]}, "", null],
-	["calotte", "tube", Vector3(0.15, 0.13, 0.15), {
-		"debout": [Vector3(0, 1.86, 0.02), Vector3.ZERO], "accroupi": [Vector3(0, 1.47, 0.27), Vector3(0.3, 0, 0)], "couche": [Vector3(0, 0.47, 0.67), Vector3(PI / 2 - 0.5, 0, 0)]}, "", null],
-	["bras_g", "capsule", Vector3(0.075, 0.62, 0.075), {
-		"debout": [Vector3(-0.3, 1.16, 0), Vector3(0, 0, -0.12)], "accroupi": [Vector3(-0.2, 1.0, 0.3), Vector3(-1.25, 0, 0)], "couche": [Vector3(-0.24, 0.16, 0.6), Vector3(PI / 2, 0, 0)]}, "arm_l", null],
-	["bras_d", "capsule", Vector3(0.075, 0.62, 0.075), {
-		"debout": [Vector3(0.3, 1.16, 0), Vector3(0, 0, 0.12)], "accroupi": [Vector3(0.2, 1.0, 0.3), Vector3(-1.25, 0, 0)], "couche": [Vector3(0.24, 0.16, 0.6), Vector3(PI / 2, 0, 0)]}, "arm_r", null],
-	["sac", "box", Vector3(0.34, 0.4, 0.17), {
-		"debout": [Vector3(0, 1.2, -0.25), Vector3.ZERO], "accroupi": [Vector3(0, 0.86, -0.18), Vector3(0.3, 0, 0)], "couche": [Vector3(0, 0.38, -0.02), Vector3(PI / 2, 0, 0)]}, "", null],
-	["fusil", "tube", Vector3(0.028, 1.15, 0.028), {
-		"debout": [Vector3(0.04, 1.2, -0.37), Vector3(0, 0, 0.8)], "accroupi": [Vector3(0.08, 1.04, 0.62), Vector3(PI / 2, 0, 0)], "couche": [Vector3(0.1, 0.24, 1.05), Vector3(PI / 2, 0, 0)]}, "", Color("#2b2f33")],
-	["lunette", "tube", Vector3(0.045, 0.3, 0.045), {
-		"debout": [Vector3(-0.03, 1.3, -0.43), Vector3(0, 0, 0.8)], "accroupi": [Vector3(0.08, 1.12, 0.5), Vector3(PI / 2, 0, 0)], "couche": [Vector3(0.1, 0.32, 0.92), Vector3(PI / 2, 0, 0)]}, "", Color("#1d2023")],
-	["crosse", "box", Vector3(0.07, 0.36, 0.11), {
-		"debout": [Vector3(0.36, 0.86, -0.37), Vector3(0, 0, 0.8)], "accroupi": [Vector3(0.08, 1.0, 0.08), Vector3(PI / 2, 0, 0)], "couche": [Vector3(0.1, 0.2, 0.5), Vector3(PI / 2, 0, 0)]}, "", Color("#8a5a3a")],
+	["bras_g", "capsule", Vector3(0.08, 0.62, 0.08), {
+		"debout": [Vector3(-0.31, 1.16, 0), Vector3(0, 0, -0.12)], "accroupi": [Vector3(-0.21, 1.0, 0.3), Vector3(-1.25, 0, 0)], "couche": [Vector3(-0.25, 0.16, 0.6), Vector3(PI / 2, 0, 0)]}, "arm_l", null],
+	["bras_d", "capsule", Vector3(0.08, 0.62, 0.08), {
+		"debout": [Vector3(0.31, 1.16, 0), Vector3(0, 0, 0.12)], "accroupi": [Vector3(0.21, 1.0, 0.3), Vector3(-1.25, 0, 0)], "couche": [Vector3(0.25, 0.16, 0.6), Vector3(PI / 2, 0, 0)]}, "arm_r", null],
+	["sac", "box", Vector3(0.36, 0.42, 0.18), {
+		"debout": [Vector3(0, 1.2, -0.27), Vector3.ZERO], "accroupi": [Vector3(0, 0.86, -0.2), Vector3(0.3, 0, 0)], "couche": [Vector3(0, 0.4, -0.02), Vector3(PI / 2, 0, 0)]}, "", null],
+	# Fusil : boîtier au centre, canon vers +y ; le haut de l'arme est vers -z (repère du fusil).
+	["fusil", "tube", Vector3(0.034, 0.55, 0.034), {
+		"debout": [Vector3(0.04, 1.2, -0.4), Vector3(0, 0, 0.8)], "accroupi": [Vector3(0.08, 1.04, 0.62), Vector3(PI / 2, 0, 0)], "couche": [Vector3(0.1, 0.24, 1.05), Vector3(PI / 2, 0, 0)]}, "", Color("#2b2f33")],
+	# Détails attachés (repère de la pièce parente).
+	["semelle_g", "box", Vector3(0.19, 0.035, 0.31), {"debout": [Vector3(0, -0.065, 0), Vector3.ZERO]}, "leg_l", Color("#2a2420"), "botte_g"],
+	["semelle_d", "box", Vector3(0.19, 0.035, 0.31), {"debout": [Vector3(0, -0.065, 0), Vector3.ZERO]}, "leg_r", Color("#2a2420"), "botte_d"],
+	["ceinture", "tube", Vector3(0.24, 0.07, 0.24), {"debout": [Vector3(0, -0.29, 0), Vector3.ZERO]}, "", Color("#3d3428"), "buste"],
+	["gilet", "box", Vector3(0.44, 0.36, 0.1), {"debout": [Vector3(0, 0.06, 0.19), Vector3.ZERO]}, "", null, "buste"],
+	["poche_g", "box", Vector3(0.12, 0.13, 0.06), {"debout": [Vector3(-0.11, -0.04, 0.26), Vector3.ZERO]}, "", null, "buste"],
+	["poche_d", "box", Vector3(0.12, 0.13, 0.06), {"debout": [Vector3(0.11, -0.04, 0.26), Vector3.ZERO]}, "", null, "buste"],
+	["cou", "capsule", Vector3(0.075, 0.22, 0.075), {"debout": [Vector3(0, 0.36, 0.01), Vector3.ZERO]}, "", null, "buste"],
+	["capuche", "sphere", Vector3(0.2, 0.2, 0.2), {"debout": [Vector3(0, 0.04, -0.06), Vector3.ZERO]}, "", null, "tete"],
+	["oeil_g", "sphere", Vector3(0.024, 0.024, 0.024), {"debout": [Vector3(-0.06, 0.025, 0.155), Vector3.ZERO]}, "", Color("#1b1d1e"), "tete"],
+	["oeil_d", "sphere", Vector3(0.024, 0.024, 0.024), {"debout": [Vector3(0.06, 0.025, 0.155), Vector3.ZERO]}, "", Color("#1b1d1e"), "tete"],
+	["main_g", "sphere", Vector3(0.075, 0.075, 0.075), {"debout": [Vector3(0, -0.33, 0), Vector3.ZERO]}, "arm_l", Color("#3b3a30"), "bras_g"],
+	["main_d", "sphere", Vector3(0.075, 0.075, 0.075), {"debout": [Vector3(0, -0.33, 0), Vector3.ZERO]}, "arm_r", Color("#3b3a30"), "bras_d"],
+	["tapis", "tube", Vector3(0.075, 0.42, 0.075), {"debout": [Vector3(0, 0.28, -0.02), Vector3(0, 0, PI / 2)]}, "", null, "sac"],
+	["canon", "tube", Vector3(0.017, 0.62, 0.017), {"debout": [Vector3(0, 0.56, 0), Vector3.ZERO]}, "", Color("#1d2023"), "fusil"],
+	["frein", "tube", Vector3(0.027, 0.08, 0.027), {"debout": [Vector3(0, 0.87, 0), Vector3.ZERO]}, "", Color("#1d2023"), "fusil"],
+	["lunette", "tube", Vector3(0.042, 0.34, 0.042), {"debout": [Vector3(0, -0.02, -0.085), Vector3.ZERO]}, "", Color("#1d2023"), "fusil"],
+	["crosse", "box", Vector3(0.06, 0.38, 0.13), {"debout": [Vector3(0, -0.45, 0.02), Vector3.ZERO]}, "", Color("#6b4a32"), "fusil"],
+	["chargeur", "box", Vector3(0.045, 0.1, 0.08), {"debout": [Vector3(0, -0.04, 0.07), Vector3.ZERO]}, "", Color("#2b2f33"), "fusil"],
+	["bipied_g", "tube", Vector3(0.01, 0.26, 0.01), {"debout": [Vector3(-0.035, 0.5, 0.13), Vector3(PI / 2, 0, 0)]}, "", Color("#1d2023"), "fusil"],
+	["bipied_d", "tube", Vector3(0.01, 0.26, 0.01), {"debout": [Vector3(0.035, 0.5, 0.13), Vector3(PI / 2, 0, 0)]}, "", Color("#1d2023"), "fusil"],
 ]
 const CAMO_SHADER := preload("res://shaders/camo.gdshader")
 const SWING := {"leg_l": 1.0, "leg_r": -1.0, "arm_l": -0.8, "arm_r": 0.8}
@@ -722,8 +738,18 @@ const SWING := {"leg_l": 1.0, "leg_r": -1.0, "arm_l": -0.8, "arm_r": 0.8}
 const PIVOTS := {"leg_l": Vector3(-0.11, 0.88, 0), "leg_r": Vector3(0.11, 0.88, 0), "arm_l": Vector3(-0.3, 1.43, 0), "arm_r": Vector3(0.3, 1.43, 0)}
 
 static func part_transform(part: Array, pose: String) -> Transform3D:
+	if part.size() > 6:
+		# Pièce attachée : sa pose « debout » est donnée dans le repère de sa parente.
+		var local: Array = part[3]["debout"]
+		return part_transform(_part_named(part[6]), pose) * Transform3D(Basis.from_euler(local[1]), local[0])
 	var t: Array = part[3][pose]
 	return Transform3D(Basis.from_euler(t[1]), t[0])
+
+static func _part_named(n: String) -> Array:
+	for p in PARTS:
+		if p[0] == n:
+			return p
+	return []
 
 static func paintable(part: Array) -> bool:
 	return part[5] == null
