@@ -4,7 +4,7 @@ extends RefCounted
 
 const MAX := 600                       # même limite que le shader camo
 const SIZES := [0.045, 0.09, 0.17]     # rayon du pinceau : petit, moyen, gros
-const DEFAULT_BASE := Color("#8f8a6c")   # toile kaki
+const DEFAULT_BASE := Color("#383127")   # tenue du modèle 3D (couleur moyenne de sa texture)
 const PALETTE := [
 	Color("#eef3f9"), Color("#c9d3dc"), Color("#b9b2a5"), Color("#928e86"),
 	Color("#6d6a64"), Color("#e3d39a"), Color("#a0855c"), Color("#7a5233"),
@@ -25,50 +25,14 @@ var _match_cache := {}                 # score par terrain, recalculé seulement
 var _stroke_tex: ImageTexture
 
 
-func _init(mat: ShaderMaterial, parts: Array, part_transform: Callable) -> void:
+func _init(mat: ShaderMaterial, body_samples: Array[Vector3]) -> void:
+	# body_samples : points répartis sur le corps, dans la pose debout (world.figure_samples()).
 	material = mat
 	_rng.seed = 7
-	_build_samples(parts, part_transform)
+	samples = body_samples
 	_set_default()
 	refresh()
 
-func _build_samples(parts: Array, part_transform: Callable) -> void:
-	# Environ 900 points par m² de surface, sur la pose debout.
-	for part in parts:
-		if part.size() > 5 and part[5] != null:
-			continue  # pièce à couleur fixe (fusil) : pas peinte, pas comptée
-		var size: Vector3 = part[2]
-		var t: Transform3D = part_transform.call(part, "debout")
-		var area := 0.0
-		match part[1]:
-			"box":
-				area = 2 * (size.x * size.y + size.y * size.z + size.x * size.z)
-			"sphere", "capsule":
-				area = 4 * PI * size.x * size.x + (TAU * size.x * (size.y - 2 * size.x) if part[1] == "capsule" else 0.0)
-			_:
-				area = TAU * size.x * size.y
-		for i in maxi(4, int(area * 900)):
-			var p := Vector3.ZERO
-			match part[1]:
-				"box":
-					p = Vector3(_rng.randf() - 0.5, _rng.randf() - 0.5, _rng.randf() - 0.5) * size
-					var axis := _rng.randi() % 3
-					p[axis] = size[axis] / 2 * (1 if _rng.randf() < 0.5 else -1)
-				"sphere":
-					p = Vector3(_rng.randfn(), _rng.randfn(), _rng.randfn()).normalized() * size.x
-				"capsule":
-					var hh: float = size.y / 2 - size.x
-					var side := TAU * size.x * 2 * hh
-					if _rng.randf() * area < side:
-						var a := _rng.randf() * TAU
-						p = Vector3(cos(a) * size.x, _rng.randf_range(-hh, hh), sin(a) * size.x)
-					else:
-						p = Vector3(_rng.randfn(), _rng.randfn(), _rng.randfn()).normalized() * size.x
-						p.y += hh if p.y > 0 else -hh
-				_:
-					var a := _rng.randf() * TAU
-					p = Vector3(cos(a) * size.x, (_rng.randf() - 0.5) * size.y, sin(a) * size.x)
-			samples.append(t * p)
 
 func color_at(p: Vector3) -> Color:
 	var c := base
@@ -130,23 +94,9 @@ func clear() -> void:
 	refresh()
 
 func _set_default() -> void:
-	# Tenue de départ : toile kaki, capuche et gilet plus foncés, visage, bottes. À repeindre pour se camoufler.
+	# Tenue de départ : celle du modèle 3D (sa texture), sans peinture. À repeindre pour se camoufler.
 	base = DEFAULT_BASE
-	strokes = [
-		[Vector4(0, 1.71, -0.04, 0.215), Color("#77744f")],   # capuche
-		[Vector4(0, 1.665, 0.19, 0.16), Color("#e2b48a")],    # visage (après la capuche : il reste visible)
-		[Vector4(-0.12, 0.82, 0, 0.19), Color("#7a7457")],     # pantalon
-		[Vector4(0.12, 0.82, 0, 0.19), Color("#7a7457")],
-		[Vector4(-0.12, 0.62, 0, 0.19), Color("#7a7457")],
-		[Vector4(0.12, 0.62, 0, 0.19), Color("#7a7457")],
-		[Vector4(-0.12, 0.42, 0, 0.19), Color("#7a7457")],
-		[Vector4(0.12, 0.42, 0, 0.19), Color("#7a7457")],
-		[Vector4(-0.12, 0.22, 0, 0.19), Color("#7a7457")],
-		[Vector4(0.12, 0.22, 0, 0.19), Color("#7a7457")],
-		[Vector4(-0.12, 0.07, 0.05, 0.21), Color("#3b2e25")],  # bottes
-		[Vector4(0.12, 0.07, 0.05, 0.21), Color("#3b2e25")],
-		[Vector4(0, 1.25, -0.27, 0.3), Color("#5e5a45")],     # sac et tapis
-	]
+	strokes = []
 
 func undo() -> void:
 	if history.is_empty():
@@ -188,6 +138,8 @@ func _apply() -> void:
 		_stroke_tex.update(img)
 	material.set_shader_parameter("base_color", base)
 	material.set_shader_parameter("stroke_count", strokes.size())
+	# Tant que le fond n'a pas été repeint (outil Remplir), on voit la tenue d'origine du modèle.
+	material.set_shader_parameter("tex_mix", 1.0 if base == DEFAULT_BASE else 0.0)
 
 func set_cursor(ref: Vector3, size_idx: int) -> void:
 	material.set_shader_parameter("cursor", Vector4(ref.x, ref.y, ref.z, SIZES[size_idx]))

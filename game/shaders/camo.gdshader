@@ -8,7 +8,12 @@ shader_type spatial;
 // ligne 0 = position + rayon, ligne 1 = couleur. Une image passe partout, y compris dans
 // Safari sur iPhone, où la taille des listes envoyées aux shaders est très limitée.
 
-uniform vec4 base_color : source_color = vec4(0.57, 0.56, 0.53, 1.0);
+// Couleur de fond convertie ici (pow 2,2), comme les coups de pinceau : même rendu sur ordinateur et dans le navigateur.
+uniform vec4 base_color = vec4(0.57, 0.56, 0.53, 1.0);
+// Texture du modèle 3D : tex_mix = 1 montre la tenue d'origine ; sinon la peinture garde ses plis (luminance).
+uniform sampler2D albedo_tex : source_color, filter_linear_mipmap;
+uniform float tex_mix = 0.0;
+uniform float avg_lum = 0.043;
 uniform sampler2D stroke_tex : filter_nearest, repeat_disable;
 uniform int stroke_count = 0;
 uniform vec4 cursor = vec4(0.0, 0.0, 0.0, -1.0);  // cercle du pinceau (atelier)
@@ -25,11 +30,13 @@ void vertex() {
 }
 
 void fragment() {
-	vec3 c = base_color.rgb;
+	vec3 t = texture(albedo_tex, UV).rgb;
+	float fold = mix(1.0, clamp(dot(t, vec3(0.2126, 0.7152, 0.0722)) / avg_lum, 0.45, 1.6), 0.65);
+	vec3 c = mix(pow(base_color.rgb, vec3(2.2)) * fold, t, tex_mix);
 	for (int i = 0; i < stroke_count; i++) {
 		vec4 s = texelFetch(stroke_tex, ivec2(i, 0), 0);
 		if (distance(ref_pos, s.xyz) < s.w) {
-			c = pow(texelFetch(stroke_tex, ivec2(i, 1), 0).rgb, vec3(2.2));
+			c = pow(texelFetch(stroke_tex, ivec2(i, 1), 0).rgb, vec3(2.2)) * fold;
 		}
 	}
 	if (cursor.w > 0.0) {

@@ -681,249 +681,229 @@ func update_grass(cam: Vector3) -> void:
 
 
 # ---------- Personnages ----------
-# Le sniper est fait de pièces rigides arrondies. Chaque pose (debout, accroupi, couché)
-# ne fait que déplacer ces mêmes pièces. Chaque sommet garde sa position « debout »
-# (CUSTOM0) : la peinture suit le corps. Les pièces à couleur fixe (fusil) ne se peignent pas.
-# [nom, forme, taille, {pose: [position, rotation (euler)]}, balancement, couleur fixe, (pièce parente)]
-#   capsule : taille = (rayon, hauteur totale, rayon) ; tube : (rayon, hauteur, rayon) ; sphère : (rayon, …)
-#   Une pièce avec une pièce parente (7e valeur) n'a que la pose « debout », donnée dans le repère
-#   de sa parente : elle la suit dans toutes les poses (yeux sur la tête, mains au bout des bras…).
-const PARTS := [
-	["jambe_g", "capsule", Vector3(0.11, 0.86, 0.11), {
-		"debout": [Vector3(-0.12, 0.47, 0), Vector3.ZERO], "accroupi": [Vector3(-0.12, 0.2, -0.28), Vector3(1.35, 0, 0)], "couche": [Vector3(-0.12, 0.11, -0.68), Vector3(PI / 2, 0, 0)]}, "leg_l", null],
-	["jambe_d", "capsule", Vector3(0.11, 0.86, 0.11), {
-		"debout": [Vector3(0.12, 0.47, 0), Vector3.ZERO], "accroupi": [Vector3(0.13, 0.42, 0.18), Vector3(-0.75, 0, 0)], "couche": [Vector3(0.12, 0.11, -0.68), Vector3(PI / 2, 0, 0)]}, "leg_r", null],
-	["botte_g", "box", Vector3(0.18, 0.14, 0.3), {
-		"debout": [Vector3(-0.12, 0.07, 0.05), Vector3.ZERO], "accroupi": [Vector3(-0.12, 0.08, -0.62), Vector3(1.35, 0, 0)], "couche": [Vector3(-0.12, 0.1, -1.13), Vector3(PI / 2, 0, 0)]}, "leg_l", null],
-	["botte_d", "box", Vector3(0.18, 0.14, 0.3), {
-		"debout": [Vector3(0.12, 0.07, 0.05), Vector3.ZERO], "accroupi": [Vector3(0.13, 0.07, 0.42), Vector3.ZERO], "couche": [Vector3(0.12, 0.1, -1.13), Vector3(PI / 2, 0, 0)]}, "leg_r", null],
-	["buste", "capsule", Vector3(0.23, 0.7, 0.23), {
-		"debout": [Vector3(0, 1.18, 0), Vector3.ZERO], "accroupi": [Vector3(0, 0.82, 0.06), Vector3(0.3, 0, 0)], "couche": [Vector3(0, 0.2, 0.02), Vector3(PI / 2, 0, 0)]}, "", null],
-	["tete", "sphere", Vector3(0.17, 0.17, 0.17), {
-		"debout": [Vector3(0, 1.67, 0.02), Vector3.ZERO], "accroupi": [Vector3(0, 1.3, 0.2), Vector3(0.3, 0, 0)], "couche": [Vector3(0, 0.33, 0.52), Vector3(PI / 2 - 0.5, 0, 0)]}, "", null],
-	["bras_g", "capsule", Vector3(0.08, 0.62, 0.08), {
-		"debout": [Vector3(-0.31, 1.16, 0), Vector3(0, 0, -0.12)], "accroupi": [Vector3(-0.21, 1.0, 0.3), Vector3(-1.25, 0, 0)], "couche": [Vector3(-0.25, 0.16, 0.6), Vector3(PI / 2, 0, 0)]}, "arm_l", null],
-	["bras_d", "capsule", Vector3(0.08, 0.62, 0.08), {
-		"debout": [Vector3(0.31, 1.16, 0), Vector3(0, 0, 0.12)], "accroupi": [Vector3(0.21, 1.0, 0.3), Vector3(-1.25, 0, 0)], "couche": [Vector3(0.25, 0.16, 0.6), Vector3(PI / 2, 0, 0)]}, "arm_r", null],
-	["sac", "box", Vector3(0.36, 0.42, 0.18), {
-		"debout": [Vector3(0, 1.2, -0.27), Vector3.ZERO], "accroupi": [Vector3(0, 0.86, -0.2), Vector3(0.3, 0, 0)], "couche": [Vector3(0, 0.4, -0.02), Vector3(PI / 2, 0, 0)]}, "", null],
-	# Fusil : boîtier au centre, canon vers +y ; le haut de l'arme est vers -z (repère du fusil).
-	["fusil", "tube", Vector3(0.034, 0.55, 0.034), {
-		"debout": [Vector3(0.04, 1.2, -0.4), Vector3(0, 0, 0.8)], "accroupi": [Vector3(0.08, 1.04, 0.62), Vector3(PI / 2, 0, 0)], "couche": [Vector3(0.1, 0.24, 1.05), Vector3(PI / 2, 0, 0)]}, "", Color("#2b2f33")],
-	# Détails attachés (repère de la pièce parente).
-	["semelle_g", "box", Vector3(0.19, 0.035, 0.31), {"debout": [Vector3(0, -0.065, 0), Vector3.ZERO]}, "leg_l", Color("#2a2420"), "botte_g"],
-	["semelle_d", "box", Vector3(0.19, 0.035, 0.31), {"debout": [Vector3(0, -0.065, 0), Vector3.ZERO]}, "leg_r", Color("#2a2420"), "botte_d"],
-	["ceinture", "tube", Vector3(0.24, 0.07, 0.24), {"debout": [Vector3(0, -0.29, 0), Vector3.ZERO]}, "", Color("#3d3428"), "buste"],
-	["gilet", "box", Vector3(0.44, 0.36, 0.1), {"debout": [Vector3(0, 0.06, 0.19), Vector3.ZERO]}, "", null, "buste"],
-	["poche_g", "box", Vector3(0.12, 0.13, 0.06), {"debout": [Vector3(-0.11, -0.04, 0.26), Vector3.ZERO]}, "", null, "buste"],
-	["poche_d", "box", Vector3(0.12, 0.13, 0.06), {"debout": [Vector3(0.11, -0.04, 0.26), Vector3.ZERO]}, "", null, "buste"],
-	["cou", "capsule", Vector3(0.075, 0.22, 0.075), {"debout": [Vector3(0, 0.36, 0.01), Vector3.ZERO]}, "", null, "buste"],
-	["capuche", "sphere", Vector3(0.2, 0.2, 0.2), {"debout": [Vector3(0, 0.04, -0.06), Vector3.ZERO]}, "", null, "tete"],
-	["oeil_g", "sphere", Vector3(0.024, 0.024, 0.024), {"debout": [Vector3(-0.06, 0.025, 0.155), Vector3.ZERO]}, "", Color("#1b1d1e"), "tete"],
-	["oeil_d", "sphere", Vector3(0.024, 0.024, 0.024), {"debout": [Vector3(0.06, 0.025, 0.155), Vector3.ZERO]}, "", Color("#1b1d1e"), "tete"],
-	["main_g", "sphere", Vector3(0.075, 0.075, 0.075), {"debout": [Vector3(0, -0.33, 0), Vector3.ZERO]}, "arm_l", Color("#3b3a30"), "bras_g"],
-	["main_d", "sphere", Vector3(0.075, 0.075, 0.075), {"debout": [Vector3(0, -0.33, 0), Vector3.ZERO]}, "arm_r", Color("#3b3a30"), "bras_d"],
-	["tapis", "tube", Vector3(0.075, 0.42, 0.075), {"debout": [Vector3(0, 0.28, -0.02), Vector3(0, 0, PI / 2)]}, "", null, "sac"],
-	["canon", "tube", Vector3(0.017, 0.62, 0.017), {"debout": [Vector3(0, 0.56, 0), Vector3.ZERO]}, "", Color("#1d2023"), "fusil"],
-	["frein", "tube", Vector3(0.027, 0.08, 0.027), {"debout": [Vector3(0, 0.87, 0), Vector3.ZERO]}, "", Color("#1d2023"), "fusil"],
-	["lunette", "tube", Vector3(0.042, 0.34, 0.042), {"debout": [Vector3(0, -0.02, -0.085), Vector3.ZERO]}, "", Color("#1d2023"), "fusil"],
-	["crosse", "box", Vector3(0.06, 0.38, 0.13), {"debout": [Vector3(0, -0.45, 0.02), Vector3.ZERO]}, "", Color("#6b4a32"), "fusil"],
-	["chargeur", "box", Vector3(0.045, 0.1, 0.08), {"debout": [Vector3(0, -0.04, 0.07), Vector3.ZERO]}, "", Color("#2b2f33"), "fusil"],
-	["bipied_g", "tube", Vector3(0.01, 0.26, 0.01), {"debout": [Vector3(-0.035, 0.5, 0.13), Vector3(PI / 2, 0, 0)]}, "", Color("#1d2023"), "fusil"],
-	["bipied_d", "tube", Vector3(0.01, 0.26, 0.01), {"debout": [Vector3(0.035, 0.5, 0.13), Vector3(PI / 2, 0, 0)]}, "", Color("#1d2023"), "fusil"],
-]
 const CAMO_SHADER := preload("res://shaders/camo.gdshader")
-const SWING := {"leg_l": 1.0, "leg_r": -1.0, "arm_l": -0.8, "arm_r": 0.8}
-# Pivots (hanche, épaule) dans le repère de la pose « debout ».
-const PIVOTS := {"leg_l": Vector3(-0.11, 0.88, 0), "leg_r": Vector3(0.11, 0.88, 0), "arm_l": Vector3(-0.3, 1.43, 0), "arm_r": Vector3(0.3, 1.43, 0)}
 
-static func part_transform(part: Array, pose: String) -> Transform3D:
-	if part.size() > 6:
-		# Pièce attachée : sa pose « debout » est donnée dans le repère de sa parente.
-		var local: Array = part[3]["debout"]
-		return part_transform(_part_named(part[6]), pose) * Transform3D(Basis.from_euler(local[1]), local[0])
-	var t: Array = part[3][pose]
-	return Transform3D(Basis.from_euler(t[1]), t[0])
+# ---------- Le modèle 3D du sniper ----------
+# Le sniper est un modèle 3D (art/sniper.glb, créé avec Higgsfield / Tripo, allégé à 8 700 triangles)
+# animé par un petit squelette de 4 os : buste (avec bras, fusil), tête, jambe gauche, jambe droite.
+# Chaque sommet garde sa position « debout » (CUSTOM0) : la peinture suit le corps dans toutes les poses.
+const MODEL := preload("res://art/sniper.glb")
+const MODEL_TEX := preload("res://art/sniper_couleur.jpg")
+const MODEL_LUM := 0.043          # luminance moyenne de la texture (linéaire), pour garder ses plis sous la peinture
+const HIP := Vector3(0, 0.9, 0)   # hanche, pose debout
+const NECK := Vector3(0, 1.5, 0.02)
+const LEG_X := 0.12               # écart des jambes depuis le milieu
+# hip : où va la hanche ; lean : bascule du buste vers l'avant ; legs : angle de chaque jambe (gauche, droite)
+# autour de la hanche (positif : vers l'arrière) ; head : tête relevée (négatif).
+const FIG_POSES := {
+	"debout": {"hip": Vector3(0, 0.9, 0), "lean": 0.0, "legs": [0.0, 0.0], "head": 0.0},
+	"accroupi": {"hip": Vector3(0, 0.5, 0.0), "lean": 0.35, "legs": [1.05, -1.05], "head": -0.3},
+	"couche": {"hip": Vector3(0, 0.17, -0.1), "lean": PI / 2, "legs": [PI / 2, PI / 2], "head": -1.0},
+}
+var _fig_arrays: Array = []    # maillage debout, avec os, poids et positions de référence
+var _fig_posed := {}           # pose → [positions, TriangleMesh] (pinceau de l'atelier)
 
-static func _part_named(n: String) -> Array:
-	for p in PARTS:
-		if p[0] == n:
-			return p
-	return []
-
-static func paintable(part: Array) -> bool:
-	return part[5] == null
-
-func _part_mesh(part: Array) -> ArrayMesh:
-	var prim: PrimitiveMesh
-	var size: Vector3 = part[2]
-	match part[1]:
-		"box":
-			var b := BoxMesh.new()
-			b.size = size
-			prim = b
-		"sphere":
-			prim = _sphere(size.x, 16, 10)
-		"capsule":
-			var c := CapsuleMesh.new()
-			c.radius = size.x
-			c.height = size.y
-			c.radial_segments = 14
-			c.rings = 6
-			prim = c
-		_:
-			prim = _cyl(size.x, size.x, size.y, 14)
-	var arrays := prim.get_mesh_arrays()
+func _model_arrays() -> Array:
+	if not _fig_arrays.is_empty():
+		return _fig_arrays
+	var scene: Node = MODEL.instantiate()
+	var mi: MeshInstance3D = scene.find_children("*", "MeshInstance3D", true, false)[0]
+	var xf := Transform3D.IDENTITY
+	var n: Node = mi
+	while n != null:
+		if n is Node3D:
+			xf = (n as Node3D).transform * xf
+		if n == scene:
+			break
+		n = n.get_parent()
+	var arrays: Array = mi.mesh.surface_get_arrays(0)
+	scene.free()
+	# Le modèle regarde vers +x : on le tourne vers +z, pieds à y = 0, 1,8 m de haut.
+	xf = Transform3D(Basis(Vector3.UP, -PI / 2), Vector3.ZERO) * xf
 	var verts: PackedVector3Array = arrays[Mesh.ARRAY_VERTEX]
-	var stand := part_transform(part, "debout")
+	var lo := Vector3.INF
+	var hi := -Vector3.INF
+	for i in verts.size():
+		verts[i] = xf * verts[i]
+		lo = lo.min(verts[i])
+		hi = hi.max(verts[i])
+	var k := 1.8 / (hi.y - lo.y)
+	var shift := Vector3(-(lo.x + hi.x) / 2, -lo.y, -(lo.z + hi.z) / 2)
+	for i in verts.size():
+		verts[i] = (verts[i] + shift) * k
+	var normals: PackedVector3Array = arrays[Mesh.ARRAY_NORMAL]
+	for i in normals.size():
+		normals[i] = (xf.basis * normals[i]).normalized()
+	# Axe de chaque jambe (moyenne des sommets bas), pour ne pas prendre le fusil pour une jambe.
+	var axis := [Vector2.ZERO, Vector2.ZERO]
+	var cnt := [0, 0]
+	for v in verts:
+		if v.y > 0.15 and v.y < 0.6:
+			var side := 0 if v.x < 0 else 1
+			axis[side] += Vector2(v.x, v.z)
+			cnt[side] += 1
+	for side in 2:
+		axis[side] = axis[side] / maxi(1, cnt[side]) if cnt[side] > 0 else Vector2(LEG_X * (side * 2 - 1), 0)
+	var bones := PackedInt32Array()
+	var weights := PackedFloat32Array()
 	var custom := PackedFloat32Array()
 	custom.resize(verts.size() * 4)
 	for i in verts.size():
-		var r := stand * verts[i]
-		custom[i * 4] = r.x
-		custom[i * 4 + 1] = r.y
-		custom[i * 4 + 2] = r.z
+		var v := verts[i]
+		var side := 0 if v.x < 0 else 1
+		var leg := 1.0 - smoothstep(0.13, 0.2, Vector2(v.x, v.z).distance_to(axis[side]))
+		var low := (1.0 - smoothstep(0.8, 0.96, v.y)) * leg
+		var s := smoothstep(-0.04, 0.04, v.x)
+		var head := smoothstep(1.47, 1.57, v.y) if absf(v.x) < 0.22 else 0.0
+		var up := 1.0 - low
+		bones.append_array([0, 1, 2, 3])
+		weights.append_array([up * (1.0 - head), up * head, low * (1.0 - s), low * s])
+		custom[i * 4] = v.x
+		custom[i * 4 + 1] = v.y
+		custom[i * 4 + 2] = v.z
+	arrays[Mesh.ARRAY_VERTEX] = verts
+	arrays[Mesh.ARRAY_NORMAL] = normals
+	arrays[Mesh.ARRAY_BONES] = bones
+	arrays[Mesh.ARRAY_WEIGHTS] = weights
 	arrays[Mesh.ARRAY_CUSTOM0] = custom
-	var mesh := ArrayMesh.new()
-	mesh.add_surface_from_arrays(Mesh.PRIMITIVE_TRIANGLES, arrays, [], {}, Mesh.ARRAY_CUSTOM_RGBA_FLOAT << Mesh.ARRAY_FORMAT_CUSTOM0_SHIFT)
-	return mesh
+	arrays[Mesh.ARRAY_TANGENT] = null
+	_fig_arrays = arrays
+	return arrays
 
-func _make_figure(poses: Array = ["accroupi"]) -> Node3D:
+## Transformation de chaque os (buste, tête, jambe g, jambe d) pour une pose ; swing balance les jambes (marche).
+static func bone_poses(stance: String, swing := 0.0) -> Array[Transform3D]:
+	var P: Dictionary = FIG_POSES[stance]
+	var torso := Transform3D(Basis.IDENTITY, P.hip) * Transform3D(Basis(Vector3.RIGHT, P.lean), Vector3.ZERO) * Transform3D(Basis.IDENTITY, -HIP)
+	var head := torso * Transform3D(Basis.IDENTITY, NECK) * Transform3D(Basis(Vector3.RIGHT, P.head), Vector3.ZERO) * Transform3D(Basis.IDENTITY, -NECK)
+	var out: Array[Transform3D] = [torso, head]
+	for side in 2:
+		var h := Vector3(LEG_X * (side * 2 - 1), HIP.y, 0)
+		var a: float = P.legs[side] + swing * (1.0 if side == 0 else -1.0)
+		out.append(Transform3D(Basis.IDENTITY, torso * h) * Transform3D(Basis(Vector3.RIGHT, a), Vector3.ZERO) * Transform3D(Basis.IDENTITY, -h))
+	return out
+
+func _make_figure(_poses: Array = ["accroupi"]) -> Node3D:
 	var g := Node3D.new()
 	var camo := ShaderMaterial.new()
 	camo.shader = CAMO_SHADER
 	camo.set_shader_parameter("base_color", ZONES["roche"]["color"])
-	var meshes := PARTS.map(func(p): return _part_mesh(p))
-	for pose_name in poses:
-		var pose := Node3D.new()
-		pose.name = pose_name
-		g.add_child(pose)
-		for i in PARTS.size():
-			var part: Array = PARTS[i]
-			var mi := MeshInstance3D.new()
-			mi.mesh = meshes[i]
-			mi.material_override = camo if paintable(part) else toon(part[5])
-			mi.transform = part_transform(part, pose_name)
-			mi.set_meta("part", i)
-			mi.set_meta("base", mi.transform)
-			if part[4] != "":
-				# Pivot de balancement (hanche, épaule) exprimé dans la pose courante.
-				var pivot_stand: Vector3 = PIVOTS[part[4]]
-				var local := part_transform(part, "debout").affine_inverse() * pivot_stand
-				mi.set_meta("pivot", mi.transform * local)
-			pose.add_child(mi)
+	camo.set_shader_parameter("albedo_tex", MODEL_TEX)
+	camo.set_shader_parameter("avg_lum", MODEL_LUM)
+	var mesh := ArrayMesh.new()
+	mesh.add_surface_from_arrays(Mesh.PRIMITIVE_TRIANGLES, _model_arrays(), [], {}, Mesh.ARRAY_CUSTOM_RGBA_FLOAT << Mesh.ARRAY_FORMAT_CUSTOM0_SHIFT)
+	var sk := Skeleton3D.new()
+	sk.name = "squelette"
+	var skin := Skin.new()
+	for i in 4:
+		sk.add_bone(["buste", "tete", "jambe_g", "jambe_d"][i])
+		skin.add_bind(i, Transform3D.IDENTITY)
+	g.add_child(sk)
+	var mi := MeshInstance3D.new()
+	mi.mesh = mesh
+	mi.skin = skin
+	mi.material_override = camo
+	sk.add_child(mi)
+	mi.skeleton = NodePath("..")
 	g.set_meta("camo", camo)
-	set_stance(g, poses[0])
+	set_stance(g, "accroupi")
 	return g
 
+func _apply_bones(fig: Node3D, poses: Array[Transform3D]) -> void:
+	var sk := fig.get_node("squelette") as Skeleton3D
+	for i in poses.size():
+		sk.set_bone_pose_position(i, poses[i].origin)
+		sk.set_bone_pose_rotation(i, poses[i].basis.get_rotation_quaternion())
+
 func set_stance(fig: Node3D, stance: String) -> void:
-	for pose in fig.get_children():
-		if pose.get_class() == "Node3D":
-			pose.visible = pose.name == stance
+	fig.set_meta("stance", stance)
+	_apply_bones(fig, bone_poses(stance))
+	(fig.get_node("squelette") as Node3D).position = Vector3.ZERO
 
 func animate_figure(fig: Node3D, stance: String, phase: float, amount: float) -> void:
-	# Marche procédurale : jambes et bras se balancent autour de la hanche et de l'épaule,
-	# le corps rebondit légèrement. amount = 0 (immobile) à 1 (course).
-	var pose := fig.get_node_or_null(stance) as Node3D
-	if pose == null:
-		return
-	var swing: float = {"debout": 0.65, "accroupi": 0.25, "couche": 0.12}[stance] * amount
-	for mi in pose.get_children():
-		var part: Array = PARTS[mi.get_meta("part")]
-		if part[4] == "" or not mi.has_meta("pivot"):
-			continue
-		var base: Transform3D = mi.get_meta("base")
-		var pivot: Vector3 = mi.get_meta("pivot")
-		var a: float = sin(phase) * swing * SWING[part[4]]
-		mi.transform = Transform3D(Basis(Vector3.RIGHT, a), pivot) * Transform3D(Basis.IDENTITY, -pivot) * base
-	pose.position.y = absf(sin(phase)) * 0.05 * amount if stance == "debout" else 0.0
+	# Marche : les jambes se balancent autour de la hanche, le corps rebondit légèrement.
+	# amount = 0 (immobile) à 1 (course).
+	fig.set_meta("stance", stance)
+	var swing: float = {"debout": 0.6, "accroupi": 0.2, "couche": 0.1}[stance] * amount * sin(phase)
+	_apply_bones(fig, bone_poses(stance, swing))
+	(fig.get_node("squelette") as Node3D).position.y = absf(sin(phase)) * 0.05 * amount if stance == "debout" else 0.0
+
+func _posed(stance: String) -> Array:
+	# Positions des sommets dans une pose (calculées une fois) et leur TriangleMesh pour viser au pinceau.
+	if _fig_posed.has(stance):
+		return _fig_posed[stance]
+	var a := _model_arrays()
+	var verts: PackedVector3Array = a[Mesh.ARRAY_VERTEX]
+	var w: PackedFloat32Array = a[Mesh.ARRAY_WEIGHTS]
+	var idx: PackedInt32Array = a[Mesh.ARRAY_INDEX]
+	var poses := bone_poses(stance)
+	var posed := PackedVector3Array()
+	posed.resize(verts.size())
+	for i in verts.size():
+		var p := Vector3.ZERO
+		for b in 4:
+			if w[i * 4 + b] > 0.0:
+				p += (poses[b] * verts[i]) * w[i * 4 + b]
+		posed[i] = p
+	var faces := PackedVector3Array()
+	faces.resize(idx.size())
+	for i in idx.size():
+		faces[i] = posed[idx[i]]
+	var tm := TriangleMesh.new()
+	tm.create_from_faces(faces)
+	_fig_posed[stance] = [posed, tm]
+	return _fig_posed[stance]
 
 func pick_part(fig: Node3D, from: Vector3, dir: Vector3) -> Dictionary:
-	# Rayon de la souris contre les pièces visibles (sans moteur physique).
+	# Rayon de la souris contre le corps (dans la pose courante).
 	# Renvoie le point touché dans le repère « debout », celui de la peinture.
-	var best := {}
-	var best_t := INF
-	for pose in fig.get_children():
-		if not (pose is Node3D) or pose.get_class() != "Node3D" or not pose.visible:
-			continue
-		for mi in pose.get_children():
-			var part: Array = PARTS[mi.get_meta("part")]
-			var inv: Transform3D = mi.global_transform.affine_inverse()
-			var o: Vector3 = inv * from
-			var d: Vector3 = (inv.basis * dir).normalized()
-			var size: Vector3 = part[2]
-			var t := INF
-			match part[1]:
-				"sphere":
-					var b := o.dot(d)
-					var c := o.dot(o) - size.x * size.x
-					var disc := b * b - c
-					if disc >= 0:
-						t = -b - sqrt(disc)
-				"capsule":
-					t = _ray_capsule(o, d, size.x, size.y / 2 - size.x)
-				"box":
-					t = _ray_box(o, d, size / 2)
-				_:
-					t = _ray_box(o, d, Vector3(size.x, size.y / 2, size.x))
-			if t > 0 and t < best_t:
-				best_t = t
-				if not paintable(part):
-					best = {}  # le fusil cache ce qui est derrière, mais ne se peint pas
-					continue
-				var local := o + d * t
-				best = {"ref": part_transform(part, "debout") * local, "world": mi.global_transform * local}
-	return best
+	var stance: String = fig.get_meta("stance", "debout")
+	var data := _posed(stance)
+	var inv := fig.global_transform.affine_inverse()
+	var hit: Dictionary = (data[1] as TriangleMesh).intersect_ray(inv * from, (inv.basis * dir).normalized())
+	if hit.is_empty():
+		return {}
+	var a := _model_arrays()
+	var verts: PackedVector3Array = a[Mesh.ARRAY_VERTEX]
+	var idx: PackedInt32Array = a[Mesh.ARRAY_INDEX]
+	var posed: PackedVector3Array = data[0]
+	var f: int = hit["face_index"]
+	var i0 := idx[f * 3]
+	var i1 := idx[f * 3 + 1]
+	var i2 := idx[f * 3 + 2]
+	var bc := Geometry3D.get_triangle_barycentric_coords(hit["position"], posed[i0], posed[i1], posed[i2])
+	var ref := verts[i0] * bc.x + verts[i1] * bc.y + verts[i2] * bc.z
+	return {"ref": ref, "world": fig.global_transform * (hit["position"] as Vector3)}
 
-static func _ray_box(o: Vector3, d: Vector3, half: Vector3) -> float:
-	var tmin := -INF
-	var tmax := INF
-	for a in 3:
-		if absf(d[a]) < 1e-6:
-			if absf(o[a]) > half[a]:
-				return INF
-			continue
-		var t1 := (-half[a] - o[a]) / d[a]
-		var t2 := (half[a] - o[a]) / d[a]
-		tmin = maxf(tmin, minf(t1, t2))
-		tmax = minf(tmax, maxf(t1, t2))
-	if tmin > tmax or tmax < 0:
-		return INF
-	return tmin if tmin > 0 else tmax
-
-static func _ray_capsule(ro: Vector3, rd: Vector3, r: float, hh: float) -> float:
-	# Intersection rayon / capsule d'axe y (segment de -hh à +hh, rayon r).
-	var pa := Vector3(0, -hh, 0)
-	var pb := Vector3(0, hh, 0)
-	var ba := pb - pa
-	var oa := ro - pa
-	var baba := ba.dot(ba)
-	var bard := ba.dot(rd)
-	var baoa := ba.dot(oa)
-	var rdoa := rd.dot(oa)
-	var oaoa := oa.dot(oa)
-	var a := baba - bard * bard
-	var b := baba * rdoa - baoa * bard
-	var c := baba * oaoa - baoa * baoa - r * r * baba
-	var h := b * b - a * c
-	if h >= 0.0 and absf(a) > 1e-9:
-		var t := (-b - sqrt(h)) / a
-		var y := baoa + t * bard
-		if y > 0.0 and y < baba:
-			return t
-		var oc := oa if y <= 0.0 else ro - pb
-		b = rd.dot(oc)
-		c = oc.dot(oc) - r * r
-		h = b * b - c
-		if h > 0.0:
-			return -b - sqrt(h)
-	return INF
+## Points répartis sur tout le corps (pose debout), pour mesurer le camouflage.
+func figure_samples() -> Array[Vector3]:
+	var a := _model_arrays()
+	var verts: PackedVector3Array = a[Mesh.ARRAY_VERTEX]
+	var idx: PackedInt32Array = a[Mesh.ARRAY_INDEX]
+	var areas := PackedFloat32Array()
+	var total := 0.0
+	for f in idx.size() / 3:
+		total += (verts[idx[f * 3 + 1]] - verts[idx[f * 3]]).cross(verts[idx[f * 3 + 2]] - verts[idx[f * 3]]).length() / 2
+		areas.append(total)
+	var r := RandomNumberGenerator.new()
+	r.seed = 7
+	var out: Array[Vector3] = []
+	for i in 2400:
+		var f := areas.bsearch(r.randf() * total)
+		var u := r.randf()
+		var v := r.randf()
+		if u + v > 1.0:
+			u = 1.0 - u
+			v = 1.0 - v
+		var p0 := verts[idx[f * 3]]
+		out.append(p0 + (verts[idx[f * 3 + 1]] - p0) * u + (verts[idx[f * 3 + 2]] - p0) * v)
+	return out
 
 func set_camo(fig: Node3D, zone: String) -> void:
 	# Tenue unie (l'ennemi) : la couleur du terrain, sans coups de pinceau.
 	var m: ShaderMaterial = fig.get_meta("camo")
 	m.set_shader_parameter("base_color", ZONES[zone]["color"])
 	m.set_shader_parameter("stroke_count", 0)
+	m.set_shader_parameter("tex_mix", 0.0)
 
 
 # ---------- Repères, éclair du canon, marqueur de fin ----------

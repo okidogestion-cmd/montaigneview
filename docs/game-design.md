@@ -229,3 +229,15 @@ Le jeu devient une **appli mobile** (même jeu : cachette, peinture, duel), plus
 - `world.gd` → `PARTS` : une pièce peut avoir une **pièce parente** (7e valeur) ; elle n'a alors que la pose « debout »,
   donnée dans le repère de sa parente, et la suit dans toutes les poses et la marche.
 - Tenue de départ (`paint.gd` → `_set_default`) : capuche olive, visage, pantalon olive, bottes, sac.
+
+### Personnage 3D (27/10/2026)
+- Le sniper est maintenant un **modèle 3D** fait par l'utilisateur avec Higgsfield (Tripo), via ChatGPT :
+  original 65 Mo / 1,9 million de triangles, allégé à **8 700 triangles** (`game/art/sniper.glb`, 280 Ko)
+  + texture couleur 1024 px (`game/art/sniper_couleur.jpg`). Le modèle d'origine reste sur le Google Drive de l'utilisateur.
+- Pas de squelette dans le modèle : `world.gd` lui en ajoute un de 4 os (buste avec bras et fusil, tête, jambe gauche,
+  jambe droite) avec des poids calculés selon la position des sommets (`_model_arrays`). Poses : `FIG_POSES`
+  (hanche, bascule du buste, angle des jambes, tête relevée) ; marche : balancement des jambes.
+- Peinture : le pinceau vise le vrai maillage (`TriangleMesh`, `pick_part`) ; le score de camouflage se mesure sur
+  2 400 points répartis sur le corps (`figure_samples`). Tant que rien n'est peint, on voit la tenue d'origine
+  (`tex_mix` du shader camo) ; la peinture garde les plis du vêtement.
+- Les anciennes pièces (`PARTS`) sont supprimées.

@@ -144,7 +144,7 @@ func _ready() -> void:
 	hud.again_pressed.connect(start_hide)
 	hud.menu_pressed.connect(to_menu)
 	hud.level_chosen.connect(_on_level)
-	paint = PaintScript.new(world.player.get_meta("camo"), WorldScript.PARTS, Callable(WorldScript, "part_transform"))
+	paint = PaintScript.new(world.player.get_meta("camo"), world.figure_samples())
 	hud.paint_color.connect(func(c): brush_color = c; _paint_state())
 	hud.paint_size.connect(func(i): brush_size = i; _paint_state())
 	hud.paint_tool.connect(func(t): brush_tool = t; _paint_state())
