@@ -19,7 +19,7 @@ const HIDE_TIME := 60.0
 const HIDE_FOV := 62.0
 const FIRE_FOV := [55.0, 14.0, 5.5]
 const ZOOM_LABELS := ["x1", "x4", "x10"]
-const SKY := Color("#b3dbf2")   # couleur de l'horizon, reprise par le brouillard
+const SKY := Color("#efd9c9")   # couleur de l'horizon (lever de soleil du panorama), reprise par le brouillard
 const FOG_NEAR := 200.0
 const FOG_FAR := 1100.0
 const ENEMY_VIEW := Vector3(0, 92, -125)   # d'où la petite lunette ennemie te regarde pendant la cachette
@@ -139,6 +139,7 @@ func _ready() -> void:
 	inset_cam.far = 3000
 	hud.inset_viewport.add_child(inset_cam)
 	inset_cam.current = true
+	hud.orientation_changed.connect(_on_orientation)
 	hud.play_pressed.connect(start_hide)
 	hud.again_pressed.connect(start_hide)
 	hud.menu_pressed.connect(to_menu)
@@ -179,6 +180,10 @@ func _on_touch_tap(name: String) -> void:
 		"zoom":
 			cycle_zoom()
 
+## Debout, l'angle de vue se règle sur la largeur (sinon on ne verrait qu'une tranche de l'île d'en face).
+func _on_orientation(portrait: bool) -> void:
+	camera.keep_aspect = Camera3D.KEEP_WIDTH if portrait else Camera3D.KEEP_HEIGHT
+
 func _on_level(lv: String) -> void:
 	level = lv
 	hud.set_level(lv)
@@ -191,6 +196,7 @@ func _build_environment() -> void:
 	env = Environment.new()
 	var sky_mat := ShaderMaterial.new()
 	sky_mat.shader = preload("res://shaders/sky.gdshader")
+	sky_mat.set_shader_parameter("panorama", preload("res://art/ciel.jpg"))
 	var sky := Sky.new()
 	sky.sky_material = sky_mat
 	env.background_mode = Environment.BG_SKY
@@ -792,7 +798,7 @@ func _process(dt: float) -> void:
 		var e := clampf(reveal_t / 3.0, 0, 1)
 		var s := e * e * (3 - 2 * e)
 		set_fog(lerpf(0, FOG_NEAR, s), lerpf(12, FOG_FAR, s))
-		hud.fog_overlay.color.a = 1 - s
+		hud.set_fog_amount(1 - s)
 		if reveal_t >= 3:
 			phase = "fire"
 			hud.center_label.text = ""
@@ -838,7 +844,7 @@ func _process(dt: float) -> void:
 		if ai_next <= 0:
 			ai_shoot()
 	if phase != "reveal":
-		hud.fog_overlay.color.a = 0
+		hud.set_fog_amount(0)
 	if phase == "paint":
 		_place_workshop_camera()
 		if matches_dirty and not painting:

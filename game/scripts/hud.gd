@@ -15,6 +15,7 @@ signal paint_pose(pose: String)
 signal paint_undo
 signal paint_clear
 signal paint_done
+signal orientation_changed(portrait: bool)
 
 const ZONES: Dictionary = preload("res://scripts/world.gd").ZONES
 const INK := Color("#0e1418")
@@ -48,6 +49,7 @@ void fragment() {
 
 var root: Control
 var fog_overlay: ColorRect
+var fog_layers: Array[TextureRect] = []
 var scope: ColorRect
 var dot: Control
 var flash: ColorRect
@@ -92,7 +94,12 @@ var menu_hint: Label
 var ready_btn: Button
 var fire_keys: Label
 var paint_hint: Label
-var _rotate_msg: Control
+var menu_card: Control
+var paint_left: Control
+var paint_right: Control
+## Téléphone tenu debout : l'interface passe en 720 × 1280 et se réorganise (voir _apply_orientation).
+var portrait := false
+var _orient_done := false
 
 var _toast_tween: Tween
 
@@ -102,6 +109,20 @@ func _ready() -> void:
 	add_child(root)
 	fog_overlay = _full(_rect(Color("#dfe6ea", 0)))
 	root.add_child(fog_overlay)
+	# Deux nappes de brume (art/brume.jpg, créée avec Higgsfield) qui s'écartent quand le brouillard se lève.
+	for i in 2:
+		var f := TextureRect.new()
+		f.texture = preload("res://art/brume.jpg")
+		f.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
+		f.stretch_mode = TextureRect.STRETCH_SCALE
+		f.flip_h = i == 1
+		var fm := CanvasItemMaterial.new()
+		fm.blend_mode = CanvasItemMaterial.BLEND_MODE_ADD
+		f.material = fm
+		f.mouse_filter = Control.MOUSE_FILTER_IGNORE
+		f.visible = false
+		root.add_child(f)
+		fog_layers.append(f)
 	scope = _full(ColorRect.new())
 	var sm := ShaderMaterial.new()
 	sm.shader = Shader.new()
@@ -137,6 +158,21 @@ func _ready() -> void:
 	toast_panel.add_child(toast_label)
 	toast_panel.modulate.a = 0
 	root.add_child(toast_panel)
+
+
+## Brume de 1 (écran noyé) à 0 (dégagé) : fond clair + deux nappes qui s'écartent et s'effacent.
+func set_fog_amount(a: float) -> void:
+	fog_overlay.color.a = clampf((a - 0.45) / 0.55, 0, 1)
+	var vs := root.size
+	for i in fog_layers.size():
+		var f := fog_layers[i]
+		f.visible = a > 0.001
+		if not f.visible:
+			continue
+		var spread := (1.0 - a) * 0.5 * vs.x
+		f.size = vs * Vector2(1.6, 1.2) * (1.0 + (1.0 - a) * 0.4)
+		f.position = Vector2((vs.x - f.size.x) / 2 + (spread if i == 1 else -spread), (vs.y - f.size.y) / 2)
+		f.modulate.a = clampf(a * 1.4, 0, 1)
 
 
 # ---------- Petites fabriques ----------
@@ -243,7 +279,17 @@ func _center_card(width: float) -> Array:
 # ---------- Menu ----------
 func _build_menu() -> void:
 	var parts := _center_card(440)
-	menu = parts[0]
+	# Illustration du menu (art/menu.jpg, créée avec Higgsfield) derrière la carte, poussée à droite.
+	menu = _full(Control.new())
+	var bg := TextureRect.new()
+	bg.texture = preload("res://art/menu.jpg")
+	bg.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
+	bg.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_COVERED
+	menu.add_child(_full(bg))
+	menu.add_child(_full(_rect(Color(INK, 0.3))))
+	menu_card = parts[0]
+	menu_card.anchor_left = 0.42
+	menu.add_child(menu_card)
 	var v: VBoxContainer = parts[1]
 	var title := RichTextLabel.new()
 	title.bbcode_enabled = true
@@ -309,7 +355,9 @@ func _build_hide() -> void:
 	var tv := _vbox(2)
 	tv.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	tv.add_child(_label("Cache-toi", 30, PAPER))
-	tv.add_child(_small("Trouve une cachette sur ton île, puis tu te peindras sur place. L'ennemi regarde depuis l'île d'en face."))
+	var hide_sub := _small("Trouve une cachette sur ton île, puis tu te peindras sur place. L'ennemi regarde depuis l'île d'en face.")
+	hide_sub.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	tv.add_child(hide_sub)
 	th.add_child(tv)
 	var tr := _vbox(2)
 	var tl := _small("Temps")
@@ -563,7 +611,9 @@ func _build_paint() -> void:
 	var top := _bar(true)
 	var tv := _vbox(2)
 	tv.add_child(_label("Atelier de peinture", 30, PAPER))
-	tv.add_child(_small("Peins ton sniper aux couleurs du terrain où tu comptes te cacher"))
+	var paint_sub := _small("Peins ton sniper aux couleurs du terrain où tu comptes te cacher")
+	paint_sub.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	tv.add_child(paint_sub)
 	top.add_child(tv)
 	paint_hud.add_child(top)
 
@@ -635,6 +685,7 @@ func _build_paint() -> void:
 	left.add_child(lv)
 	paint_hud.add_child(left)
 	paint_panels.append(left)
+	paint_left = left
 
 	# Panneau de droite : ressemblance avec chaque terrain.
 	var right := _panel()
@@ -671,12 +722,14 @@ func _build_paint() -> void:
 	right.add_child(rv)
 	paint_hud.add_child(right)
 	paint_panels.append(right)
+	paint_right = right
 
 	var bottom := _bar(false)
 	var bh := _hbox()
 	paint_hint = _label("Clic gauche : peindre   Clic droit (glisser) : tourner autour   Molette : zoom", 14, MUTED)
 	var hint := paint_hint
 	hint.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	hint.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 	bh.add_child(hint)
 	var done := _button("TERMINÉ", BLAZE, Color("#1a0d04"), 24)
 	done.pressed.connect(func(): paint_done.emit())
@@ -734,17 +787,6 @@ func set_touch_mode(on: bool) -> void:
 	for l in fire_hud.find_children("*", "Label", true, false):
 		(l as Label).text = (l as Label).text.replace(" (MAJ / CLIC DROIT)", "").replace(" (MOLETTE / Z)", "")
 	paint_hint.text = "Un doigt sur le sniper : peindre   ·   Un doigt à côté : tourner autour   ·   Deux doigts : zoomer"
-	_rotate_msg = _full(_rect(INK))
-	_rotate_msg.mouse_filter = Control.MOUSE_FILTER_STOP
-	var rl := _label("Tourne ton téléphone
-en mode paysage", 40, PAPER)
-	rl.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-	rl.set_anchors_preset(Control.PRESET_CENTER)
-	rl.grow_horizontal = Control.GROW_DIRECTION_BOTH
-	rl.grow_vertical = Control.GROW_DIRECTION_BOTH
-	_rotate_msg.add_child(rl)
-	_rotate_msg.visible = false
-	root.add_child(_rotate_msg)
 
 func over_paint_panel(pos: Vector2) -> bool:
 	for p in paint_panels:
@@ -753,8 +795,41 @@ func over_paint_panel(pos: Vector2) -> bool:
 	return false
 
 func _process(_dt: float) -> void:
-	# Téléphone tenu debout : on demande de le tourner (le jeu se joue en paysage).
-	if _rotate_msg == null:
-		return
-	var s := root.get_viewport_rect().size
-	_rotate_msg.visible = s.y > s.x * 1.05
+	# Le jeu se joue téléphone debout ou couché : on suit l'orientation de l'écran.
+	var ws := get_window().size
+	var p := ws.y > ws.x * 1.05
+	if p != portrait or not _orient_done:
+		_orient_done = true
+		portrait = p
+		_apply_orientation()
+
+## Place un panneau sur un point d'ancrage (0 à 1) avec un décalage, et dans quel sens il grandit.
+func _pin(c: Control, anchor: Vector2, offset: Vector2, grow_h: int, grow_v: int) -> void:
+	c.anchor_left = anchor.x
+	c.anchor_right = anchor.x
+	c.anchor_top = anchor.y
+	c.anchor_bottom = anchor.y
+	c.offset_left = offset.x
+	c.offset_right = offset.x
+	c.offset_top = offset.y
+	c.offset_bottom = offset.y
+	c.grow_horizontal = grow_h
+	c.grow_vertical = grow_v
+	c.reset_size()
+
+func _apply_orientation() -> void:
+	# Base 720 × 1280 debout (au lieu de 1280 × 720) : le texte garde sa taille sur un écran étroit.
+	get_window().content_scale_size = Vector2i(720, 1280) if portrait else Vector2i(1280, 720)
+	# Menu : la carte au centre debout ; à droite couché, pour laisser voir l'illustration.
+	menu_card.anchor_left = 0.0 if portrait else 0.42
+	# Lunette ennemie : un peu plus bas debout, le bandeau du haut y prend trois lignes.
+	inset.position.y = 132 if portrait else 92
+	inset_label.position.y = inset.position.y + 206
+	# Atelier : debout, les couleurs en bas à gauche et le camouflage en haut à droite, le sniper au milieu.
+	if portrait:
+		_pin(paint_left, Vector2(0, 1), Vector2(14, -110), Control.GROW_DIRECTION_END, Control.GROW_DIRECTION_BEGIN)
+		_pin(paint_right, Vector2(1, 0), Vector2(-14, 120), Control.GROW_DIRECTION_BEGIN, Control.GROW_DIRECTION_END)
+	else:
+		_pin(paint_left, Vector2(0, 0.5), Vector2(14, 0), Control.GROW_DIRECTION_END, Control.GROW_DIRECTION_BOTH)
+		_pin(paint_right, Vector2(1, 0.5), Vector2(-14, 0), Control.GROW_DIRECTION_BEGIN, Control.GROW_DIRECTION_BOTH)
+	orientation_changed.emit(portrait)

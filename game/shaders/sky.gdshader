@@ -1,7 +1,10 @@
 shader_type sky;
-// Ciel peint : dégradé bleu franc, soleil net, gros nuages cartoon qui dérivent.
+// Ciel peint : panorama du lever de soleil (art/ciel.jpg, créé avec Higgsfield) autour de l'horizon,
+// dégradé bleu au-dessus, soleil net, gros nuages cartoon qui dérivent.
 
-uniform vec3 top_color : source_color = vec3(0.16, 0.48, 0.86);
+uniform sampler2D panorama : source_color, filter_linear, repeat_disable;
+uniform float pano_strength = 1.0;
+uniform vec3 top_color : source_color = vec3(0.41, 0.64, 0.92);
 uniform vec3 horizon_color : source_color = vec3(0.70, 0.86, 0.96);
 uniform vec3 cloud_color : source_color = vec3(1.0, 1.0, 1.0);
 uniform vec3 cloud_shade : source_color = vec3(0.72, 0.80, 0.92);
@@ -29,6 +32,12 @@ void sky() {
 	float h = clamp(d.y, 0.0, 1.0);
 	vec3 col = mix(horizon_color, top_color, pow(h, 0.55));
 	if (d.y < 0.0) col = horizon_color;
+	// Panorama répété 4 fois en miroir autour de l'horizon (pas de raccord visible).
+	float az = atan(d.x, d.z) / 6.2831853 + 0.5;
+	float pu = abs(fract(az * 2.0) * 2.0 - 1.0);
+	float pv = 1.0 - clamp((d.y + 0.03) / 0.55, 0.0, 1.0);
+	vec3 pano = texture(panorama, vec2(pu, pv)).rgb;
+	col = mix(col, pano, (1.0 - smoothstep(0.35, 0.52, d.y)) * pano_strength);
 	// Soleil
 	float s = dot(d, normalize(LIGHT0_DIRECTION));
 	col = mix(col, vec3(1.0, 0.97, 0.85), smoothstep(0.9985, 0.9992, s));

@@ -28,3 +28,8 @@
 # Polices
 *.ttf filter=lfs diff=lfs merge=lfs -text
 *.otf filter=lfs diff=lfs merge=lfs -text
+
+# Exception : petites images (< 200 Ko) du jeu et de l'artefact, rangées directement dans Git
+# (le service LFS n'est pas joignable depuis les séances Claude dans le cloud).
+game/art/*.jpg -filter -diff -merge binary
+tools/artefact/*.jpg -filter -diff -merge binary

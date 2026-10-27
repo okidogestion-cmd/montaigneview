@@ -204,3 +204,13 @@ Le jeu devient une **appli mobile** (même jeu : cachette, peinture, duel), plus
 - Pour mettre à jour : exporter la version web, compresser `index.wasm` en gzip, puis republier la page
   avec ces fichiers sur le même lien (mettre à jour la taille de `index.pck` dans GODOT_CONFIG).
 - Vérifié par l'utilisateur le 26/10/2026 : le jeu démarre dans l'artefact.
+
+### Images Higgsfield et jeu debout (27/10/2026)
+- Trois images créées avec Higgsfield dans `game/art/` : `ciel.jpg` (panorama du lever de soleil, répété en miroir
+  autour de l'horizon par `shaders/sky.gdshader`), `brume.jpg` (deux nappes qui s'écartent quand le brouillard se lève,
+  `hud.gd` → `set_fog_amount`), `menu.jpg` (derrière le menu, et derrière l'écran de chargement de l'artefact).
+- Le jeu se joue **téléphone debout ou couché** : `hud.gd` → `_apply_orientation` passe la base de l'interface en
+  720 × 1280 debout, replace la carte du menu, les panneaux de l'atelier et la lunette ennemie ; la caméra règle
+  son angle de vue sur la largeur (`main.gd` → `_on_orientation`). Orientation de l'appli : capteur (`orientation=6`).
+- Mise à jour de l'artefact : seul `donnees-pck.wasm` change (`godot --headless --path game --export-pack "Web" index.pck`),
+  le moteur publié reste le même tant que la version de Godot (4.7.2) ne change pas.
