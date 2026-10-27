@@ -234,9 +234,11 @@ Le jeu devient une **appli mobile** (même jeu : cachette, peinture, duel), plus
 - Le sniper est maintenant un **modèle 3D** fait par l'utilisateur avec Higgsfield (Tripo), via ChatGPT :
   original 65 Mo / 1,9 million de triangles, allégé à **8 700 triangles** (`game/art/sniper.glb`, 280 Ko)
   + texture couleur 1024 px (`game/art/sniper_couleur.jpg`). Le modèle d'origine reste sur le Google Drive de l'utilisateur.
-- Pas de squelette dans le modèle : `world.gd` lui en ajoute un de 4 os (buste avec bras et fusil, tête, jambe gauche,
-  jambe droite) avec des poids calculés selon la position des sommets (`_model_arrays`). Poses : `FIG_POSES`
-  (hanche, bascule du buste, angle des jambes, tête relevée) ; marche : balancement des jambes.
+- Pas de squelette dans le modèle : `world.gd` lui en ajoute un de 6 os (buste avec bras et fusil, tête, deux cuisses,
+  deux tibias avec genoux) avec des poids calculés selon la position des sommets (`_model_arrays`) : les pieds suivent
+  toujours le tibia ; plus haut, seuls les sommets proches de l'axe de la jambe la suivent (le canon du fusil reste au buste).
+  Poses : `FIG_POSES` (hanche, bascule du buste, angle de chaque cuisse et tibia, tête relevée). Accroupi = tireur à
+  genou (genou gauche au sol, pied droit devant). Marche : la cuisse se balance et le genou plie quand la jambe recule.
 - Peinture : le pinceau vise le vrai maillage (`TriangleMesh`, `pick_part`) ; le score de camouflage se mesure sur
   2 400 points répartis sur le corps (`figure_samples`). Tant que rien n'est peint, on voit la tenue d'origine
   (`tex_mix` du shader camo) ; la peinture garde les plis du vêtement.

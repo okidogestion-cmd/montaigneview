@@ -685,21 +685,25 @@ const CAMO_SHADER := preload("res://shaders/camo.gdshader")
 
 # ---------- Le modèle 3D du sniper ----------
 # Le sniper est un modèle 3D (art/sniper.glb, créé avec Higgsfield / Tripo, allégé à 8 700 triangles)
-# animé par un petit squelette de 4 os : buste (avec bras, fusil), tête, jambe gauche, jambe droite.
+# animé par un petit squelette de 6 os : buste (avec bras, fusil), tête, cuisses et tibias (avec genoux).
 # Chaque sommet garde sa position « debout » (CUSTOM0) : la peinture suit le corps dans toutes les poses.
 const MODEL := preload("res://art/sniper.glb")
 const MODEL_TEX := preload("res://art/sniper_couleur.jpg")
 const MODEL_LUM := 0.043          # luminance moyenne de la texture (linéaire), pour garder ses plis sous la peinture
 const HIP := Vector3(0, 0.9, 0)   # hanche, pose debout
+const KNEE_Y := 0.48              # hauteur des genoux, pose debout
 const NECK := Vector3(0, 1.5, 0.02)
-const LEG_X := 0.12               # écart des jambes depuis le milieu
-# hip : où va la hanche ; lean : bascule du buste vers l'avant ; legs : angle de chaque jambe (gauche, droite)
-# autour de la hanche (positif : vers l'arrière) ; head : tête relevée (négatif).
+const LEG_X := 0.12               # écart des jambes depuis le milieu (si le modèle ne permet pas de le mesurer)
+# Os : 0 buste, 1 tête, 2 cuisse gauche, 3 cuisse droite, 4 tibia gauche, 5 tibia droit.
+# hip : où va la hanche ; lean : bascule du buste vers l'avant ; thighs / shins : angle de chaque cuisse et de
+# chaque tibia (gauche, droite) par rapport à la verticale (positif : vers l'arrière) ; head : tête relevée (négatif).
+# Accroupi = tireur à genou : genou gauche au sol, tibia couché derrière ; pied droit posé devant, cuisse à l'horizontale.
 const FIG_POSES := {
-	"debout": {"hip": Vector3(0, 0.9, 0), "lean": 0.0, "legs": [0.0, 0.0], "head": 0.0},
-	"accroupi": {"hip": Vector3(0, 0.5, 0.0), "lean": 0.35, "legs": [1.05, -1.05], "head": -0.3},
-	"couche": {"hip": Vector3(0, 0.17, -0.1), "lean": PI / 2, "legs": [PI / 2, PI / 2], "head": -1.0},
+	"debout": {"hip": Vector3(0, 0.9, 0), "lean": 0.0, "thighs": [0.0, 0.0], "shins": [0.0, 0.0], "head": 0.0},
+	"accroupi": {"hip": Vector3(0, 0.5, -0.05), "lean": 0.22, "thighs": [0.05, -1.4], "shins": [1.47, 0.0], "head": -0.15},
+	"couche": {"hip": Vector3(0, 0.17, -0.1), "lean": PI / 2, "thighs": [PI / 2, PI / 2], "shins": [PI / 2, PI / 2], "head": -1.0},
 }
+var _leg_axis := [Vector2(-LEG_X, 0), Vector2(LEG_X, 0)]   # axe de chaque jambe (x, z), mesuré sur le modèle
 var _fig_arrays: Array = []    # maillage debout, avec os, poids et positions de référence
 var _fig_posed := {}           # pose → [positions, TriangleMesh] (pinceau de l'atelier)
 
@@ -743,7 +747,8 @@ func _model_arrays() -> Array:
 			axis[side] += Vector2(v.x, v.z)
 			cnt[side] += 1
 	for side in 2:
-		axis[side] = axis[side] / maxi(1, cnt[side]) if cnt[side] > 0 else Vector2(LEG_X * (side * 2 - 1), 0)
+		if cnt[side] > 0:
+			_leg_axis[side] = axis[side] / cnt[side]
 	var bones := PackedInt32Array()
 	var weights := PackedFloat32Array()
 	var custom := PackedFloat32Array()
@@ -751,13 +756,16 @@ func _model_arrays() -> Array:
 	for i in verts.size():
 		var v := verts[i]
 		var side := 0 if v.x < 0 else 1
-		var leg := 1.0 - smoothstep(0.13, 0.2, Vector2(v.x, v.z).distance_to(axis[side]))
+		# Jambe : tout ce qui est bas (pieds compris) ; plus haut, seulement près de l'axe de la jambe
+		# (le canon du fusil descend devant la cuisse et doit rester avec le buste).
+		var near := 1.0 - smoothstep(0.14, 0.2, Vector2(v.x, v.z).distance_to(_leg_axis[side]))
+		var leg := 1.0 if v.y < 0.42 else near
 		var low := (1.0 - smoothstep(0.8, 0.96, v.y)) * leg
-		var s := smoothstep(-0.04, 0.04, v.x)
+		var shin := 1.0 - smoothstep(KNEE_Y - 0.06, KNEE_Y + 0.06, v.y)
 		var head := smoothstep(1.47, 1.57, v.y) if absf(v.x) < 0.22 else 0.0
 		var up := 1.0 - low
-		bones.append_array([0, 1, 2, 3])
-		weights.append_array([up * (1.0 - head), up * head, low * (1.0 - s), low * s])
+		bones.append_array([0, 1, 2 + side, 4 + side])
+		weights.append_array([up * (1.0 - head), up * head, low * (1.0 - shin), low * shin])
 		custom[i * 4] = v.x
 		custom[i * 4 + 1] = v.y
 		custom[i * 4 + 2] = v.z
@@ -770,16 +778,27 @@ func _model_arrays() -> Array:
 	_fig_arrays = arrays
 	return arrays
 
-## Transformation de chaque os (buste, tête, jambe g, jambe d) pour une pose ; swing balance les jambes (marche).
-static func bone_poses(stance: String, swing := 0.0) -> Array[Transform3D]:
+## Rotation autour de l'axe x passant par le point « from » (pose debout), qui est amené en « to ».
+static func _hinge(from: Vector3, to: Vector3, angle: float) -> Transform3D:
+	return Transform3D(Basis.IDENTITY, to) * Transform3D(Basis(Vector3.RIGHT, angle), Vector3.ZERO) * Transform3D(Basis.IDENTITY, -from)
+
+## Transformation de chaque os pour une pose. swing balance les jambes (marche) : la cuisse avance ou recule,
+## et le genou plie quand la jambe part en arrière.
+func bone_poses(stance: String, swing := 0.0) -> Array[Transform3D]:
 	var P: Dictionary = FIG_POSES[stance]
-	var torso := Transform3D(Basis.IDENTITY, P.hip) * Transform3D(Basis(Vector3.RIGHT, P.lean), Vector3.ZERO) * Transform3D(Basis.IDENTITY, -HIP)
-	var head := torso * Transform3D(Basis.IDENTITY, NECK) * Transform3D(Basis(Vector3.RIGHT, P.head), Vector3.ZERO) * Transform3D(Basis.IDENTITY, -NECK)
+	var torso := _hinge(HIP, P.hip, P.lean)
+	var head := torso * _hinge(NECK, NECK, P.head)
 	var out: Array[Transform3D] = [torso, head]
+	var shins: Array[Transform3D] = []
 	for side in 2:
-		var h := Vector3(LEG_X * (side * 2 - 1), HIP.y, 0)
-		var a: float = P.legs[side] + swing * (1.0 if side == 0 else -1.0)
-		out.append(Transform3D(Basis.IDENTITY, torso * h) * Transform3D(Basis(Vector3.RIGHT, a), Vector3.ZERO) * Transform3D(Basis.IDENTITY, -h))
+		var ax: Vector2 = _leg_axis[side]
+		var hip := Vector3(ax.x, HIP.y, ax.y)
+		var knee := Vector3(ax.x, KNEE_Y, ax.y)
+		var s := swing * (1.0 if side == 0 else -1.0)
+		var thigh := _hinge(hip, torso * hip, P.thighs[side] + s)
+		out.append(thigh)
+		shins.append(_hinge(knee, thigh * knee, P.shins[side] + s + maxf(0.0, s) * 1.4))
+	out.append_array(shins)
 	return out
 
 func _make_figure(_poses: Array = ["accroupi"]) -> Node3D:
@@ -794,9 +813,8 @@ func _make_figure(_poses: Array = ["accroupi"]) -> Node3D:
 	var sk := Skeleton3D.new()
 	sk.name = "squelette"
 	var skin := Skin.new()
-	for i in 4:
-		sk.add_bone(["buste", "tete", "jambe_g", "jambe_d"][i])
-		skin.add_bind(i, Transform3D.IDENTITY)
+	for b in ["buste", "tete", "cuisse_g", "cuisse_d", "tibia_g", "tibia_d"]:
+		skin.add_bind(sk.add_bone(b), Transform3D.IDENTITY)
 	g.add_child(sk)
 	var mi := MeshInstance3D.new()
 	mi.mesh = mesh
@@ -834,6 +852,7 @@ func _posed(stance: String) -> Array:
 	var a := _model_arrays()
 	var verts: PackedVector3Array = a[Mesh.ARRAY_VERTEX]
 	var w: PackedFloat32Array = a[Mesh.ARRAY_WEIGHTS]
+	var bi: PackedInt32Array = a[Mesh.ARRAY_BONES]
 	var idx: PackedInt32Array = a[Mesh.ARRAY_INDEX]
 	var poses := bone_poses(stance)
 	var posed := PackedVector3Array()
@@ -842,7 +861,7 @@ func _posed(stance: String) -> Array:
 		var p := Vector3.ZERO
 		for b in 4:
 			if w[i * 4 + b] > 0.0:
-				p += (poses[b] * verts[i]) * w[i * 4 + b]
+				p += (poses[bi[i * 4 + b]] * verts[i]) * w[i * 4 + b]
 		posed[i] = p
 	var faces := PackedVector3Array()
 	faces.resize(idx.size())
