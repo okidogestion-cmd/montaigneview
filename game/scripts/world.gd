@@ -44,9 +44,6 @@ var _grass_mask := PackedByteArray()
 var _grass_fields: Array[MultiMeshInstance3D] = []
 var _outline: ShaderMaterial
 var _rock_mesh: Mesh
-var _bush_mesh: Mesh
-var _pine_mesh: Mesh
-var _round_tree_mesh: Mesh
 var _log_mesh: Mesh
 var _foliage_mats: Array[ShaderMaterial] = []   # feuillage et écorce : effacés près de la caméra
 var near_fade := 0.0                            # rayon actuel de cet effacement (m)
@@ -227,13 +224,12 @@ func _build_meshes() -> void:
 	st.create_from(rmesh, 0)
 	st.generate_normals()
 	_rock_mesh = st.commit()
-	# Végétation réaliste (vegetation.gd) : cartes d'aiguilles et de feuilles autour d'un tronc d'écorce.
-	_pine_mesh = VEG.spruce(11)
-	_veg_materials(_pine_mesh, "vege_sapin.png", Color("#d8e4d0"), 0.12, 8.0, 0.25)
-	_round_tree_mesh = VEG.broadleaf(23)
-	_veg_materials(_round_tree_mesh, "vege_feuilles.png", Color.WHITE, 0.1, 6.0, 0.4)
-	_bush_mesh = VEG.bush(37)
-	_veg_materials(_bush_mesh, "vege_feuilles.png", Color("#c9d6b8"), 0.05, 1.5, 0.35)
+	# Arbres et buissons photo (art/arbres/) : plusieurs modèles par sorte, mélangés dans le décor.
+	for kind in PACK_TREES:
+		var meshes: Array[Mesh] = []
+		for t in PACK_TREES[kind]:
+			meshes.append(_pack_tree(t[0], t[1], t[2], t[3]))
+		_tree_meshes[kind] = meshes
 	var bark := Color("#7a5233")
 	# Bois flotté : un tronc couché, avec une branche cassée.
 	_log_mesh = _merge([
@@ -241,20 +237,61 @@ func _build_meshes() -> void:
 		[_cyl(0.05, 0.08, 0.7, 5), Transform3D(Basis(Vector3.FORWARD, 0.6), Vector3(0.5, 0.35, 0)), Color("#a8937a")],
 	])
 
-## Matériaux d'un arbre (surface 0 : écorce, surface 1 : feuillage), réglés pour s'effacer près de la caméra.
-func _veg_materials(mesh: ArrayMesh, leaf_tex: String, tint: Color, wind: float, wind_height: float, translucency: float) -> void:
-	for i in 2:
-		var m := ShaderMaterial.new()
-		m.shader = FOLIAGE
-		m.set_shader_parameter("albedo_tex", load("res://art/" + ("vege_ecorce.jpg" if i == 0 else leaf_tex)))
-		m.set_shader_parameter("alpha_cut", 0.0 if i == 0 else 0.45)
-		m.set_shader_parameter("tint", Color.WHITE if i == 0 else tint)
-		m.set_shader_parameter("translucency", 0.0 if i == 0 else translucency)
-		m.set_shader_parameter("wind", wind)
-		m.set_shader_parameter("wind_height", wind_height)
-		m.set_shader_parameter("near_fade", near_fade)
-		mesh.surface_set_material(i, m)
-		_foliage_mats.append(m)
+## Arbres du « tree pack 1.1 » : un tronc et quatre cartes croisées avec la photo de l'arbre
+## (128 px d'origine, agrandie à 256 px aux contours adoucis).
+## [modèle, hauteur (m), vent, lumière qui traverse les feuilles]
+const PACK_TREES := {
+	"tree": [["tree07", 9.5, 0.12, 0.25], ["tree09", 9.0, 0.12, 0.25], ["tree12", 9.5, 0.12, 0.25]],
+	"round": [["tree19", 7.5, 0.1, 0.4], ["tree24", 7.5, 0.1, 0.4]],
+	"bush": [["bush02", 1.8, 0.05, 0.35], ["bush06", 1.7, 0.05, 0.35]],
+}
+var _tree_meshes := {}   # sorte → modèles
+
+## Un arbre du pack, mis à la hauteur voulue. Le feuillage reçoit des normales « en boule » (éclairage doux,
+## comme une vraie couronne) et s'assombrit vers le bas ; il s'efface près de la caméra comme le reste.
+func _pack_tree(name: String, height: float, wind: float, translucency: float) -> ArrayMesh:
+	var scene: Node = load("res://art/arbres/%s.fbx" % name).instantiate()
+	var src: MeshInstance3D = scene.find_children("*", "MeshInstance3D", true, false)[0]
+	var a: Array = src.mesh.surface_get_arrays(0)
+	scene.free()
+	var v: PackedVector3Array = a[Mesh.ARRAY_VERTEX]
+	var uv: PackedVector2Array = a[Mesh.ARRAY_TEX_UV]
+	var nrm: PackedVector3Array = a[Mesh.ARRAY_NORMAL]
+	var bush := name.begins_with("bush")
+	var top := 0.0
+	var low := INF
+	for i in v.size():
+		top = maxf(top, v[i].y)
+		if bush or uv[i].x > 0.25:   # le tronc est à gauche de l'image, le feuillage à droite
+			low = minf(low, v[i].y)
+	var k := height / top
+	var center := Vector3(0, (low + top) * 0.5 * k, 0)
+	var col := PackedColorArray()
+	col.resize(v.size())
+	for i in v.size():
+		v[i] *= k
+		if bush or uv[i].x > 0.25:
+			nrm[i] = (v[i] - center).normalized().lerp(Vector3.UP, 0.35).normalized()
+			col[i] = Color.WHITE * lerpf(0.65, 1.0, clampf((v[i].y - low * k) / ((top - low) * k), 0.0, 1.0))
+		else:
+			col[i] = Color.WHITE * 0.8
+	a[Mesh.ARRAY_VERTEX] = v
+	a[Mesh.ARRAY_NORMAL] = nrm
+	a[Mesh.ARRAY_COLOR] = col
+	a[Mesh.ARRAY_TANGENT] = null
+	var mesh := ArrayMesh.new()
+	mesh.add_surface_from_arrays(Mesh.PRIMITIVE_TRIANGLES, a)
+	var m := ShaderMaterial.new()
+	m.shader = FOLIAGE
+	m.set_shader_parameter("albedo_tex", load("res://art/arbres/%s.png" % name))
+	m.set_shader_parameter("alpha_cut", 0.5)
+	m.set_shader_parameter("translucency", translucency)
+	m.set_shader_parameter("wind", wind)
+	m.set_shader_parameter("wind_height", height)
+	m.set_shader_parameter("near_fade", near_fade)
+	mesh.surface_set_material(0, m)
+	_foliage_mats.append(m)
+	return mesh
 
 ## Rayon (m) autour de la caméra où arbres et buissons s'effacent : ils ne bouchent jamais la vue.
 func set_near_fade(r: float) -> void:
@@ -459,12 +496,12 @@ func _make_cover(zone: String) -> Node3D:
 			_part(g, _rock_mesh, toon(col, false, true, 0.0, 7.0, zone), Vector3(0, 0.35, 0), Vector3(1.8, 1, 1.5))
 			_box(body, Vector3(0, 0.35, 0), Vector3(3.2, 1.8, 2.7))
 		"herbe":
-			_part(g, _bush_mesh, null, Vector3.ZERO, Vector3(1.4, 1, 1.3))
+			_part(g, _tree_meshes["bush"][0], null, Vector3.ZERO, Vector3(1.8, 1.0, 1.7))
 			body.set_meta("foliage", true)
 			_box(body, Vector3(0.2, 0.6, 0), Vector3(3.2, 1.8, 2.6))
 		_:
-			_part(g, _pine_mesh, null, Vector3(-1.6, 0, -0.6), Vector3(0.9, 0.95, 0.9))
-			_part(g, _bush_mesh, null, Vector3.ZERO, Vector3(1.3, 0.95, 1.2))
+			_part(g, _tree_meshes["tree"][0], null, Vector3(-1.6, 0, -0.6), Vector3(0.9, 0.85, 0.9))
+			_part(g, _tree_meshes["bush"][1], null, Vector3.ZERO, Vector3(1.7, 0.95, 1.6))
 			body.set_meta("foliage", true)
 			_box(body, Vector3(0, 0.6, 0), Vector3(2.8, 1.8, 2.4))
 			var cs := CollisionShape3D.new()
@@ -560,13 +597,24 @@ func _scatter() -> void:
 	var leafy := StaticBody3D.new()   # arbres et buissons : traversés par les balles quand ils sont effacés
 	leafy.set_meta("foliage", true)
 	add_child(leafy)
-	_inst(_pine_mesh, null, pines, leafy, "tree")
-	_inst(_round_tree_mesh, null, rounds, leafy, "round")
+	_inst_mixed("tree", pines, leafy)
+	_inst_mixed("round", rounds, leafy)
 	_inst(_rock_mesh, toon(Color("#86837c"), false, true, 0.0, 7.0, "roche"), rocks[0], body, "rock")
 	_inst(_rock_mesh, toon(Color("#e3eaf2"), false, true, 0.0, 7.0, "neige"), rocks[1], body, "rock")
-	_inst(_bush_mesh, null, bushes, leafy, "bush")
+	_inst_mixed("bush", bushes, leafy)
 	_inst(_rock_mesh, toon(Color("#b8ad98"), false, false, 0.0, 7.0, "roche"), beach[0], body, "pebble")
 	_inst(_log_mesh, toon(Color.WHITE, true, true), beach[1], body, "log")
+
+## Répartit les arbres d'une sorte entre ses modèles (choix fixé par la position).
+func _inst_mixed(kind: String, list: Array, body: StaticBody3D) -> void:
+	var meshes: Array = _tree_meshes[kind]
+	var parts := []
+	for m in meshes:
+		parts.append([])
+	for p in list:
+		parts[mini(int(hash2(p[0] * 0.37, p[2] * 0.37) * meshes.size()), meshes.size() - 1)].append(p)
+	for i in meshes.size():
+		_inst(meshes[i], null, parts[i], body, kind)
 
 func _multimesh(mesh: Mesh, m: Material, xforms: Array) -> MultiMeshInstance3D:
 	var mm := MultiMesh.new()

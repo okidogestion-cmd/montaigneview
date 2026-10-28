@@ -252,6 +252,7 @@ Le jeu devient une **appli mobile** (même jeu : cachette, peinture, duel), plus
 - **Végétation** (`scripts/vegetation.gd`, `shaders/foliage.gdshader`) : épicéas à 13 étages de branches (deux cartes
   d'aiguilles en V par branche), feuillus et buissons en bouquets de feuilles, troncs d'écorce, touffes d'herbe et de
   fleurs des champs en cartes. Textures dessinées par programme : `art/vege_*.png`, `art/vege_ecorce.jpg`.
+  *28/10/2026 : arbres et buissons remplacés par les arbres photo du « tree pack », voir plus bas.*
 - **Les arbres ne bouchent pas la vue** : ils s'effacent en tramage près de la caméra (`world.set_near_fade`) :
   4 m à l'atelier, 5 m en cachette (3e personne), 35 m en vue de tir. Les balles traversent les arbres effacés
   (`main.gd` → `shoot`). Arbres et buissons ont leur propre corps physique (`is_foliage`).
@@ -287,3 +288,15 @@ Le jeu devient une **appli mobile** (même jeu : cachette, peinture, duel), plus
 - Pour plus tard : le ciel de nuit du même auteur (`PSX Nightsky HDRI`) pourrait servir à un mode de nuit.
   Le pack « PSX Forest » (modèles façon PlayStation 1, textures de 128 px) n'est pas utilisé : trop simple pour le
   rendu visé.
+
+### Arbres photo (28/10/2026)
+- Arbres et buissons du **« tree pack 1.1 »** fourni par l'utilisateur (`sources/tree_pack_1.1/` : 36 arbres et 8 buissons,
+  chacun un tronc et quatre cartes croisées avec la photo de l'arbre, 52 triangles). Licence à vérifier avant Steam.
+- Gardés pour la montagne (`game/art/arbres/`, `world.gd` → `PACK_TREES`) : 3 sapins (`tree07`, `tree09`, `tree12`) dans
+  la forêt, 2 feuillus (`tree19`, `tree24`) dans l'herbe, 2 buissons (`bush02`, `bush06`), aussi pour les cachettes.
+  Chaque arbre du décor prend l'un des modèles de sa sorte (choix fixé par sa position). Les arbres d'automne
+  (orange, rouge, jaune) ne sont pas utilisés.
+- Photos de 128 px agrandies à 256 px aux contours adoucis (moins de « pixels » de près), luminosité égalisée.
+  Feuillage avec normales « en boule » et bas plus sombre (`_pack_tree`), effacement près de la caméra comme avant.
+- Plus réalistes que les arbres dessinés par programme, surtout dans la lunette, et bien plus légers (52 triangles au
+  lieu d'environ 300 pour un sapin). Les anciens arbres (`VEG.spruce`, `broadleaf`, `bush`) et leurs textures sont retirés.

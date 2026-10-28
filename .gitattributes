@@ -37,3 +37,5 @@ game/art/*.glb -filter -diff -merge binary
 game/art/*.png -filter -diff -merge binary
 game/art/*.scn -filter -diff -merge binary
 sources/*.glb -filter -diff -merge binary
+game/art/arbres/* -filter -diff -merge binary
+sources/tree_pack_1.1/** -filter -diff -merge binary
