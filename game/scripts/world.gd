@@ -25,6 +25,8 @@ const TERRAIN := preload("res://shaders/terrain.gdshader")
 const OUTLINE := preload("res://shaders/outline.gdshader")
 const WATER := preload("res://shaders/water.gdshader")
 const GRASS := preload("res://shaders/grass.gdshader")
+const FOLIAGE := preload("res://shaders/foliage.gdshader")
+const VEG := preload("res://scripts/vegetation.gd")
 const GRASS_RADIUS := 40.0
 
 var heights := PackedFloat32Array()
@@ -46,6 +48,8 @@ var _bush_mesh: Mesh
 var _pine_mesh: Mesh
 var _round_tree_mesh: Mesh
 var _log_mesh: Mesh
+var _foliage_mats: Array[ShaderMaterial] = []   # feuillage et écorce : effacés près de la caméra
+var near_fade := 0.0                            # rayon actuel de cet effacement (m)
 
 
 # ---------- Bruit et relief ----------
@@ -136,6 +140,9 @@ func toon(color := Color.WHITE, vertex_colors := false, outline := false, wind :
 		if detail != "":
 			m.set_shader_parameter("use_detail", true)
 			m.set_shader_parameter("detail_tex", load("res://art/sol_%s.jpg" % detail))
+			if detail == "roche":
+				m.set_shader_parameter("use_relief", true)
+				m.set_shader_parameter("detail_nrm", load("res://art/relief_roche.jpg"))
 		if outline:
 			pass  # contours désactivés : ils dessinaient chaque arbre deux fois (trop lourd sur téléphone)
 		_materials[key] = m
@@ -202,50 +209,62 @@ func _at(pos: Vector3, scl := Vector3.ONE, rot_y := 0.0) -> Transform3D:
 	return Transform3D(Basis(Vector3.UP, rot_y).scaled(scl), pos)
 
 func _build_meshes() -> void:
-	# Rocher : sphère bosselée à facettes.
-	var rock := _sphere(1.0, 7, 4)
+	# Rocher : sphère déformée par un bruit à plusieurs échelles (bloc arrondi, arêtes et méplats),
+	# normales douces : la texture de roche fait le détail.
+	var rock := _sphere(1.0, 14, 9)
 	var ra := rock.get_mesh_arrays()
 	var rv: PackedVector3Array = ra[Mesh.ARRAY_VERTEX]
 	for i in rv.size():
 		var p := rv[i]
-		rv[i] = p * (0.82 + hash2(p.x * 3.1 + p.y * 1.7, p.z * 2.3 - p.y) * 0.36)
+		var k := 0.78 + vnoise(p.x * 1.7 + p.y * 0.6, p.z * 1.7 - p.y) * 0.3 + vnoise(p.x * 4.1 - p.y, p.z * 4.1 + p.y * 2.0) * 0.12
+		var q := p * k
+		q.y = maxf(q.y, -0.35) * (0.8 if q.y > 0 else 1.0)   # dessous aplati : il repose sur le sol
+		rv[i] = q
 	ra[Mesh.ARRAY_VERTEX] = rv
 	var rmesh := ArrayMesh.new()
 	rmesh.add_surface_from_arrays(Mesh.PRIMITIVE_TRIANGLES, ra)
 	var st := SurfaceTool.new()
 	st.create_from(rmesh, 0)
-	st.deindex()
 	st.generate_normals()
 	_rock_mesh = st.commit()
-	# Buisson : trois boules.
-	var leaf := Color("#5fae3e")
-	var leaf2 := Color("#4f9a37")
-	_bush_mesh = _merge([
-		[_sphere(1.0, 7, 4), _at(Vector3(0, 0.6, 0)), leaf],
-		[_sphere(0.7, 7, 4), _at(Vector3(0.9, 0.45, 0.2)), leaf2],
-		[_sphere(0.75, 7, 4), _at(Vector3(-0.7, 0.5, -0.3)), leaf2],
-	])
-	# Sapin : tronc et trois étages.
+	# Végétation réaliste (vegetation.gd) : cartes d'aiguilles et de feuilles autour d'un tronc d'écorce.
+	_pine_mesh = VEG.spruce(11)
+	_veg_materials(_pine_mesh, "vege_sapin.png", Color("#d8e4d0"), 0.12, 8.0, 0.25)
+	_round_tree_mesh = VEG.broadleaf(23)
+	_veg_materials(_round_tree_mesh, "vege_feuilles.png", Color.WHITE, 0.1, 6.0, 0.4)
+	_bush_mesh = VEG.bush(37)
+	_veg_materials(_bush_mesh, "vege_feuilles.png", Color("#c9d6b8"), 0.05, 1.5, 0.35)
 	var bark := Color("#7a5233")
-	_pine_mesh = _merge([
-		[_cyl(0.22, 0.3, 1.8, 6), _at(Vector3(0, 0.9, 0)), bark],
-		[_cyl(0.0, 1.9, 3.0, 8), _at(Vector3(0, 2.7, 0)), Color("#2f6e3b")],
-		[_cyl(0.0, 1.45, 2.6, 8), _at(Vector3(0, 4.1, 0)), Color("#367a41")],
-		[_cyl(0.0, 0.95, 2.1, 8), _at(Vector3(0, 5.6, 0)), Color("#3f8749")],
-	])
-	# Arbre rond (feuillu, comme dans Wind Waker).
 	# Bois flotté : un tronc couché, avec une branche cassée.
 	_log_mesh = _merge([
 		[_cyl(0.16, 0.2, 2.6, 7), Transform3D(Basis(Vector3.FORWARD, PI / 2), Vector3(0, 0.1, 0)), Color("#b9a58a")],
 		[_cyl(0.05, 0.08, 0.7, 5), Transform3D(Basis(Vector3.FORWARD, 0.6), Vector3(0.5, 0.35, 0)), Color("#a8937a")],
 	])
-	_round_tree_mesh = _merge([
-		[_cyl(0.24, 0.34, 2.6, 6), _at(Vector3(0, 1.3, 0)), bark],
-		[_sphere(1.9, 8, 4), _at(Vector3(0, 3.7, 0)), Color("#62b240")],
-		[_sphere(1.3, 8, 4), _at(Vector3(1.1, 3.2, 0.4)), Color("#56a339")],
-		[_sphere(1.4, 8, 4), _at(Vector3(-0.9, 3.3, -0.5)), Color("#56a339")],
-		[_sphere(1.1, 8, 4), _at(Vector3(0.2, 4.9, 0.3)), Color("#6dbf48")],
-	])
+
+## Matériaux d'un arbre (surface 0 : écorce, surface 1 : feuillage), réglés pour s'effacer près de la caméra.
+func _veg_materials(mesh: ArrayMesh, leaf_tex: String, tint: Color, wind: float, wind_height: float, translucency: float) -> void:
+	for i in 2:
+		var m := ShaderMaterial.new()
+		m.shader = FOLIAGE
+		m.set_shader_parameter("albedo_tex", load("res://art/" + ("vege_ecorce.jpg" if i == 0 else leaf_tex)))
+		m.set_shader_parameter("alpha_cut", 0.0 if i == 0 else 0.45)
+		m.set_shader_parameter("tint", Color.WHITE if i == 0 else tint)
+		m.set_shader_parameter("translucency", 0.0 if i == 0 else translucency)
+		m.set_shader_parameter("wind", wind)
+		m.set_shader_parameter("wind_height", wind_height)
+		m.set_shader_parameter("near_fade", near_fade)
+		mesh.surface_set_material(i, m)
+		_foliage_mats.append(m)
+
+## Rayon (m) autour de la caméra où arbres et buissons s'effacent : ils ne bouchent jamais la vue.
+func set_near_fade(r: float) -> void:
+	near_fade = r
+	for m in _foliage_mats:
+		m.set_shader_parameter("near_fade", r)
+
+## Le décor touché est-il un arbre ou un buisson (traversé par les balles quand il est effacé) ?
+func is_foliage(collider: Object) -> bool:
+	return collider != null and collider.has_meta("foliage")
 
 
 # ---------- Construction ----------
@@ -376,6 +395,8 @@ func _build_terrain() -> void:
 	m.shader = TERRAIN
 	for k in ["neige", "roche", "herbe", "foret", "sable"]:
 		m.set_shader_parameter("tex_" + k, load("res://art/sol_%s.jpg" % k))
+	m.set_shader_parameter("nrm_roche", load("res://art/relief_roche.jpg"))
+	m.set_shader_parameter("nrm_herbe", load("res://art/relief_herbe.jpg"))
 	m.set_shader_parameter("patches", 0.12)
 	var mi := MeshInstance3D.new()
 	mi.mesh = mesh
@@ -436,11 +457,13 @@ func _make_cover(zone: String) -> Node3D:
 			_part(g, _rock_mesh, toon(col, false, true, 0.0, 7.0, zone), Vector3(0, 0.35, 0), Vector3(1.8, 1, 1.5))
 			_box(body, Vector3(0, 0.35, 0), Vector3(3.2, 1.8, 2.7))
 		"herbe":
-			_part(g, _bush_mesh, toon(Color.WHITE, true, true, 0.05, 1.5), Vector3.ZERO, Vector3(1.4, 1, 1.3))
+			_part(g, _bush_mesh, null, Vector3.ZERO, Vector3(1.4, 1, 1.3))
+			body.set_meta("foliage", true)
 			_box(body, Vector3(0.2, 0.6, 0), Vector3(3.2, 1.8, 2.6))
 		_:
-			_part(g, _pine_mesh, toon(Color.WHITE, true, true, 0.12), Vector3(-1.6, 0, -0.6), Vector3(1, 1.1, 1))
-			_part(g, _bush_mesh, toon(Color("#c8d8c0"), true, true, 0.05, 1.5), Vector3.ZERO, Vector3(1.3, 0.95, 1.2))
+			_part(g, _pine_mesh, null, Vector3(-1.6, 0, -0.6), Vector3(0.9, 0.95, 0.9))
+			_part(g, _bush_mesh, null, Vector3.ZERO, Vector3(1.3, 0.95, 1.2))
+			body.set_meta("foliage", true)
 			_box(body, Vector3(0, 0.6, 0), Vector3(2.8, 1.8, 2.4))
 			var cs := CollisionShape3D.new()
 			var cyl := CylinderShape3D.new()
@@ -532,11 +555,14 @@ func _scatter() -> void:
 			rocks[1].append([x, h + 0.2, z, 0.8 + rng.randf() * 2.0, rot, 0.7])
 	var body := StaticBody3D.new()
 	add_child(body)
-	_inst(_pine_mesh, toon(Color.WHITE, true, true, 0.12), pines, body, "tree")
-	_inst(_round_tree_mesh, toon(Color.WHITE, true, true, 0.1), rounds, body, "round")
+	var leafy := StaticBody3D.new()   # arbres et buissons : traversés par les balles quand ils sont effacés
+	leafy.set_meta("foliage", true)
+	add_child(leafy)
+	_inst(_pine_mesh, null, pines, leafy, "tree")
+	_inst(_round_tree_mesh, null, rounds, leafy, "round")
 	_inst(_rock_mesh, toon(Color("#86837c"), false, true, 0.0, 7.0, "roche"), rocks[0], body, "rock")
 	_inst(_rock_mesh, toon(Color("#e3eaf2"), false, true, 0.0, 7.0, "neige"), rocks[1], body, "rock")
-	_inst(_bush_mesh, toon(Color.WHITE, true, true, 0.05, 1.5), bushes, body, "bush")
+	_inst(_bush_mesh, null, bushes, leafy, "bush")
 	_inst(_rock_mesh, toon(Color("#b8ad98"), false, false, 0.0, 7.0, "roche"), beach[0], body, "pebble")
 	_inst(_log_mesh, toon(Color.WHITE, true, true), beach[1], body, "log")
 
@@ -585,7 +611,7 @@ func _inst(mesh: Mesh, m: Material, list: Array, body: StaticBody3D, kind: Strin
 		if kind == "tree" or kind == "round":
 			var cyl := CylinderShape3D.new()
 			cyl.radius = (1.0 if kind == "tree" else 1.7) * s
-			cyl.height = (7.0 if kind == "tree" else 5.5) * s
+			cyl.height = (8.0 if kind == "tree" else 6.0) * s
 			cs.shape = cyl
 			cs.position = Vector3(p[0], p[1] + cyl.height / 2, p[2])
 		else:
@@ -598,41 +624,6 @@ func _inst(mesh: Mesh, m: Material, list: Array, body: StaticBody3D, kind: Strin
 
 
 # ---------- Herbe et fleurs (seulement pour le décor, n'arrêtent pas les balles) ----------
-func _tuft_mesh() -> ArrayMesh:
-	var verts := PackedVector3Array()
-	var cols := PackedColorArray()
-	var norms := PackedVector3Array()
-	var base := Color("#3f7d2a")
-	var tip := Color("#b4e35f")
-	for i in 5:
-		var a := TAU * i / 5.0 + 0.3
-		var dir := Vector3(cos(a), 0, sin(a))
-		var side := Vector3(-dir.z, 0, dir.x) * 0.07
-		var hgt := 0.5 + 0.25 * (i % 3) / 2.0
-		var top := dir * 0.22 + Vector3(0, hgt, 0)
-		# Lame visible des deux côtés.
-		for tri in [[-side, side, top], [side, -side, top]]:
-			for v in tri:
-				verts.append(v)
-				cols.append(tip if v == top else base)
-				norms.append(Vector3.UP)
-	var arrays := []
-	arrays.resize(Mesh.ARRAY_MAX)
-	arrays[Mesh.ARRAY_VERTEX] = verts
-	arrays[Mesh.ARRAY_NORMAL] = norms
-	arrays[Mesh.ARRAY_COLOR] = cols
-	var mesh := ArrayMesh.new()
-	mesh.add_surface_from_arrays(Mesh.PRIMITIVE_TRIANGLES, arrays)
-	return mesh
-
-func _flower_mesh(color: Color) -> ArrayMesh:
-	var stem := _cyl(0.015, 0.015, 0.4, 4)
-	var head := _sphere(0.09, 6, 3)
-	return _merge([
-		[stem, _at(Vector3(0, 0.2, 0)), Color("#4f8f30")],
-		[head, _at(Vector3(0, 0.42, 0), Vector3(1.3, 0.6, 1.3)), color],
-	])
-
 func _grass() -> void:
 	# Deux petites textures décrivent le sol : la hauteur et où pousse l'herbe.
 	var w := SEG + 1
@@ -640,11 +631,9 @@ func _grass() -> void:
 	var mtex := ImageTexture.create_from_image(Image.create_from_data(w, w, false, Image.FORMAT_RGBA8, _grass_mask))
 	var fields := [
 		# [forme, teinte, canal du masque, densité, touffes par m², vent, garder les normales, taille min, taille max, aplatissement]
-		[_tuft_mesh(), Color.WHITE, 0, 1.0, 2.0, 0.12, false, 0.8, 1.4, 1.0],
-		[_flower_mesh(Color("#fffbf0")), Color.WHITE, 1, 0.6, 0.12, 0.06, false, 0.9, 1.3, 1.0],
-		[_flower_mesh(Color("#ffd84a")), Color.WHITE, 1, 0.6, 0.1, 0.06, false, 0.9, 1.3, 1.0],
-		[_flower_mesh(Color("#ff8fb8")), Color.WHITE, 1, 0.6, 0.08, 0.06, false, 0.9, 1.3, 1.0],
-		[_rock_mesh, Color("#a8a39a"), 2, 1.0, 0.3, 0.0, true, 0.1, 0.45, 0.6],
+		[VEG.tuft(0.9, 0.55), Color("#f2f7e6"), 0, 1.0, 1.6, 0.12, false, 0.8, 1.4, 1.0, "vege_herbe.png"],
+		[VEG.tuft(0.8, 0.5), Color.WHITE, 1, 0.6, 0.07, 0.08, false, 0.9, 1.3, 1.0, "vege_fleurs.png"],
+		[_rock_mesh, Color("#6f6b64"), 2, 1.0, 0.3, 0.0, true, 0.1, 0.45, 0.6],
 		[_rock_mesh, Color("#f4f8fc"), 3, 1.0, 0.12, 0.0, true, 0.3, 1.0, 0.35],
 	]
 	for f in fields:
@@ -662,6 +651,9 @@ func _grass() -> void:
 		m.set_shader_parameter("density", f[3])
 		m.set_shader_parameter("wind", f[5])
 		m.set_shader_parameter("keep_normals", f[6])
+		if f.size() > 10:
+			m.set_shader_parameter("albedo_tex", load("res://art/" + f[10]))
+			m.set_shader_parameter("use_tex", true)
 		# Touffes réparties au hasard dans un carré autour de la caméra.
 		var count := int(4 * GRASS_RADIUS * GRASS_RADIUS * f[4])
 		var xforms := []

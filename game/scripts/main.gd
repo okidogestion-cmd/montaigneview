@@ -197,6 +197,7 @@ func _build_environment() -> void:
 	var sky_mat := ShaderMaterial.new()
 	sky_mat.shader = preload("res://shaders/sky.gdshader")
 	sky_mat.set_shader_parameter("panorama", preload("res://art/ciel.jpg"))
+	sky_mat.set_shader_parameter("cloud_cover", 0.64)   # quelques nuages seulement : ceux du panorama suffisent
 	var sky := Sky.new()
 	sky.sky_material = sky_mat
 	env.background_mode = Environment.BG_SKY
@@ -209,8 +210,9 @@ func _build_environment() -> void:
 	env.tonemap_exposure = 1.12
 	env.tonemap_white = 6.0
 	env.adjustment_enabled = true
-	env.adjustment_saturation = 1.12
-	env.adjustment_contrast = 1.05
+	# Couleurs plus naturelles (moins saturées), un peu plus de contraste : rendu réaliste.
+	env.adjustment_saturation = 0.9
+	env.adjustment_contrast = 1.1
 	env.fog_enabled = true
 	env.fog_mode = Environment.FOG_MODE_DEPTH
 	env.fog_light_color = SKY
@@ -288,6 +290,7 @@ func to_menu() -> void:
 	gid += 1
 	touch.set_mode("")
 	phase = "menu"
+	world.set_near_fade(0.0)
 	Input.mouse_mode = Input.MOUSE_MODE_VISIBLE
 	hud.menu.visible = true
 	hud.paint_hud.visible = false
@@ -313,6 +316,7 @@ func start_paint() -> void:
 	gid += 1
 	touch.set_mode("")
 	phase = "paint"
+	world.set_near_fade(4.0)   # rien ne cache le sniper à l'atelier
 	Input.mouse_mode = Input.MOUSE_MODE_VISIBLE
 	hud.menu.visible = false
 	hud.end_panel.visible = false
@@ -461,6 +465,7 @@ func start_hide() -> void:
 	gid += 1
 	touch.set_mode("hide" if touch_mode else "")
 	phase = "hide"
+	world.set_near_fade(5.0)   # vue à la 3e personne : les arbres entre la caméra et le sniper s'effacent
 	capture_mouse()
 	hud.menu.visible = false
 	hud.end_panel.visible = false
@@ -525,6 +530,8 @@ func start_fire() -> void:
 	gid += 1
 	touch.set_mode("fire" if touch_mode else "")
 	phase = "reveal"
+	# Vue de tir : les arbres et buissons proches s'effacent (rayon de 35 m), ils ne bouchent pas la lunette.
+	world.set_near_fade(35.0)
 	reveal_t = 0.0
 	hud.hide_hud.visible = false
 	hud.paint_hud.visible = false
@@ -615,6 +622,11 @@ func shoot() -> void:
 	hud.render_ammo(ammo, AMMO)
 	var dir := -camera.global_transform.basis.z
 	var hit := ray(camera.global_position, camera.global_position + dir * 3000)
+	# Les arbres effacés près du tireur ne retiennent pas la balle : elle repart juste derrière.
+	for i in 8:
+		if hit.is_empty() or not world.is_foliage(hit.collider) or camera.global_position.distance_to(hit.position) > world.near_fade:
+			break
+		hit = ray(hit.position + dir * 0.05, camera.global_position + dir * 3000)
 	recoil = 0.012
 	hud.pulse(hud.flash, 0.35, 0.16)
 	bang(bang_near, 0.9)

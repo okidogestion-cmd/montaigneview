@@ -1,5 +1,5 @@
 shader_type spatial;
-// Herbe et fleurs façon Wind Waker : un champ qui suit la caméra.
+// Herbe, fleurs et cailloux : un champ qui suit la caméra. Herbe et fleurs : cartes texturées découpées.
 // Chaque touffe lit la hauteur du sol et la zone (herbe / forêt) dans deux petites textures.
 render_mode cull_disabled, world_vertex_coords;
 
@@ -16,6 +16,8 @@ uniform float density = 1.0;
 uniform int channel = 0;          // 0 : herbe, 1 : fleurs, 2 : cailloux, 3 : neige
 uniform bool keep_normals = false;
 uniform vec4 tint : source_color = vec4(1.0);
+uniform sampler2D albedo_tex : source_color, filter_linear_mipmap, repeat_disable;
+uniform bool use_tex = false;
 uniform float band = 0.5;
 
 varying float shade;
@@ -66,12 +68,20 @@ void vertex() {
 }
 
 void fragment() {
-	ALBEDO = pow(COLOR.rgb, vec3(2.2)) * tint.rgb * shade;
+	if (use_tex) {
+		vec4 t = texture(albedo_tex, UV);
+		if (t.a < 0.45) {
+			discard;
+		}
+		ALBEDO = t.rgb * tint.rgb * shade * COLOR.rgb;
+	} else {
+		ALBEDO = pow(COLOR.rgb, vec3(2.2)) * tint.rgb * shade;
+	}
 	ROUGHNESS = 1.0;
 	SPECULAR = 0.0;
 }
 
 void light() {
 	float ndl = dot(NORMAL, LIGHT) * ATTENUATION;
-	DIFFUSE_LIGHT += LIGHT_COLOR * smoothstep(band - 0.04, band + 0.04, ndl * 0.5 + 0.5) * cloud_shadow(world_pos.xz, TIME);
+	DIFFUSE_LIGHT += LIGHT_COLOR * clamp((ndl + 0.3) / 1.3, 0.0, 1.0) * ATTENUATION * cloud_shadow(world_pos.xz, TIME);
 }

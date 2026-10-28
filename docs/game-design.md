@@ -243,3 +243,19 @@ Le jeu devient une **appli mobile** (même jeu : cachette, peinture, duel), plus
   2 400 points répartis sur le corps (`figure_samples`). Tant que rien n'est peint, on voit la tenue d'origine
   (`tex_mix` du shader camo) ; la peinture garde les plis du vêtement.
 - Les anciennes pièces (`PARTS`) sont supprimées.
+
+### Direction artistique réaliste, façon jeux PS3 (28/10/2026)
+- **Éclairage doux** (Lambert) à la place des deux tons cartoon : terrain, rochers, sniper, herbe.
+  Étalonnage commun du sol et de la peinture (`shaders/grade.gdshaderinc`) : verts plus naturels, sans fausser
+  le camouflage (la même couleur est corrigée de la même façon sur le sol et sur le sniper).
+- **Végétation** (`scripts/vegetation.gd`, `shaders/foliage.gdshader`) : épicéas à 13 étages de branches (deux cartes
+  d'aiguilles en V par branche), feuillus et buissons en bouquets de feuilles, troncs d'écorce, touffes d'herbe et de
+  fleurs des champs en cartes. Textures dessinées par programme : `art/vege_*.png`, `art/vege_ecorce.jpg`.
+- **Les arbres ne bouchent pas la vue** : ils s'effacent en tramage près de la caméra (`world.set_near_fade`) :
+  4 m à l'atelier, 5 m en cachette (3e personne), 35 m en vue de tir. Les balles traversent les arbres effacés
+  (`main.gd` → `shoot`). Arbres et buissons ont leur propre corps physique (`is_foliage`).
+- **Roche et terre réalistes** : photo de roche et sa carte de relief, terre avec feuillage, venues du pack « Hills »
+  fourni par l'utilisateur (`art/sol_roche.jpg`, `art/sol_foret.jpg`, `art/relief_*.jpg`). Licence du pack à vérifier
+  avant une sortie sur Steam. Les collines du pack (low-poly) ne sont pas utilisées : la carte reste celle du jeu.
+- **Mer réaliste** (`shaders/water.gdshader`) : vagues calculées, reflet du ciel (Fresnel) et du soleil, écume légère.
+- Nuages du ciel plus vaporeux et plus rares ; rochers plus fins et arrondis ; cailloux plus sombres.

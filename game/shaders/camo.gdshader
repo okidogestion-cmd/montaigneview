@@ -23,6 +23,7 @@ varying vec3 ref_pos;
 varying vec3 world_pos;
 
 #include "res://shaders/clouds.gdshaderinc"
+#include "res://shaders/grade.gdshaderinc"
 
 void vertex() {
 	ref_pos = CUSTOM0.xyz;
@@ -32,11 +33,11 @@ void vertex() {
 void fragment() {
 	vec3 t = texture(albedo_tex, UV).rgb;
 	float fold = mix(1.0, clamp(dot(t, vec3(0.2126, 0.7152, 0.0722)) / avg_lum, 0.45, 1.6), 0.65);
-	vec3 c = mix(pow(base_color.rgb, vec3(2.2)) * fold, t, tex_mix);
+	vec3 c = mix(grade(pow(base_color.rgb, vec3(2.2))) * fold, t, tex_mix);
 	for (int i = 0; i < stroke_count; i++) {
 		vec4 s = texelFetch(stroke_tex, ivec2(i, 0), 0);
 		if (distance(ref_pos, s.xyz) < s.w) {
-			c = pow(texelFetch(stroke_tex, ivec2(i, 1), 0).rgb, vec3(2.2)) * fold;
+			c = grade(pow(texelFetch(stroke_tex, ivec2(i, 1), 0).rgb, vec3(2.2))) * fold;
 		}
 	}
 	if (cursor.w > 0.0) {
@@ -50,7 +51,7 @@ void fragment() {
 
 void light() {
 	float ndl = dot(NORMAL, LIGHT) * ATTENUATION;
-	float lit = smoothstep(band - 0.07, band + 0.07, ndl * 0.5 + 0.5);
-	float rim = pow(1.0 - clamp(dot(NORMAL, VIEW), 0.0, 1.0), 3.0) * lit * 0.35;
+	float lit = clamp((ndl + 0.1) / 1.1, 0.0, 1.0);
+	float rim = pow(1.0 - clamp(dot(NORMAL, VIEW), 0.0, 1.0), 3.0) * lit * 0.15;
 	DIFFUSE_LIGHT += LIGHT_COLOR * (lit + rim) * cloud_shadow(world_pos.xz, TIME);
 }

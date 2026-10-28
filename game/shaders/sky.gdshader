@@ -46,8 +46,9 @@ void sky() {
 	if (d.y > 0.0) {
 		vec2 uv = d.xz / (d.y + 0.18) * 1.4 + vec2(37.3 + TIME * 0.006, 11.7 + TIME * 0.002);
 		float n = fbm(uv);
-		float edge = smoothstep(cloud_cover, cloud_cover + 0.02, n);
-		float inner = smoothstep(cloud_cover + 0.06, cloud_cover + 0.08, fbm(uv + vec2(0.05, 0.09)));
+		// Bords flous et ombre progressive : des nuages vaporeux plutôt que des formes de dessin animé.
+		float edge = smoothstep(cloud_cover, cloud_cover + 0.12, n) * 0.85;
+		float inner = smoothstep(cloud_cover + 0.02, cloud_cover + 0.2, fbm(uv + vec2(0.05, 0.09)));
 		vec3 cc = mix(cloud_shade, cloud_color, inner);
 		col = mix(col, cc, edge * smoothstep(0.04, 0.22, d.y));
 	}

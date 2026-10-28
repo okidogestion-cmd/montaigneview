@@ -1,6 +1,6 @@
 shader_type spatial;
-// Sol de la vallée : ombrage cartoon de toon.gdshader + textures peintes par terrain
-// (art/sol_*.jpg, créées avec Higgsfield). Les images sont préparées en « cartes de détail » :
+// Sol de la vallée : éclairage doux + textures par terrain (art/sol_*.jpg : Higgsfield, et photos de roche
+// et de terre du pack « Hills ») et relief (art/relief_*.jpg). Les images sont préparées en « cartes de détail » :
 // 0,5 = couleur de la zone inchangée, plus clair ou plus sombre autour (moyenne 0,5). La couleur
 // moyenne reste donc celle de la zone (couleur de sommet) : le camouflage ne change pas.
 render_mode cull_back;
@@ -10,6 +10,10 @@ uniform sampler2D tex_roche : filter_linear_mipmap, repeat_enable;
 uniform sampler2D tex_herbe : filter_linear_mipmap, repeat_enable;
 uniform sampler2D tex_foret : filter_linear_mipmap, repeat_enable;
 uniform sampler2D tex_sable : filter_linear_mipmap, repeat_enable;
+// Cartes de relief (normales) : la lumière accroche les fissures de la roche et les bosses du sol.
+uniform sampler2D nrm_roche : filter_linear_mipmap, repeat_enable;
+uniform sampler2D nrm_herbe : filter_linear_mipmap, repeat_enable;
+uniform float relief = 0.9;
 uniform float tile = 7.0;          // mètres couverts par une texture
 uniform float detail = 0.85;       // force du détail (0 : couleurs unies comme avant)
 uniform float patches = 0.0;
@@ -20,6 +24,7 @@ varying vec3 world_n;
 varying vec4 w4;   // poids neige, roche, herbe, forêt (le reste : sable)
 
 #include "res://shaders/clouds.gdshaderinc"
+#include "res://shaders/grade.gdshaderinc"
 
 float hash(vec2 p) { return fract(sin(dot(p, vec2(127.1, 311.7))) * 43758.5453); }
 float vnoise(vec2 p) {
@@ -45,8 +50,29 @@ vec3 triplanar(sampler2D t, vec3 p, vec3 n) {
 	return texture(t, p.zy / tile).rgb * b.x + planar(t, p.xz) * b.y + texture(t, p.xy / tile).rgb * b.z;
 }
 
+vec2 nm(sampler2D t, vec2 uv) {
+	return texture(t, uv).xy * 2.0 - 1.0;
+}
+// Inclinaison de la normale par la carte de relief, projetée comme la texture (trois plans pour la roche).
+vec3 bump_tri(sampler2D t, vec3 p, vec3 n) {
+	vec3 b = pow(abs(n), vec3(4.0));
+	b /= b.x + b.y + b.z;
+	vec2 tx = nm(t, p.zy / tile);
+	vec2 ty = nm(t, p.xz / tile);
+	vec2 tz = nm(t, p.xy / tile);
+	return vec3(0.0, tx.y, tx.x) * b.x + vec3(ty.x, 0.0, ty.y) * b.y + vec3(tz.x, tz.y, 0.0) * b.z;
+}
+
 void fragment() {
-	vec3 c = pow(COLOR.rgb, vec3(2.2));
+	vec3 c = grade(pow(COLOR.rgb, vec3(2.2)));
+	vec3 off = vec3(0.0);
+	if (w4.y > 0.01) off += bump_tri(nrm_roche, world_pos, world_n) * w4.y;
+	if (w4.z + w4.w > 0.01) {
+		vec2 g = nm(nrm_herbe, world_pos.xz / (tile * 0.5));
+		off += vec3(g.x, 0.0, g.y) * (w4.z + w4.w) * 0.6;
+	}
+	float near_b = 1.0 - smoothstep(60.0, 180.0, distance(CAMERA_POSITION_WORLD, world_pos));
+	NORMAL = normalize((VIEW_MATRIX * vec4(normalize(normalize(world_n) + off * relief * near_b), 0.0)).xyz);
 	float ws = clamp(1.0 - (w4.x + w4.y + w4.z + w4.w), 0.0, 1.0);
 	vec3 d = vec3(0.0);
 	if (w4.x > 0.01) d += planar(tex_neige, world_pos.xz) * 2.0 * w4.x;
@@ -66,6 +92,6 @@ void fragment() {
 
 void light() {
 	float ndl = dot(NORMAL, LIGHT) * ATTENUATION;
-	float lit = smoothstep(band - 0.07, band + 0.07, ndl * 0.5 + 0.5);
+	float lit = clamp((ndl + 0.1) / 1.1, 0.0, 1.0);
 	DIFFUSE_LIGHT += LIGHT_COLOR * lit * cloud_shadow(world_pos.xz, TIME);
 }
