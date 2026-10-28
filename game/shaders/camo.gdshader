@@ -1,4 +1,5 @@
 shader_type spatial;
+render_mode cull_disabled;   // le capuchon et quelques vêtements sont en une seule épaisseur
 // Peinture de camouflage du sniper.
 // Chaque coup de pinceau est une petite boule de couleur posée sur le corps,
 // dans le repère de la pose « debout » (CUSTOM0) : la peinture suit le corps
@@ -31,6 +32,9 @@ void vertex() {
 }
 
 void fragment() {
+	if (!FRONT_FACING) {
+		NORMAL = -NORMAL;
+	}
 	vec3 t = texture(albedo_tex, UV).rgb;
 	float fold = mix(1.0, clamp(dot(t, vec3(0.2126, 0.7152, 0.0722)) / avg_lum, 0.45, 1.6), 0.65);
 	vec3 c = mix(grade(pow(base_color.rgb, vec3(2.2))) * fold, t, tex_mix);

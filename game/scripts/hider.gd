@@ -134,11 +134,16 @@ func _apply() -> void:
 	var p := _vis if not _first_frame else pos
 	var basis := Basis(Vector3.UP, facing)
 	if stance == "couche":
-		# Couché, le corps suit la pente.
+		# Couché, le corps suit la pente dans sa longueur (tête 0,75 m devant, pieds 0,95 m derrière)
+		# et sur le côté ; il ne s'enfonce pas si le sol se creuse sous le bassin.
 		var f := forward()
-		var hf: float = world.height_at(pos.x + f.x * 0.9, pos.z + f.z * 0.9)
-		var hb: float = world.height_at(pos.x - f.x * 0.9, pos.z - f.z * 0.9)
-		basis = basis * Basis(Vector3.RIGHT, -atan2(hf - hb, 1.8))
+		var r := Vector3(f.z, 0, -f.x)
+		var hf: float = world.height_at(p.x + f.x * 0.75, p.z + f.z * 0.75)
+		var hb: float = world.height_at(p.x - f.x * 0.95, p.z - f.z * 0.95)
+		var hr: float = world.height_at(p.x + r.x * 0.3, p.z + r.z * 0.3)
+		var hl: float = world.height_at(p.x - r.x * 0.3, p.z - r.z * 0.3)
+		basis = basis * Basis(Vector3.RIGHT, -atan2(hf - hb, 1.7)) * Basis(Vector3.FORWARD, atan2(hr - hl, 0.6) * -1.0)
+		p.y = maxf(p.y, (hf * 0.95 + hb * 0.75) / 1.7) - 0.03
 	world.player.transform = Transform3D(basis, p)
 
 func update_visual(dt: float) -> void:

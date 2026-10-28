@@ -263,6 +263,7 @@ Le jeu devient une **appli mobile** (même jeu : cachette, peinture, duel), plus
 - Nuages du ciel plus vaporeux et plus rares ; rochers plus fins et arrondis ; cailloux plus sombres.
 
 ### Sniper animé (28/10/2026)
+*Remplacé le jour même par le nouveau sniper sans arme, voir « Nouveau sniper, fusil dans le dos » plus bas.*
 - Squelette (65 os) et animations de la **« Universal Animation Library » de Quaternius** (licence CC0, libre pour Steam),
   fournie par l'utilisateur : `sources/UAL1_Standard.glb` (+ `UAL1_License.txt`).
 - `tools/sniper_anime.gd` (à lancer une fois, voir l'en-tête du fichier) pose ce squelette sur `art/sniper.glb` et
@@ -300,3 +301,20 @@ Le jeu devient une **appli mobile** (même jeu : cachette, peinture, duel), plus
   Feuillage avec normales « en boule » et bas plus sombre (`_pack_tree`), effacement près de la caméra comme avant.
 - Plus réalistes que les arbres dessinés par programme, surtout dans la lunette, et bien plus légers (52 triangles au
   lieu d'environ 300 pour un sapin). Les anciens arbres (`VEG.spruce`, `broadleaf`, `bush`) et leurs textures sont retirés.
+
+### Nouveau sniper, fusil dans le dos (28/10/2026)
+- Retour de l'utilisateur : genoux et jambes « ça va pas du tout » (bosses aux genoux, couché sur le fusil, pieds en
+  l'air). Cause : l'ancien modèle tenait son fusil soudé aux mains et n'avait pas de squelette ; ses poids étaient
+  devinés d'après le mannequin.
+- L'utilisateur a généré sur Higgsfield un **sniper sans arme, en A-pose, avec son propre squelette** (24 os) et le
+  **fusil seul**. Allégés dans le bac à sable Higgsfield (13 300 triangles, texture couleur 1024 px ; fusil 2 400
+  triangles) : `sources/sniper_higgsfield.glb`, `sources/fusil_higgsfield.glb`.
+- `tools/sniper_anime.gd` refait : le squelette des animations Quaternius est **ajusté aux articulations du sniper**
+  (longueur et direction de chaque os : hanches, genoux, chevilles, épaules, coudes, poignets ; écart nul), et le sniper
+  garde **ses propres poids de peau** (os du modèle → os des animations). Le bassin des animations est remis à la
+  hauteur du modèle. Les bras sont libres : ils bougent avec les animations (balancement en marchant, course…).
+- **Fusil dans le dos**, en travers (canon vers le haut derrière l'épaule gauche), rigide avec le haut du buste, dans
+  le même maillage : la peinture le recouvre aussi. L'éclair du tir ennemi part devant sa tête.
+- Couché refait : coudes posés devant, mains sous le menton, jambes allongées ; en rampant, le coude opposé au genou
+  qui remonte avance. Le corps couché suit la pente dans sa longueur et sur le côté (`hider.gd` → `_apply`).
+- Shader camo : faces affichées des deux côtés (capuche en une seule épaisseur). L'ancien `art/sniper.glb` est retiré.

@@ -726,13 +726,13 @@ func update_grass(cam: Vector3) -> void:
 const CAMO_SHADER := preload("res://shaders/camo.gdshader")
 
 # ---------- Le sniper ----------
-# Modèle 3D (art/sniper.glb, créé avec Higgsfield / Tripo) animé avec le squelette et les animations de la
-# « Universal Animation Library » de Quaternius (CC0) : art/sniper_anime.scn, préparé par tools/sniper_anime.gd
-# (qui fabrique aussi la position couchée). Chaque sommet garde sa position « debout » (CUSTOM0) :
+# Modèle 3D du sniper sans arme et fusil dans le dos (créés avec Higgsfield, sources/), animés avec les animations
+# de la « Universal Animation Library » de Quaternius (CC0) : art/sniper_anime.scn, préparé par tools/sniper_anime.gd
+# (qui ajuste le squelette des animations au modèle et fabrique aussi la position couchée). Chaque sommet garde sa position « debout » (CUSTOM0) :
 # la peinture suit le corps dans toutes les poses.
 const FIG_SCENE := preload("res://art/sniper_anime.scn")
 const MODEL_TEX := preload("res://art/sniper_couleur.jpg")
-const MODEL_LUM := 0.043          # luminance moyenne de la texture (linéaire), pour garder ses plis sous la peinture
+const MODEL_LUM := 0.051          # luminance moyenne de la texture (linéaire), pour garder ses plis sous la peinture
 # Animations de chaque posture : [nom, vitesse au sol (m/s) à vitesse normale de l'animation] ; la première est à l'arrêt.
 const FIG_ANIMS := {
 	"debout": [["Idle_Loop", 0.0], ["Walk_Loop", 1.05], ["Jog_Fwd_Loop", 3.6], ["Sprint_Loop", 6.2]],
@@ -740,7 +740,6 @@ const FIG_ANIMS := {
 	"couche": [["Prone_Idle_Loop", 0.0], ["Prone_Crawl_Loop", 0.8]],
 }
 const FIG_HOLD := 0.4             # moment de l'animation à l'arrêt montré quand la pose est figée (atelier)
-const MUZZLE := 7099              # sommet au bout du canon
 
 func _make_figure() -> Node3D:
 	var g := Node3D.new()
@@ -805,7 +804,7 @@ func fall(fig: Node3D) -> void:
 	ap.play("Death01", 0.15)
 
 ## Positions des sommets dans la pose affichée (repère du personnage), calculées comme la carte graphique.
-func _skinned(fig: Node3D, only := -1) -> PackedVector3Array:
+func _skinned(fig: Node3D) -> PackedVector3Array:
 	var mi: MeshInstance3D = fig.get_meta("mesh")
 	var sk: Skeleton3D = fig.get_meta("skel")
 	var a := _fig_arrays(fig)
@@ -822,16 +821,14 @@ func _skinned(fig: Node3D, only := -1) -> PackedVector3Array:
 	for b in mi.skin.get_bind_count():
 		mats.append(to_fig * sk.get_bone_global_pose(mi.skin.get_bind_bone(b)) * mi.skin.get_bind_pose(b))
 	var out := PackedVector3Array()
-	var first := 0 if only < 0 else only
-	var last := verts.size() if only < 0 else only + 1
-	out.resize(last - first)
-	for i in range(first, last):
+	out.resize(verts.size())
+	for i in verts.size():
 		var p := Vector3.ZERO
 		for j in 4:
 			var w := weights[i * 4 + j]
 			if w > 0.0:
 				p += (mats[bones[i * 4 + j]] * verts[i]) * w
-		out[i - first] = p
+		out[i] = p
 	return out
 
 var _arrays_cache := {}
@@ -841,9 +838,12 @@ func _fig_arrays(fig: Node3D) -> Array:
 		_arrays_cache[mesh] = mesh.surface_get_arrays(0)
 	return _arrays_cache[mesh]
 
-## Bout du canon, dans le monde (éclair du tir).
+## D'où part l'éclair du tir, dans le monde : devant la tête du tireur (le fusil est dans son dos).
 func muzzle(fig: Node3D) -> Vector3:
-	return fig.global_transform * _skinned(fig, MUZZLE)[0]
+	var sk: Skeleton3D = fig.get_meta("skel")
+	sk.force_update_all_bone_transforms()
+	var head := sk.global_transform * sk.get_bone_global_pose(sk.find_bone("Head")).origin
+	return head + fig.global_transform.basis.z.normalized() * 0.45
 
 func pick_part(fig: Node3D, from: Vector3, dir: Vector3) -> Dictionary:
 	# Rayon de la souris contre le corps (dans la pose affichée, figée pendant l'atelier).
