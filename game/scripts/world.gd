@@ -265,6 +265,32 @@ func _pack_tree(name: String, height: float, wind: float, translucency: float) -
 	_foliage_mats.append(m)
 	return mesh
 
+## Accessoires de la scène Higgsfield « Sniper Arena » de l'utilisateur (art/accessoires/, sortis par
+## tools/accessoires.gd) : une surface par matière d'origine, à qui on donne une matière du jeu.
+const PROP_MATS := {
+	"MAT_worn_sandbags": ["#7a7052", "foret"], "MAT_weathered_timber": ["#7a6548", "foret"],
+	"MAT_dark_timber": ["#4a4034", "foret"], "CAMO_DIGITAL_OLIVE": ["#5d6b45", "herbe"],
+	"MAT_military_crate_olive": ["#5f6a4a", "roche"], "MAT_old_military_metal": ["#454c40", "foret"],
+	"MAT_dark_trunk": ["#6a573f", "foret"],
+}
+var _props := {}
+
+func prop(name: String) -> Mesh:
+	if not _props.has(name):
+		var src: ArrayMesh = load("res://art/accessoires/%s.res" % name)
+		var mesh := ArrayMesh.new()
+		for i in src.get_surface_count():
+			var st := SurfaceTool.new()
+			# Le « rondin » de la scène d'origine est debout : on le couche.
+			var xf := Transform3D(Basis(Vector3.RIGHT, PI / 2), Vector3(0, 0.36, 2.0)) if name == "rondin" else Transform3D.IDENTITY
+			st.append_from(src, i, xf)
+			st.commit(mesh)
+			var key := src.surface_get_name(i)
+			var pm: Array = PROP_MATS.get(key, ["#7d7a70", "roche"])
+			mesh.surface_set_material(i, toon(Color(pm[0]), false, false, 0.0, 7.0, pm[1]))
+		_props[name] = mesh
+	return _props[name]
+
 ## Rayon (m) autour de la caméra où arbres et buissons s'effacent : ils ne bouchent jamais la vue.
 func set_near_fade(r: float) -> void:
 	near_fade = r
@@ -286,6 +312,7 @@ func build() -> void:
 	_build_water()
 	enemy_spots = _build_spots(-MZ, 1)
 	player_spots = _build_spots(MZ, -1)
+	_build_towers()
 	_scatter()
 	_grass()
 	player = _make_figure()
@@ -446,6 +473,21 @@ func _make_cover(zone: String) -> Node3D:
 	var body := StaticBody3D.new()
 	g.add_child(body)
 	match zone:
+		"sacs":
+			# Nid de tireur : muret de sacs de sable sur deux hauteurs, retours sur les côtés, caisse et fût.
+			_part(g, prop("sacs"), null, Vector3(0, -0.08, 0), Vector3.ONE)
+			_part(g, prop("sacs"), null, Vector3(0.14, 0.46, 0), Vector3(0.95, 1, 1))
+			for side in [-1.0, 1.0]:
+				var w := MeshInstance3D.new()
+				w.mesh = prop("sacs_petit")
+				w.position = Vector3(side * 1.75, -0.08, -0.55)
+				w.rotation.y = PI / 2
+				g.add_child(w)
+			_part(g, prop("caisse"), null, Vector3(1.0, -0.05, -1.5), Vector3.ONE)
+			_part(g, prop("fut"), null, Vector3(-1.2, -0.05, -1.7), Vector3.ONE)
+			_box(body, Vector3(0, 0.5, 0), Vector3(3.1, 1.1, 0.5))
+			_box(body, Vector3(-1.75, 0.3, -0.55), Vector3(0.5, 0.6, 1.5))
+			_box(body, Vector3(1.75, 0.3, -0.55), Vector3(0.5, 0.6, 1.5))
 		"neige", "roche":
 			var col := Color("#e3eaf2") if zone == "neige" else Color("#86837c")
 			_part(g, _rock_mesh, toon(col, false, true, 0.0, 7.0, zone), Vector3(0, 0.35, 0), Vector3(1.8, 1, 1.5))
@@ -485,7 +527,8 @@ func _build_spots(cz: float, facing: int) -> Array:
 				z = cz + facing * cos(ang) * rr
 				h = height_at(x, z)
 			var zone := zone_of(x, z)
-			var cover := _make_cover(zone)
+			# Une cachette sur quatre est un nid de sacs de sable (sauf dans la neige).
+			var cover := _make_cover("sacs" if list.size() % 4 == 2 and zone != "neige" else zone)
 			cover.position = Vector3(x, h, z)
 			if facing < 0:
 				cover.rotation.y = PI
@@ -498,6 +541,41 @@ func _build_spots(cz: float, facing: int) -> Array:
 				"facing": facing, "fig": Vector3(fx, height_at(fx, fz), fz),
 			})
 	return list
+
+## Une tour de tireur (plateforme sur pilotis, échelle, filet de camouflage) par île, sur le versant qui fait
+## face à l'autre île, à l'endroit le plus plat : un poste bien visible, donc risqué.
+func _build_towers() -> void:
+	for isl in [[-MZ, 1], [MZ, -1]]:
+		var cz: float = isl[0]
+		var facing: int = isl[1]
+		var best := Vector3.ZERO
+		var best_score := INF
+		for rad in range(70, 160, 10):
+			for a in range(-60, 61, 10):
+				var ang := deg_to_rad(a)
+				var x := sin(ang) * rad * 1.2
+				var z := cz + facing * cos(ang) * rad
+				var h := height_at(x, z)
+				if h < WATER_Y + 6.0 or _near_spot(x, z, 400.0):
+					continue
+				var bump := 0.0
+				for d in [Vector2(2, 0), Vector2(-2, 0), Vector2(0, 2), Vector2(0, -2)]:
+					bump = maxf(bump, absf(height_at(x + d.x, z + d.y) - h))
+				if bump < best_score:
+					best_score = bump
+					best = Vector3(x, h, z)
+		var t := Node3D.new()
+		t.position = best - Vector3(0, 0.15, 0)
+		t.rotation.y = 0.0 if facing > 0 else PI
+		add_child(t)
+		_part(t, prop("tour"), null, Vector3.ZERO, Vector3.ONE)
+		var body := StaticBody3D.new()
+		t.add_child(body)
+		_box(body, Vector3(0, 2.0, 0), Vector3(3.0, 0.25, 2.5))
+		_box(body, Vector3(0, 3.4, 0), Vector3(3.2, 0.1, 2.6))
+		for lx in [-1.35, 1.35]:
+			for lz in [-1.1, 1.1]:
+				_box(body, Vector3(lx, 1.0, lz), Vector3(0.18, 2.0, 0.18))
 
 func _near_spot(x: float, z: float, r2: float) -> bool:
 	for s in enemy_spots + player_spots:
@@ -512,6 +590,7 @@ func _scatter() -> void:
 	var rounds := []
 	var rocks := [[], []]
 	var bushes := []
+	var logs := []   # troncs couchés en forêt
 	var beach := [[], []]   # galets et bois flotté sur les plages
 	for i in 18000:
 		var x := (rng.randf() * 2 - 1) * 640
@@ -537,6 +616,8 @@ func _scatter() -> void:
 				pines.append([x, h - 0.3, z, sc, rot, 1.0])
 			elif r < 0.78:
 				bushes.append([x, h, z, sc, rot, 0.9])
+			elif r < 0.795:
+				logs.append([x, h - 0.1, z, sc, rot, 1.0])
 		elif zn == "herbe":
 			if r < 0.07:
 				bushes.append([x, h, z, sc + 0.1, rot, 0.85])
@@ -557,6 +638,7 @@ func _scatter() -> void:
 	_inst(_rock_mesh, toon(Color("#86837c"), false, true, 0.0, 7.0, "roche"), rocks[0], body, "rock")
 	_inst(_rock_mesh, toon(Color("#e3eaf2"), false, true, 0.0, 7.0, "neige"), rocks[1], body, "rock")
 	_inst_mixed("bush", bushes, leafy)
+	_inst(prop("rondin"), null, logs, body, "rondin")
 	_inst(_rock_mesh, toon(Color("#b8ad98"), false, false, 0.0, 7.0, "roche"), beach[0], body, "pebble")
 	_inst(_log_mesh, toon(Color.WHITE, true, true), beach[1], body, "log")
 
@@ -835,6 +917,85 @@ func pick_part(fig: Node3D, from: Vector3, dir: Vector3) -> Dictionary:
 		var i: int = [i0, i1, i2][c]
 		r += Vector3(ref[i * 4], ref[i * 4 + 1], ref[i * 4 + 2]) * bc[c]
 	return {"ref": r, "world": fig.global_transform * (hit["position"] as Vector3)}
+
+## Tenue de feuillage (« ghillie ») : des touffes d'herbe accrochées sur les épaules, le dos, la capuche, les bras et
+## les jambes ; elles suivent les os du corps. Teinte de la tenue choisie ; sans effacement près de la caméra.
+const GHILLIE_TEX := preload("res://art/vege_herbe.png")
+
+func set_ghillie(fig: Node3D, on: bool, tint: Color) -> void:
+	if not fig.has_meta("ghillie"):
+		if not on:
+			return
+		fig.set_meta("ghillie", _make_ghillie(fig))
+	var g: MeshInstance3D = fig.get_meta("ghillie")
+	g.visible = on
+	(g.material_override as ShaderMaterial).set_shader_parameter("tint", tint.lerp(Color.WHITE, 0.25))
+
+func _make_ghillie(fig: Node3D) -> MeshInstance3D:
+	var body: MeshInstance3D = fig.get_meta("mesh")
+	var a := _fig_arrays(fig)
+	var v: PackedVector3Array = a[Mesh.ARRAY_VERTEX]
+	var nr: PackedVector3Array = a[Mesh.ARRAY_NORMAL]
+	var bo: PackedInt32Array = a[Mesh.ARRAY_BONES]
+	var we: PackedFloat32Array = a[Mesh.ARRAY_WEIGHTS]
+	var r := RandomNumberGenerator.new()
+	r.seed = 99
+	var pv := PackedVector3Array()
+	var pn := PackedVector3Array()
+	var puv := PackedVector2Array()
+	var pb := PackedInt32Array()
+	var pw := PackedFloat32Array()
+	var idx := PackedInt32Array()
+	var placed := 0
+	while placed < 260:
+		var i := r.randi() % v.size()
+		var p := v[i]
+		var n := nr[i]
+		# Sur le dessus et les côtés du corps (pas sous les pieds, ni sur le visage).
+		if p.y < 0.25 or n.y < -0.4 or (p.y > 1.45 and p.y < 1.68 and n.z > 0.55):
+			continue
+		placed += 1
+		var down := (Vector3.DOWN * 0.7 + n * 0.5 + Vector3(r.randfn(), 0, r.randfn()) * 0.15).normalized()
+		var length := r.randf_range(0.16, 0.3)
+		var width := r.randf_range(0.1, 0.16)
+		for k in 2:
+			var side := n.cross(down).normalized().rotated(down, k * PI / 2)
+			var base := p + n * 0.01
+			var first := pv.size()
+			var corners := [base - side * width * 0.5, base + side * width * 0.5, base + side * width * 0.5 + down * length, base - side * width * 0.5 + down * length]
+			var uvs := [Vector2(0, 1), Vector2(1, 1), Vector2(1, 0), Vector2(0, 0)]   # pied des brins accroché au corps
+			for q in 4:
+				pv.append(corners[q])
+				pn.append(n)
+				puv.append(uvs[q])
+				for j in 4:
+					pb.append(bo[i * 4 + j])
+					pw.append(we[i * 4 + j])
+			idx.append_array([first, first + 1, first + 2, first, first + 2, first + 3])
+	var arr := []
+	arr.resize(Mesh.ARRAY_MAX)
+	arr[Mesh.ARRAY_VERTEX] = pv
+	arr[Mesh.ARRAY_NORMAL] = pn
+	arr[Mesh.ARRAY_TEX_UV] = puv
+	arr[Mesh.ARRAY_BONES] = pb
+	arr[Mesh.ARRAY_WEIGHTS] = pw
+	arr[Mesh.ARRAY_INDEX] = idx
+	var mesh := ArrayMesh.new()
+	mesh.add_surface_from_arrays(Mesh.PRIMITIVE_TRIANGLES, arr)
+	var m := ShaderMaterial.new()
+	m.shader = FOLIAGE
+	m.set_shader_parameter("albedo_tex", GHILLIE_TEX)
+	m.set_shader_parameter("alpha_cut", 0.4)
+	m.set_shader_parameter("translucency", 0.3)
+	m.set_shader_parameter("wind", 0.0)
+	m.set_shader_parameter("near_fade", 0.0)
+	var g := MeshInstance3D.new()
+	g.mesh = mesh
+	g.skin = body.skin
+	g.material_override = m
+	body.get_parent().add_child(g)
+	g.skeleton = NodePath("..")
+	return g
 
 ## Points répartis sur tout le corps (pose debout), pour mesurer le camouflage.
 func figure_samples() -> Array[Vector3]:

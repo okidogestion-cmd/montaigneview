@@ -82,6 +82,11 @@ var _fingers := {}          # doigts posés pendant la peinture (index → posit
 var _paint_finger := -1
 var _pinch := -1.0
 var matches_dirty := true
+# Mode normal : tenues de camouflage. La peinture libre (PAINT_MODE) reviendra dans un mode à part.
+const PAINT_MODE := false
+var outfit := "olive"
+var ghillie := false
+var paint_enemy
 var camo_score := 0.0       # ressemblance de ta peinture avec le terrain où tu te caches
 
 
@@ -152,6 +157,10 @@ func _ready() -> void:
 	hud.paint_undo.connect(func(): paint.undo(); matches_dirty = true)
 	hud.paint_clear.connect(func(): paint.clear(); matches_dirty = true)
 	hud.paint_done.connect(start_fire)
+	hud.paint_outfit.connect(_on_outfit)
+	hud.paint_ghillie.connect(_on_ghillie)
+	paint_enemy = PaintScript.new(world.enemy.get_meta("camo"), world.figure_samples())
+	paint.wear(outfit)
 	hud.ready_pressed.connect(_on_ready_pressed)
 	hud.set_level(level)
 	bang_near = _make_bang(5000.0)
@@ -336,14 +345,34 @@ func start_paint() -> void:
 	ws_yaw = hider.facing + 0.6   # de trois quarts face
 	ws_pitch = 0.6 if ws_pose == "couche" else 0.15
 	ws_dist = 3.2
-	hud.toast("Peins-toi aux couleurs du terrain autour de ta cachette.", 3.5)
+	hud.toast("Choisis la tenue de camouflage qui ressemble au terrain de ta cachette." if not PAINT_MODE else "Peins-toi aux couleurs du terrain autour de ta cachette.", 3.5)
 	set_fov(50)
 	set_fog(FOG_NEAR, FOG_FAR)
 	matches_dirty = true
 	_paint_state()
 
 func _paint_state() -> void:
-	hud.set_paint_state(brush_color, brush_size, brush_tool, ws_pose)
+	if PAINT_MODE:
+		hud.set_paint_state(brush_color, brush_size, brush_tool, ws_pose)
+	else:
+		hud.set_outfit_state(outfit, ghillie, ws_pose)
+
+func _on_outfit(o: String) -> void:
+	outfit = o
+	paint.wear(o)
+	world.set_ghillie(world.player, ghillie, Color(PaintScript.OUTFITS[o][1]))
+	matches_dirty = true
+	_paint_state()
+
+func _on_ghillie(on: bool) -> void:
+	ghillie = on
+	world.set_ghillie(world.player, on, Color(PaintScript.OUTFITS[outfit][1]))
+	matches_dirty = true
+	_paint_state()
+
+## Ressemblance de la tenue avec un terrain (la tenue de feuillage ajoute un bonus).
+func camo_match(zone: String) -> float:
+	return clampf(paint.match_zone(zone) + (PaintScript.GHILLIE_BONUS if ghillie else 0.0), 0.0, 1.0)
 
 func _on_paint_pose(p: String) -> void:
 	ws_pose = p
@@ -375,7 +404,7 @@ func _paint_touch(e: InputEvent) -> void:
 			if hud.over_paint_panel(e.position):
 				return  # doigt sur les couleurs ou les outils
 			_fingers[e.index] = e.position
-			if _fingers.size() == 1:
+			if _fingers.size() == 1 and PAINT_MODE:
 				var hit: Dictionary = world.pick_part(world.player, camera.project_ray_origin(e.position), camera.project_ray_normal(e.position))
 				if not hit.is_empty() and brush_tool == "remplir":
 					paint.fill(brush_color)
@@ -420,7 +449,9 @@ func _paint_input(e: InputEvent) -> void:
 			_paint_touch(e)
 		return
 	if e is InputEventMouseButton:
-		if e.button_index == MOUSE_BUTTON_LEFT:
+		if e.button_index == MOUSE_BUTTON_LEFT and not PAINT_MODE:
+			orbiting = e.pressed   # pas de pinceau : le clic gauche tourne autour du sniper
+		elif e.button_index == MOUSE_BUTTON_LEFT:
 			painting = e.pressed
 			if e.pressed:
 				if brush_tool == "remplir":
@@ -440,14 +471,15 @@ func _paint_input(e: InputEvent) -> void:
 		if orbiting:
 			ws_yaw -= e.relative.x * 0.008
 			ws_pitch = clampf(ws_pitch + e.relative.y * 0.006, -0.3, 1.2)
-		_paint_at(e.position, painting)
+		if PAINT_MODE:
+			_paint_at(e.position, painting)
 
 
 # ---------- Phase 1 : se cacher (on marche sur son île) ----------
 func update_zone_info() -> void:
 	var zones: Dictionary = WorldScript.ZONES
 	player_zone = world.zone_of(hider.pos.x, hider.pos.z)
-	camo_score = paint.match_zone(player_zone)
+	camo_score = camo_match(player_zone)
 	var expo := "[color=#86d394]faible[/color]"
 	if hide_exposure > 0.6:
 		expo = "[color=#ef4f4f]forte[/color]"
@@ -540,7 +572,7 @@ func start_fire() -> void:
 	hud.fire_hud.visible = true
 	world.player.visible = false
 	player_zone = world.zone_of(hider.pos.x, hider.pos.z)
-	camo_score = paint.match_zone(player_zone)
+	camo_score = camo_match(player_zone)
 	var eye: Vector3 = hider.eye()
 	enemy_spot = choose_enemy_spot(eye)
 	world.enemy.visible = true
@@ -551,7 +583,8 @@ func start_fire() -> void:
 	var L := D()
 	var others: Array = WorldScript.ZONE_KEYS.filter(func(k): return k != enemy_spot.zone)
 	enemy_camo = enemy_spot.zone if randf() < L.camo else others.pick_random()
-	world.set_camo(world.enemy, enemy_camo)
+	paint_enemy.wear(enemy_camo)
+	world.set_ghillie(world.enemy, randf() < 0.5, Color(PaintScript.OUTFITS[enemy_camo][1]))
 	camera.position = eye
 	aim_at(eye, Vector3(0, 78, -150))
 	base_yaw = yaw
@@ -706,7 +739,7 @@ func finish(won: bool) -> void:
 	hud.end_text.text = start + "Il était caché sur la %s, en tenue %s." % [ez.to_lower(), ec.to_lower()]
 	var tips: Array[String] = []
 	if camo_score < 0.5:
-		tips.append("Ta peinture ne ressemblait qu'à %d %% à la %s : repeins-toi à l'atelier avec ses couleurs." % [roundi(camo_score * 100), zones[player_zone]["label"].to_lower()])
+		tips.append("Ta tenue ne ressemblait qu'à %d %% à la %s : choisis la tenue de ce terrain (et le feuillage)." % [roundi(camo_score * 100), zones[player_zone]["label"].to_lower()])
 	if hider.stance == "debout":
 		tips.append("Debout, on te voyait de loin : accroupis-toi (C) ou couche-toi (X).")
 	if fire_exposure > 0.6:
@@ -865,7 +898,7 @@ func _process(dt: float) -> void:
 			matches_dirty = false
 			var scores := {}
 			for k in WorldScript.ZONE_KEYS:
-				scores[k] = paint.match_zone(k)
+				scores[k] = camo_match(k)
 			hud.set_matches(scores)
 	elif phase != "hide":
 		if touch_mode and phase in ["fire", "reveal"]:

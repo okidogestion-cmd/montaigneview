@@ -42,14 +42,17 @@ void vertex() {
 	// Chaque touffe a une place fixe dans le monde : sa position de base, plus un nombre entier
 	// de « tapis » (2 × rayon). Quand la caméra avance, seules les touffes sorties du champ,
 	// déjà invisibles, sont recyclées de l'autre côté : rien ne bouge sous les yeux du joueur.
+	// Le nombre de tapis est entier et le tirage au sort ne dépend que de lui et de la touffe :
+	// il ne change pas d'une image à l'autre (sinon, sur téléphone, les arrondis font clignoter l'herbe).
 	vec3 inst = MODEL_MATRIX[3].xyz;
-	vec2 rel = mod(inst.xz - cam_pos.xz + radius, 2.0 * radius) - radius;
-	vec3 origin = vec3(cam_pos.x + rel.x, 0.0, cam_pos.z + rel.y);
+	vec2 k = floor((cam_pos.xz - inst.xz + radius) / (2.0 * radius));
+	vec3 origin = vec3(inst.x + k.x * 2.0 * radius, 0.0, inst.z + k.y * 2.0 * radius);
 	vec2 uv = ((origin.xz + half_size) / cell + 0.5) / grid;
 	float h = ground(origin.xz);
 	vec4 mk = texture(mask, uv);
 	float m = mk[channel];
-	float rnd = fract(sin(dot(origin.xz, vec2(12.9898, 78.233))) * 43758.5453);
+	vec2 seed = fract(inst.xz * 0.0137 + k * vec2(0.3183, 0.6180));
+	float rnd = fract(sin(dot(seed, vec2(12.9898, 78.233))) * 43758.5453);
 	float d = length(origin.xz - cam_pos.xz);
 	float fade = (1.0 - smoothstep(radius * 0.7, radius, d)) * smoothstep(1.2, 1.8, d);  // rien dans les yeux
 	float show = step(rnd, m * density) * step(water_y + 0.8, h) * fade;
@@ -70,7 +73,11 @@ void vertex() {
 void fragment() {
 	if (use_tex) {
 		vec4 t = texture(albedo_tex, UV);
-		if (t.a < 0.45) {
+		// Au loin, les petites versions de l'image (mipmaps) diluent la transparence : on la renforce
+		// selon le niveau utilisé, sinon les brins maigrissent et scintillent en s'éloignant.
+		vec2 px = UV * vec2(textureSize(albedo_tex, 0));
+		float mip = max(0.0, 0.5 * log2(max(dot(dFdx(px), dFdx(px)), dot(dFdy(px), dFdy(px)))));
+		if (t.a * (1.0 + mip * 0.3) < 0.45) {
 			discard;
 		}
 		ALBEDO = t.rgb * tint.rgb * shade * COLOR.rgb;

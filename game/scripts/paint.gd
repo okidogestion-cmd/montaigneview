@@ -11,6 +11,18 @@ const PALETTE := [
 	Color("#9ccc5a"), Color("#6fae44"), Color("#4c8a34"), Color("#5a6b3a"),
 	Color("#3b7a3c"), Color("#2a5530"), Color("#1e2224"), Color("#c0503a"),
 ]
+# Tenues de camouflage (mode normal : on choisit une tenue au lieu de peindre ; la peinture reviendra dans un
+# mode à part). Couleurs inspirées des échantillons de la scène Higgsfield de l'utilisateur, accordées aux
+# teintes de chaque terrain : [nom affiché, fond, taches].
+const OUTFITS := {
+	"foret": ["Forêt", "#3b7a3c", ["#2a5530", "#5a6b3a", "#2a5530"]],
+	"herbe": ["Herbe", "#6fae44", ["#9ccc5a", "#4c8a34"]],
+	"roche": ["Pierre", "#928e86", ["#b9b2a5", "#6d6a64"]],
+	"neige": ["Neige", "#eef3f9", ["#c9d3dc"]],
+	"olive": ["Olive", "#5a6b3a", ["#4c8a34", "#6d6a64", "#2a5530"]],
+}
+const GHILLIE_BONUS := 0.1   # tenue de feuillage : la silhouette se fond encore mieux
+
 const MATCH_DIST := 0.32               # au-delà de cet écart de couleur, ça ne ressemble plus du tout
 
 var base := DEFAULT_BASE
@@ -97,6 +109,24 @@ func _set_default() -> void:
 	# Tenue de départ : celle du modèle 3D (sa texture), sans peinture. À repeindre pour se camoufler.
 	base = DEFAULT_BASE
 	strokes = []
+
+## Met une tenue : fond de la tenue et taches réparties sur tout le corps (toujours le même motif).
+func wear(outfit: String) -> void:
+	var o: Array = OUTFITS[outfit]
+	base = Color(o[1])
+	strokes = []
+	var r := RandomNumberGenerator.new()
+	r.seed = 1234
+	var spots: Array = o[2]
+	for i in 130:
+		var p: Vector3 = samples[r.randi() % samples.size()]
+		var c := Color(spots[i % spots.size()])
+		var rad := r.randf_range(0.05, 0.11)
+		for j in 2:
+			var off := Vector3(r.randfn(), r.randfn(), r.randfn()) * rad * 0.5
+			strokes.append([Vector4(p.x + off.x, p.y + off.y, p.z + off.z, rad * r.randf_range(0.5, 0.85)), c])
+	history.clear()
+	refresh()
 
 func undo() -> void:
 	if history.is_empty():

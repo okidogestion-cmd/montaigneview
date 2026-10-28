@@ -333,3 +333,19 @@ Le jeu devient une **appli mobile** (même jeu : cachette, peinture, duel), plus
   4. Un bras de mer sépare les deux îles. **Zones** selon l'altitude, la pente et l'eau : roche sur les crêtes et
      les pentes raides, neige au sommet, forêt au fond des vallons, herbe ailleurs.
 - Textures du sol : au loin, la grande échelle l'emporte (plus de rayures de répétition sur la roche).
+
+### Accessoires Higgsfield, herbe, tenues de camouflage (28/10/2026)
+- **Accessoires** de la scène 3D Jutsu « Sniper Arena » de l'utilisateur (`sources/arena_higgsfield.glb`), sortis par
+  `tools/accessoires.gd` dans `game/art/accessoires/` (sacs de sable, petit muret, tour de tireur avec filet de
+  camouflage, caisse de munitions, fût, tronc) ; matières du jeu posées dans `world.gd` → `PROP_MATS`.
+  - Une cachette sur quatre est un **nid de sacs de sable** (muret sur deux hauteurs, retours, caisse et fût).
+  - Une **tour de tireur** par île, sur le versant face à l'autre île, à l'endroit le plus plat (poste visible).
+  - **Troncs couchés** en forêt (dans la scène d'origine ils étaient debout).
+- **Herbe qui clignotait** : le tirage au sort de chaque touffe dépendait de sa position recalculée depuis la caméra ;
+  sur téléphone, les arrondis changeaient le tirage d'une image à l'autre. Tirage maintenant fixe (`grass.gdshader`) ;
+  au loin la transparence est renforcée selon la taille de l'image utilisée (les brins ne scintillent plus).
+- **Peinture remplacée par des tenues** (la peinture libre reviendra dans un mode à part : `main.gd` → `PAINT_MODE`).
+  À l'atelier « Camouflage » on choisit une tenue (`paint.gd` → `OUTFITS` : Forêt, Herbe, Pierre, Neige, Olive), avec
+  un motif de taches aux teintes du terrain, et on peut ajouter la **tenue de feuillage (ghillie)** : 260 touffes
+  d'herbe accrochées au corps, qui suivent les os (`world.gd` → `set_ghillie`), bonus de camouflage +10 %.
+  L'ennemi porte aussi une tenue (et parfois le feuillage).

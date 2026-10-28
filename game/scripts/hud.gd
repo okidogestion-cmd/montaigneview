@@ -15,6 +15,8 @@ signal paint_pose(pose: String)
 signal paint_undo
 signal paint_clear
 signal paint_done
+signal paint_outfit(outfit: String)
+signal paint_ghillie(on: bool)
 signal orientation_changed(portrait: bool)
 
 const ZONES: Dictionary = preload("res://scripts/world.gd").ZONES
@@ -86,6 +88,8 @@ var paint_colors := []
 var paint_sizes := []
 var paint_tools := {}
 var paint_poses := {}
+var outfit_buttons := {}
+var ghillie_button: Button
 var match_bars := {}
 var match_labels := {}
 var paint_info: Label
@@ -355,7 +359,7 @@ func _build_hide() -> void:
 	var tv := _vbox(2)
 	tv.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	tv.add_child(_label("Cache-toi", 30, PAPER))
-	var hide_sub := _small("Trouve une cachette sur ton île, puis tu te peindras sur place. L'ennemi regarde depuis l'île d'en face.")
+	var hide_sub := _small("Trouve une cachette sur ton île, puis tu choisiras ta tenue de camouflage sur place. L'ennemi regarde depuis l'île d'en face.")
 	hide_sub.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 	tv.add_child(hide_sub)
 	th.add_child(tv)
@@ -610,8 +614,8 @@ func _build_paint() -> void:
 	paint_hud = _full(Control.new())
 	var top := _bar(true)
 	var tv := _vbox(2)
-	tv.add_child(_label("Atelier de peinture", 30, PAPER))
-	var paint_sub := _small("Peins ton sniper aux couleurs du terrain où tu comptes te cacher")
+	tv.add_child(_label("Camouflage", 30, PAPER))
+	var paint_sub := _small("Choisis la tenue qui ressemble au terrain de ta cachette")
 	paint_sub.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 	tv.add_child(paint_sub)
 	top.add_child(tv)
@@ -624,54 +628,29 @@ func _build_paint() -> void:
 	left.position.x = 14
 	left.mouse_filter = Control.MOUSE_FILTER_STOP
 	var lv := _vbox(14)
-	var cs := _section("Couleurs")
-	var grid := GridContainer.new()
-	grid.columns = 4
-	grid.add_theme_constant_override("h_separation", 6)
-	grid.add_theme_constant_override("v_separation", 6)
-	for c in PaintScript.PALETTE:
-		var b := Button.new()
-		b.focus_mode = Control.FOCUS_NONE
-		b.custom_minimum_size = Vector2(38, 30)
-		b.add_theme_stylebox_override("normal", _style(c, Color(0, 0, 0, 0.4), 4, 0))
-		b.add_theme_stylebox_override("hover", _style(c.lightened(0.1), PAPER, 4, 0))
-		b.add_theme_stylebox_override("pressed", _style(c, PAPER, 4, 0))
-		b.pressed.connect(func(): paint_color.emit(c))
-		b.set_meta("color", c)
-		paint_colors.append(b)
-		grid.add_child(b)
-	cs.add_child(grid)
-	lv.add_child(cs)
-	var ss := _section("Pinceau")
-	var sh := _hbox(6)
-	for i in 3:
-		var b := _button(["Petit", "Moyen", "Gros"][i], Color(1, 1, 1, 0.06), PAPER, 15)
+	# Mode normal : on choisit une tenue de camouflage (la peinture libre reviendra dans un mode à part).
+	var os := _section("Tenue")
+	var og := GridContainer.new()
+	og.columns = 2
+	og.add_theme_constant_override("h_separation", 6)
+	og.add_theme_constant_override("v_separation", 6)
+	for k in PaintScript.OUTFITS:
+		var o: Array = PaintScript.OUTFITS[k]
+		var b := _button(o[0], Color(1, 1, 1, 0.06), PAPER, 15)
+		b.icon = _swatch_icon(Color(o[1]))
 		b.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-		b.pressed.connect(func(): paint_size.emit(i))
-		paint_sizes.append(b)
-		sh.add_child(b)
-	ss.add_child(sh)
-	lv.add_child(ss)
-	var ts := _section("Outils")
-	var th := _hbox(6)
-	for t in [["pinceau", "Pinceau"], ["taches", "Taches"], ["remplir", "Remplir"]]:
-		var b := _button(t[1], Color(1, 1, 1, 0.06), PAPER, 15)
-		b.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-		b.pressed.connect(func(): paint_tool.emit(t[0]))
-		paint_tools[t[0]] = b
-		th.add_child(b)
-	ts.add_child(th)
-	var uh := _hbox(6)
-	var undo := _button("Annuler", Color(1, 1, 1, 0.06), PAPER, 15)
-	undo.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-	undo.pressed.connect(func(): paint_undo.emit())
-	uh.add_child(undo)
-	var clr := _button("Tout effacer", Color(1, 1, 1, 0.06), PAPER, 15)
-	clr.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-	clr.pressed.connect(func(): paint_clear.emit())
-	uh.add_child(clr)
-	ts.add_child(uh)
-	lv.add_child(ts)
+		b.alignment = HORIZONTAL_ALIGNMENT_LEFT
+		b.pressed.connect(func(): paint_outfit.emit(k))
+		outfit_buttons[k] = b
+		og.add_child(b)
+	os.add_child(og)
+	lv.add_child(os)
+	var gs := _section("Feuillage")
+	ghillie_button = _button("Tenue de feuillage (ghillie)", Color(1, 1, 1, 0.06), PAPER, 15)
+	ghillie_button.toggle_mode = true
+	ghillie_button.toggled.connect(func(on): paint_ghillie.emit(on))
+	gs.add_child(ghillie_button)
+	lv.add_child(gs)
 	var ps := _section("Voir la posture")
 	var ph := _hbox(6)
 	for p in [["debout", "Debout"], ["accroupi", "Accroupi"], ["couche", "Couché"]]:
@@ -726,7 +705,7 @@ func _build_paint() -> void:
 
 	var bottom := _bar(false)
 	var bh := _hbox()
-	paint_hint = _label("Clic gauche : peindre   Clic droit (glisser) : tourner autour   Molette : zoom", 14, MUTED)
+	paint_hint = _label("Glisser : tourner autour   Molette : zoom", 14, MUTED)
 	var hint := paint_hint
 	hint.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	hint.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
@@ -758,6 +737,12 @@ func set_paint_state(color: Color, size_idx: int, tool: String, pose: String) ->
 	_mark(paint_tools, tool)
 	_mark(paint_poses, pose)
 
+func set_outfit_state(outfit: String, ghillie: bool, pose: String) -> void:
+	_mark(outfit_buttons, outfit)
+	ghillie_button.set_pressed_no_signal(ghillie)
+	ghillie_button.add_theme_stylebox_override("normal", _style(Color(1, 1, 1, 0.22) if ghillie else Color(1, 1, 1, 0.06), BLAZE if ghillie else LINE, 4, 10))
+	_mark(paint_poses, pose)
+
 func set_matches(scores: Dictionary) -> void:
 	var best := ""
 	for k in scores:
@@ -766,7 +751,7 @@ func set_matches(scores: Dictionary) -> void:
 		(match_bars[k] as ColorRect).size = Vector2(200 * v, 8)
 		if best == "" or v > scores[best]:
 			best = k
-	paint_info.text = "Le mieux : te cacher sur la %s. Mélanger deux ou trois teintes d'un même terrain donne un bonus (la silhouette se casse)." % ZONES[best]["label"].to_lower()
+	paint_info.text = "Cette tenue va le mieux sur la %s. La tenue de feuillage casse encore plus ta silhouette." % ZONES[best]["label"].to_lower()
 
 
 # ---------- Mode tactile ----------
@@ -786,7 +771,7 @@ func set_touch_mode(on: bool) -> void:
 	inset_label.position = Vector2(58, 298)
 	for l in fire_hud.find_children("*", "Label", true, false):
 		(l as Label).text = (l as Label).text.replace(" (MAJ / CLIC DROIT)", "").replace(" (MOLETTE / Z)", "")
-	paint_hint.text = "Un doigt sur le sniper : peindre   ·   Un doigt à côté : tourner autour   ·   Deux doigts : zoomer"
+	paint_hint.text = "Un doigt : tourner autour   ·   Deux doigts : zoomer"
 
 func over_paint_panel(pos: Vector2) -> bool:
 	for p in paint_panels:
