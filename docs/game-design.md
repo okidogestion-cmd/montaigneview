@@ -318,3 +318,18 @@ Le jeu devient une **appli mobile** (même jeu : cachette, peinture, duel), plus
 - Couché refait : coudes posés devant, mains sous le menton, jambes allongées ; en rampant, le coude opposé au genou
   qui remonte avance. Le corps couché suit la pente dans sa longueur et sur le côté (`hider.gd` → `_apply`).
 - Shader camo : faces affichées des deux côtés (capuche en une seule épaisseur). L'ancien `art/sniper.glb` est retiré.
+
+### Vraies montagnes (28/10/2026)
+- Retour de l'utilisateur : la carte « fait pas du tout naturel », « pas juste un triangle ». L'ancien relief était
+  une somme de bosses rondes (une par montagne) : chaque île était un cône.
+- Nouveau relief fabriqué hors du jeu par `tools/relief.py` (Python + numpy), puis rangé dans `game/data/` par
+  `tools/relief_vers_godot.gd` (voir l'en-tête des deux fichiers) ; le jeu ne fait que le lire.
+  1. Chaque montagne est une **ligne de crête** avec plusieurs sommets et des cols (pour les deux îles du duel, en
+     travers de la vue : l'adversaire voit une vraie ligne de sommets) ; profil concave (raide sous la crête, doux au
+     pied) ; formes irrégulières (domaine déformé par du bruit).
+  2. **Ravines et éperons** qui descendent les versants, petites crêtes partout (bruit en crêtes).
+  3. **Érosion simulée** : l'eau qui ruisselle creuse les vallées (60 passes), les éboulis glissent jusqu'à une pente
+     d'équilibre (reste praticable à pied).
+  4. Un bras de mer sépare les deux îles. **Zones** selon l'altitude, la pente et l'eau : roche sur les crêtes et
+     les pentes raides, neige au sommet, forêt au fond des vallons, herbe ailleurs.
+- Textures du sol : au loin, la grande échelle l'emporte (plus de rayures de répétition sur la roche).

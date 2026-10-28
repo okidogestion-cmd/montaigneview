@@ -15,11 +15,6 @@ const S := 1400.0          # taille de la vallée
 const SEG := 320           # finesse du relief (4,4 m entre deux points)
 const CELL := S / SEG
 const WATER_Y := 26.0      # niveau de la mer : le fond de la vallée est sous l'eau, les montagnes sont des îles
-const PEAKS := [
-	[0, -MZ, 130, 190], [0, MZ, 130, 190], [-270, -340, 95, 150], [290, -360, 110, 160],
-	[-300, 310, 90, 150], [310, 330, 85, 140], [0, -580, 160, 230], [0, 580, 150, 230],
-	[-560, 0, 120, 200], [560, 0, 120, 200],
-]
 const TOON := preload("res://shaders/toon.gdshader")
 const TERRAIN := preload("res://shaders/terrain.gdshader")
 const OUTLINE := preload("res://shaders/outline.gdshader")
@@ -81,29 +76,6 @@ static func fbm(x: float, z: float) -> float:
 		_noise.fractal_lacunarity = 2.03
 		_noise.fractal_gain = 0.5
 	return _noise.get_noise_2d(x, z) * 0.47
-
-static func height_fn(x: float, z: float) -> float:
-	var h := 0.0
-	for p in PEAKS:
-		var dx: float = x - p[0]
-		var dz: float = z - p[1]
-		var r: float = p[3]
-		h += p[2] * exp(-1.6 * (dx * dx * 0.7 + dz * dz) / (r * r))
-	h += fbm(x * 0.012, z * 0.012) * 38.0 + fbm(x * 0.05, z * 0.05) * 6.0
-	# Au bord de la carte, le sol plonge : la mer s'étend jusqu'à l'horizon.
-	var edge := maxf(absf(x), absf(z))
-	h = lerpf(h, -60.0, smoothstep(540.0, 690.0, edge))
-	return h
-
-static func zone_at(x: float, z: float, h: float) -> String:
-	var n := fbm(x * 0.025 + 11.0, z * 0.025 - 7.0)
-	if h > 108.0 + n * 28.0:
-		return "neige"
-	if h > 74.0 + n * 30.0:
-		return "roche"
-	if fbm(x * 0.018 - 40.0, z * 0.018 + 90.0) > 0.06:
-		return "foret"
-	return "herbe"
 
 func height_at(x: float, z: float) -> float:
 	var fc := clampf((x + S / 2) / CELL, 0, SEG - 0.001)
@@ -335,30 +307,13 @@ func build() -> void:
 	_build_sprites()
 
 func _load_or_compute_relief() -> void:
-	# Le relief (hauteurs et zones) est calculé une seule fois puis rangé dans data/ :
-	# le jeu et l'appli n'ont plus qu'à le lire au lancement.
+	# Le relief (hauteurs et zones) est fabriqué une fois pour toutes par tools/relief.py (montagnes, crêtes,
+	# érosion), puis rangé dans data/ par tools/relief_vers_godot.gd : le jeu n'a plus qu'à le lire.
 	var w := SEG + 1
-	var hp := "res://data/relief_%d_hauteurs.res" % SEG
-	var zp := "res://data/relief_%d_zones.res" % SEG
-	if ResourceLoader.exists(hp) and ResourceLoader.exists(zp):
-		heights = (load(hp) as Image).get_data().to_float32_array()
-		zones = (load(zp) as Image).get_data()
-		if heights.size() == w * w and zones.size() == w * w:
-			return
-	heights.resize(w * w)
-	zones.resize(w * w)
-	for r in w:
-		for c in w:
-			var x := -S / 2 + c * CELL
-			var z := -S / 2 + r * CELL
-			var h := height_fn(x, z)
-			heights[r * w + c] = h
-			zones[r * w + c] = ZONE_KEYS.find(zone_at(x, z, h))
-	if not OS.has_feature("template"):
-		# Depuis le projet (pas depuis une appli exportée) : on enregistre pour les prochains lancements.
-		DirAccess.make_dir_recursive_absolute(ProjectSettings.globalize_path("res://data"))
-		ResourceSaver.save(Image.create_from_data(w, w, false, Image.FORMAT_RF, heights.to_byte_array()), hp)
-		ResourceSaver.save(Image.create_from_data(w, w, false, Image.FORMAT_R8, zones), zp)
+	heights = (load("res://data/relief_%d_hauteurs.res" % SEG) as Image).get_data().to_float32_array()
+	zones = (load("res://data/relief_%d_zones.res" % SEG) as Image).get_data()
+	if heights.size() != w * w or zones.size() != w * w:
+		push_error("Relief de data/ incomplet : relancer tools/relief.py et tools/relief_vers_godot.gd")
 
 func zone_of(x: float, z: float) -> String:
 	# Zone du point de grille le plus proche (la même que celle dessinée sur le terrain).
