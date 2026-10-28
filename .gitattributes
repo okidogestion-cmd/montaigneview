@@ -35,3 +35,5 @@ game/art/*.jpg -filter -diff -merge binary
 tools/artefact/*.jpg -filter -diff -merge binary
 game/art/*.glb -filter -diff -merge binary
 game/art/*.png -filter -diff -merge binary
+game/art/*.scn -filter -diff -merge binary
+sources/*.glb -filter -diff -merge binary

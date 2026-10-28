@@ -5,7 +5,7 @@ extends RefCounted
 
 const STANCES := {
 	"debout":   {"label": "Debout",   "speed": 4.2, "eye": 1.6,  "height": 1.75, "body": 1.75, "cam_h": 1.65, "cam_d": 4.2, "detect": 1.8},
-	"accroupi": {"label": "Accroupi", "speed": 2.2, "eye": 1.1,  "height": 1.2,  "body": 1.2,  "cam_h": 1.25, "cam_d": 3.6, "detect": 1.0},
+	"accroupi": {"label": "Accroupi", "speed": 1.8, "eye": 1.1,  "height": 1.2,  "body": 1.2,  "cam_h": 1.25, "cam_d": 3.6, "detect": 1.0},
 	"couche":   {"label": "Couché",   "speed": 1.1, "eye": 0.35, "height": 0.45, "body": 0.6,  "cam_h": 0.8,  "cam_d": 3.2, "detect": 0.55},
 }
 const RUN_SPEED := 7.5      # course (Maj), seulement debout
@@ -24,7 +24,6 @@ var facing := PI            # le sniper regarde vers -z, l'île ennemie
 var stance := "debout"
 var cam_yaw := 0.0
 var cam_pitch := -0.25
-var walk_phase := 0.0
 var _cam_pos := Vector3.ZERO
 var _cam_dist := 4.2
 var _cam_h := 1.65
@@ -119,12 +118,10 @@ func physics_step(dt: float, input: Vector2, running: bool) -> void:
 	pos = body.global_position
 	if dir.length() > 0.01:
 		facing = lerp_angle(facing, atan2(dir.x, dir.z), 1.0 - exp(-dt * 12.0))
-	# La foulée avance avec la distance parcourue : pas de patinage.
-	var moved := Vector2(body.velocity.x, body.velocity.z).length()
-	walk_phase += moved * dt * (2.4 if stance == "debout" else 3.2)
 
-func speed_ratio() -> float:
-	return clampf(Vector2(body.velocity.x, body.velocity.z).length() / RUN_SPEED * 1.6, 0.0, 1.0)
+## Vitesse au sol (m/s) : l'animation (marche, course…) s'y cale, pas de patinage.
+func ground_speed() -> float:
+	return Vector2(body.velocity.x, body.velocity.z).length()
 
 
 # ---------- Affichage (à chaque image) ----------
@@ -149,7 +146,7 @@ func update_visual(dt: float) -> void:
 	# Petites bosses du sol adoucies en hauteur seulement.
 	_vis = Vector3(d.x, lerpf(_vis.y, d.y, 1.0 - exp(-dt * 22.0)) if not _first_frame else d.y, d.z)
 	_apply()
-	world.animate_figure(world.player, stance, walk_phase, speed_ratio())
+	world.animate_figure(world.player, stance, ground_speed())
 
 func eye() -> Vector3:
 	return pos + Vector3(0, info().eye, 0) + forward() * 0.3

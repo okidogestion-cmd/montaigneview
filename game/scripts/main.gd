@@ -197,7 +197,7 @@ func _build_environment() -> void:
 	var sky_mat := ShaderMaterial.new()
 	sky_mat.shader = preload("res://shaders/sky.gdshader")
 	sky_mat.set_shader_parameter("panorama", preload("res://art/ciel.jpg"))
-	sky_mat.set_shader_parameter("cloud_cover", 0.64)   # quelques nuages seulement : ceux du panorama suffisent
+	sky_mat.set_shader_parameter("clouds", preload("res://art/ciel_nuages.jpg"))
 	var sky := Sky.new()
 	sky.sky_material = sky_mat
 	env.background_mode = Environment.BG_SKY
@@ -332,7 +332,7 @@ func start_paint() -> void:
 	world.end_marker.visible = false
 	# On peint sur place, dans la cachette et la posture choisies : le terrain autour sert de modèle.
 	ws_pose = hider.stance
-	world.animate_figure(world.player, ws_pose, 0.0, 0.0)
+	world.set_stance(world.player, ws_pose)
 	ws_yaw = hider.facing + 0.6   # de trois quarts face
 	ws_pitch = 0.6 if ws_pose == "couche" else 0.15
 	ws_dist = 3.2
@@ -546,6 +546,7 @@ func start_fire() -> void:
 	world.enemy.visible = true
 	world.enemy.position = enemy_spot.fig
 	world.enemy.rotation.y = 0
+	world.set_stance(world.enemy, "accroupi", true)
 	fire_exposure = exposure_from([enemy_spot.fig + Vector3(0, 1.05, 0)])
 	var L := D()
 	var others: Array = WorldScript.ZONE_KEYS.filter(func(k): return k != enemy_spot.zone)
@@ -648,7 +649,7 @@ func shoot() -> void:
 func ai_shoot() -> void:
 	var L := D()
 	var p := minf(0.92, ai_reveal * L.acc)
-	var tip: Vector3 = world.enemy.to_global(Vector3(0.08, 1.04, 1.2))
+	var tip: Vector3 = world.muzzle(world.enemy)
 	world.flash_sprite.position = tip
 	world.flash_sprite.visible = true
 	get_tree().create_timer(0.11).timeout.connect(func(): world.flash_sprite.visible = false)
@@ -726,6 +727,7 @@ func finish(won: bool) -> void:
 
 func win() -> void:
 	hud.pulse(hud.flash, 0.2, 0.3)
+	world.fall(world.enemy)
 	finish(true)
 
 func lose() -> void:

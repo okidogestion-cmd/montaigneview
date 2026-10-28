@@ -243,6 +243,7 @@ Le jeu devient une **appli mobile** (même jeu : cachette, peinture, duel), plus
   2 400 points répartis sur le corps (`figure_samples`). Tant que rien n'est peint, on voit la tenue d'origine
   (`tex_mix` du shader camo) ; la peinture garde les plis du vêtement.
 - Les anciennes pièces (`PARTS`) sont supprimées.
+- *28/10/2026 : le squelette de 6 os est remplacé par un vrai squelette animé, voir ci-dessous.*
 
 ### Direction artistique réaliste, façon jeux PS3 (28/10/2026)
 - **Éclairage doux** (Lambert) à la place des deux tons cartoon : terrain, rochers, sniper, herbe.
@@ -259,3 +260,30 @@ Le jeu devient une **appli mobile** (même jeu : cachette, peinture, duel), plus
   avant une sortie sur Steam. Les collines du pack (low-poly) ne sont pas utilisées : la carte reste celle du jeu.
 - **Mer réaliste** (`shaders/water.gdshader`) : vagues calculées, reflet du ciel (Fresnel) et du soleil, écume légère.
 - Nuages du ciel plus vaporeux et plus rares ; rochers plus fins et arrondis ; cailloux plus sombres.
+
+### Sniper animé (28/10/2026)
+- Squelette (65 os) et animations de la **« Universal Animation Library » de Quaternius** (licence CC0, libre pour Steam),
+  fournie par l'utilisateur : `sources/UAL1_Standard.glb` (+ `UAL1_License.txt`).
+- `tools/sniper_anime.gd` (à lancer une fois, voir l'en-tête du fichier) pose ce squelette sur `art/sniper.glb` et
+  enregistre `art/sniper_anime.scn` (maillage, os, animations). Chaque sommet du sniper prend les poids des sommets
+  voisins du mannequin ; bras, mains et fusil suivent le buste (le sniper tient son fusil, le mannequin a les bras
+  écartés), les jambes suivent les jambes. `sniper.glb` ne sert plus qu'à cet outil (exclu de l'export).
+- Animations gardées : `Idle_Loop` (respiration), `Walk_Loop`, `Jog_Fwd_Loop`, `Sprint_Loop`, `Crouch_Idle_Loop`,
+  `Crouch_Fwd_Loop`, `Death01` (l'ennemi touché tombe). La bibliothèque n'a pas de position couchée : l'outil la
+  fabrique à partir de la pose debout (`Prone_Idle_Loop` : à plat ventre, buste un peu relevé, regard devant ;
+  `Prone_Crawl_Loop` : reptation, un genou remonte sur le côté).
+- `world.gd` → `FIG_ANIMS` : animation de chaque posture et sa vitesse au sol ; `animate_figure` choisit marche,
+  course ou sprint selon la vitesse du joueur (m/s) et règle la cadence pour que les pieds ne glissent pas ;
+  changement d'allure en douceur, au même moment de la foulée. Accroupi un peu plus lent (1,8 m/s au lieu de 2,2).
+- Atelier : la pose est figée (`set_stance`) ; le pinceau vise le maillage dans la pose affichée, calculée comme la
+  carte graphique (`_skinned`), et la peinture reste posée dans le repère debout (CUSTOM0). L'éclair du tir ennemi
+  part du bout de son canon (`muzzle`).
+
+### Ciel avec de vrais nuages (28/10/2026)
+- Les nuages calculés sont remplacés par ceux du ciel de jour **« PSX Daysky HDRI » de StarkCrafts** (fourni par
+  l'utilisateur) : moitié haute du panorama 360°, convertie en image de clarté des nuages (`art/ciel_nuages.jpg`, 130 Ko),
+  teintée aux couleurs du lever de soleil dans `shaders/sky.gdshader`. Le panorama Higgsfield reste à l'horizon.
+  Licence du pack à vérifier avant une sortie sur Steam.
+- Pour plus tard : le ciel de nuit du même auteur (`PSX Nightsky HDRI`) pourrait servir à un mode de nuit.
+  Le pack « PSX Forest » (modèles façon PlayStation 1, textures de 128 px) n'est pas utilisé : trop simple pour le
+  rendu visé.

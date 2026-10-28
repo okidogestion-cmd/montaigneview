@@ -279,12 +279,14 @@ func build() -> void:
 	player_spots = _build_spots(MZ, -1)
 	_scatter()
 	_grass()
-	player = _make_figure(["debout", "accroupi", "couche"])
+	player = _make_figure()
 	add_child(player)
 	player.visible = false
+	set_stance(player, "debout")
 	enemy = _make_figure()
 	add_child(enemy)
 	enemy.visible = false
+	set_stance(enemy, "accroupi", true)
 	enemy_hitbox = StaticBody3D.new()
 	var hs := CollisionShape3D.new()
 	var hb := BoxShape3D.new()
@@ -675,221 +677,171 @@ func update_grass(cam: Vector3) -> void:
 # ---------- Personnages ----------
 const CAMO_SHADER := preload("res://shaders/camo.gdshader")
 
-# ---------- Le modèle 3D du sniper ----------
-# Le sniper est un modèle 3D (art/sniper.glb, créé avec Higgsfield / Tripo, allégé à 8 700 triangles)
-# animé par un petit squelette de 6 os : buste (avec bras, fusil), tête, cuisses et tibias (avec genoux).
-# Chaque sommet garde sa position « debout » (CUSTOM0) : la peinture suit le corps dans toutes les poses.
-const MODEL := preload("res://art/sniper.glb")
+# ---------- Le sniper ----------
+# Modèle 3D (art/sniper.glb, créé avec Higgsfield / Tripo) animé avec le squelette et les animations de la
+# « Universal Animation Library » de Quaternius (CC0) : art/sniper_anime.scn, préparé par tools/sniper_anime.gd
+# (qui fabrique aussi la position couchée). Chaque sommet garde sa position « debout » (CUSTOM0) :
+# la peinture suit le corps dans toutes les poses.
+const FIG_SCENE := preload("res://art/sniper_anime.scn")
 const MODEL_TEX := preload("res://art/sniper_couleur.jpg")
 const MODEL_LUM := 0.043          # luminance moyenne de la texture (linéaire), pour garder ses plis sous la peinture
-const HIP := Vector3(0, 0.9, 0)   # hanche, pose debout
-const KNEE_Y := 0.48              # hauteur des genoux, pose debout
-const NECK := Vector3(0, 1.5, 0.02)
-const LEG_X := 0.12               # écart des jambes depuis le milieu (si le modèle ne permet pas de le mesurer)
-# Os : 0 buste, 1 tête, 2 cuisse gauche, 3 cuisse droite, 4 tibia gauche, 5 tibia droit.
-# hip : où va la hanche ; lean : bascule du buste vers l'avant ; thighs / shins : angle de chaque cuisse et de
-# chaque tibia (gauche, droite) par rapport à la verticale (positif : vers l'arrière) ; head : tête relevée (négatif).
-# Accroupi = tireur à genou : genou gauche au sol, tibia couché derrière ; pied droit posé devant, cuisse à l'horizontale.
-const FIG_POSES := {
-	"debout": {"hip": Vector3(0, 0.9, 0), "lean": 0.0, "thighs": [0.0, 0.0], "shins": [0.0, 0.0], "head": 0.0},
-	"accroupi": {"hip": Vector3(0, 0.5, -0.05), "lean": 0.22, "thighs": [0.05, -1.4], "shins": [1.47, 0.0], "head": -0.15},
-	"couche": {"hip": Vector3(0, 0.17, -0.1), "lean": PI / 2, "thighs": [PI / 2, PI / 2], "shins": [PI / 2, PI / 2], "head": -1.0},
+# Animations de chaque posture : [nom, vitesse au sol (m/s) à vitesse normale de l'animation] ; la première est à l'arrêt.
+const FIG_ANIMS := {
+	"debout": [["Idle_Loop", 0.0], ["Walk_Loop", 1.05], ["Jog_Fwd_Loop", 3.6], ["Sprint_Loop", 6.2]],
+	"accroupi": [["Crouch_Idle_Loop", 0.0], ["Crouch_Fwd_Loop", 0.75]],
+	"couche": [["Prone_Idle_Loop", 0.0], ["Prone_Crawl_Loop", 0.8]],
 }
-var _leg_axis := [Vector2(-LEG_X, 0), Vector2(LEG_X, 0)]   # axe de chaque jambe (x, z), mesuré sur le modèle
-var _fig_arrays: Array = []    # maillage debout, avec os, poids et positions de référence
-var _fig_posed := {}           # pose → [positions, TriangleMesh] (pinceau de l'atelier)
+const FIG_HOLD := 0.4             # moment de l'animation à l'arrêt montré quand la pose est figée (atelier)
+const MUZZLE := 7099              # sommet au bout du canon
 
-func _model_arrays() -> Array:
-	if not _fig_arrays.is_empty():
-		return _fig_arrays
-	var scene: Node = MODEL.instantiate()
-	var mi: MeshInstance3D = scene.find_children("*", "MeshInstance3D", true, false)[0]
-	var xf := Transform3D.IDENTITY
-	var n: Node = mi
-	while n != null:
-		if n is Node3D:
-			xf = (n as Node3D).transform * xf
-		if n == scene:
-			break
-		n = n.get_parent()
-	var arrays: Array = mi.mesh.surface_get_arrays(0)
-	scene.free()
-	# Le modèle regarde vers +x : on le tourne vers +z, pieds à y = 0, 1,8 m de haut.
-	xf = Transform3D(Basis(Vector3.UP, -PI / 2), Vector3.ZERO) * xf
-	var verts: PackedVector3Array = arrays[Mesh.ARRAY_VERTEX]
-	var lo := Vector3.INF
-	var hi := -Vector3.INF
-	for i in verts.size():
-		verts[i] = xf * verts[i]
-		lo = lo.min(verts[i])
-		hi = hi.max(verts[i])
-	var k := 1.8 / (hi.y - lo.y)
-	var shift := Vector3(-(lo.x + hi.x) / 2, -lo.y, -(lo.z + hi.z) / 2)
-	for i in verts.size():
-		verts[i] = (verts[i] + shift) * k
-	var normals: PackedVector3Array = arrays[Mesh.ARRAY_NORMAL]
-	for i in normals.size():
-		normals[i] = (xf.basis * normals[i]).normalized()
-	# Axe de chaque jambe (moyenne des sommets bas), pour ne pas prendre le fusil pour une jambe.
-	var axis := [Vector2.ZERO, Vector2.ZERO]
-	var cnt := [0, 0]
-	for v in verts:
-		if v.y > 0.15 and v.y < 0.6:
-			var side := 0 if v.x < 0 else 1
-			axis[side] += Vector2(v.x, v.z)
-			cnt[side] += 1
-	for side in 2:
-		if cnt[side] > 0:
-			_leg_axis[side] = axis[side] / cnt[side]
-	var bones := PackedInt32Array()
-	var weights := PackedFloat32Array()
-	var custom := PackedFloat32Array()
-	custom.resize(verts.size() * 4)
-	for i in verts.size():
-		var v := verts[i]
-		var side := 0 if v.x < 0 else 1
-		# Jambe : tout ce qui est bas (pieds compris) ; plus haut, seulement près de l'axe de la jambe
-		# (le canon du fusil descend devant la cuisse et doit rester avec le buste).
-		var near := 1.0 - smoothstep(0.14, 0.2, Vector2(v.x, v.z).distance_to(_leg_axis[side]))
-		var leg := 1.0 if v.y < 0.42 else near
-		var low := (1.0 - smoothstep(0.8, 0.96, v.y)) * leg
-		var shin := 1.0 - smoothstep(KNEE_Y - 0.06, KNEE_Y + 0.06, v.y)
-		var head := smoothstep(1.47, 1.57, v.y) if absf(v.x) < 0.22 else 0.0
-		var up := 1.0 - low
-		bones.append_array([0, 1, 2 + side, 4 + side])
-		weights.append_array([up * (1.0 - head), up * head, low * (1.0 - shin), low * shin])
-		custom[i * 4] = v.x
-		custom[i * 4 + 1] = v.y
-		custom[i * 4 + 2] = v.z
-	arrays[Mesh.ARRAY_VERTEX] = verts
-	arrays[Mesh.ARRAY_NORMAL] = normals
-	arrays[Mesh.ARRAY_BONES] = bones
-	arrays[Mesh.ARRAY_WEIGHTS] = weights
-	arrays[Mesh.ARRAY_CUSTOM0] = custom
-	arrays[Mesh.ARRAY_TANGENT] = null
-	_fig_arrays = arrays
-	return arrays
-
-## Rotation autour de l'axe x passant par le point « from » (pose debout), qui est amené en « to ».
-static func _hinge(from: Vector3, to: Vector3, angle: float) -> Transform3D:
-	return Transform3D(Basis.IDENTITY, to) * Transform3D(Basis(Vector3.RIGHT, angle), Vector3.ZERO) * Transform3D(Basis.IDENTITY, -from)
-
-## Transformation de chaque os pour une pose. swing balance les jambes (marche) : la cuisse avance ou recule,
-## et le genou plie quand la jambe part en arrière.
-func bone_poses(stance: String, swing := 0.0) -> Array[Transform3D]:
-	var P: Dictionary = FIG_POSES[stance]
-	var torso := _hinge(HIP, P.hip, P.lean)
-	var head := torso * _hinge(NECK, NECK, P.head)
-	var out: Array[Transform3D] = [torso, head]
-	var shins: Array[Transform3D] = []
-	for side in 2:
-		var ax: Vector2 = _leg_axis[side]
-		var hip := Vector3(ax.x, HIP.y, ax.y)
-		var knee := Vector3(ax.x, KNEE_Y, ax.y)
-		var s := swing * (1.0 if side == 0 else -1.0)
-		var thigh := _hinge(hip, torso * hip, P.thighs[side] + s)
-		out.append(thigh)
-		shins.append(_hinge(knee, thigh * knee, P.shins[side] + s + maxf(0.0, s) * 1.4))
-	out.append_array(shins)
-	return out
-
-func _make_figure(_poses: Array = ["accroupi"]) -> Node3D:
+func _make_figure() -> Node3D:
 	var g := Node3D.new()
 	var camo := ShaderMaterial.new()
 	camo.shader = CAMO_SHADER
 	camo.set_shader_parameter("base_color", ZONES["roche"]["color"])
 	camo.set_shader_parameter("albedo_tex", MODEL_TEX)
 	camo.set_shader_parameter("avg_lum", MODEL_LUM)
-	var mesh := ArrayMesh.new()
-	mesh.add_surface_from_arrays(Mesh.PRIMITIVE_TRIANGLES, _model_arrays(), [], {}, Mesh.ARRAY_CUSTOM_RGBA_FLOAT << Mesh.ARRAY_FORMAT_CUSTOM0_SHIFT)
-	var sk := Skeleton3D.new()
-	sk.name = "squelette"
-	var skin := Skin.new()
-	for b in ["buste", "tete", "cuisse_g", "cuisse_d", "tibia_g", "tibia_d"]:
-		skin.add_bind(sk.add_bone(b), Transform3D.IDENTITY)
-	g.add_child(sk)
-	var mi := MeshInstance3D.new()
-	mi.mesh = mesh
-	mi.skin = skin
+	var inst: Node3D = FIG_SCENE.instantiate()
+	g.add_child(inst)
+	var mi: MeshInstance3D = inst.find_children("*", "MeshInstance3D", true, false)[0]
 	mi.material_override = camo
-	sk.add_child(mi)
-	mi.skeleton = NodePath("..")
 	g.set_meta("camo", camo)
-	set_stance(g, "accroupi")
+	g.set_meta("mesh", mi)
+	g.set_meta("skel", mi.get_node(mi.skeleton))
+	g.set_meta("anim", inst.find_children("*", "AnimationPlayer", true, false)[0])
+	g.set_meta("stance", "debout")
 	return g
 
-func _apply_bones(fig: Node3D, poses: Array[Transform3D]) -> void:
-	var sk := fig.get_node("squelette") as Skeleton3D
-	for i in poses.size():
-		sk.set_bone_pose_position(i, poses[i].origin)
-		sk.set_bone_pose_rotation(i, poses[i].basis.get_rotation_quaternion())
-
-func set_stance(fig: Node3D, stance: String) -> void:
+## Posture figée (atelier de peinture) ou vivante (live : l'animation à l'arrêt tourne, respiration).
+func set_stance(fig: Node3D, stance: String, live := false) -> void:
 	fig.set_meta("stance", stance)
-	_apply_bones(fig, bone_poses(stance))
-	(fig.get_node("squelette") as Node3D).position = Vector3.ZERO
+	var ap: AnimationPlayer = fig.get_meta("anim")
+	var anim: String = FIG_ANIMS[stance][0][0]
+	ap.speed_scale = 1.0
+	if live:
+		ap.play(anim, 0.25)
+		return
+	ap.play(anim, 0.0)
+	ap.seek(FIG_HOLD, true)
+	ap.pause()
 
-func animate_figure(fig: Node3D, stance: String, phase: float, amount: float) -> void:
-	# Marche : les jambes se balancent autour de la hanche, le corps rebondit légèrement.
-	# amount = 0 (immobile) à 1 (course).
+## Pendant la cachette : l'animation suit la posture et la vitesse (m/s), pieds calés sur le sol.
+func animate_figure(fig: Node3D, stance: String, speed: float) -> void:
 	fig.set_meta("stance", stance)
-	var swing: float = {"debout": 0.6, "accroupi": 0.2, "couche": 0.1}[stance] * amount * sin(phase)
-	_apply_bones(fig, bone_poses(stance, swing))
-	(fig.get_node("squelette") as Node3D).position.y = absf(sin(phase)) * 0.05 * amount if stance == "debout" else 0.0
+	var ap: AnimationPlayer = fig.get_meta("anim")
+	var list: Array = FIG_ANIMS[stance]
+	var pick: Array = list[0]
+	var scale := 1.0
+	if speed > 0.25:
+		var best := INF
+		for a in list.slice(1):
+			var d := absf(log(speed / a[1]))
+			if d < best:
+				best = d
+				pick = a
+		scale = clampf(speed / pick[1], 0.6, 2.4)
+	ap.speed_scale = scale
+	if ap.current_animation != pick[0] or not ap.is_playing():
+		# Même moment de la foulée d'une allure à l'autre : les pieds ne sautent pas.
+		var t := 0.0
+		if ap.is_playing() and ap.current_animation_length > 0.0 and ap.current_animation != list[0][0]:
+			t = ap.current_animation_position / ap.current_animation_length
+		ap.play(pick[0], 0.25)
+		if t > 0.0:
+			ap.seek(t * ap.current_animation_length)
 
-func _posed(stance: String) -> Array:
-	# Positions des sommets dans une pose (calculées une fois) et leur TriangleMesh pour viser au pinceau.
-	if _fig_posed.has(stance):
-		return _fig_posed[stance]
-	var a := _model_arrays()
+## Le perdant tombe.
+func fall(fig: Node3D) -> void:
+	var ap: AnimationPlayer = fig.get_meta("anim")
+	ap.speed_scale = 1.0
+	ap.play("Death01", 0.15)
+
+## Positions des sommets dans la pose affichée (repère du personnage), calculées comme la carte graphique.
+func _skinned(fig: Node3D, only := -1) -> PackedVector3Array:
+	var mi: MeshInstance3D = fig.get_meta("mesh")
+	var sk: Skeleton3D = fig.get_meta("skel")
+	var a := _fig_arrays(fig)
 	var verts: PackedVector3Array = a[Mesh.ARRAY_VERTEX]
-	var w: PackedFloat32Array = a[Mesh.ARRAY_WEIGHTS]
-	var bi: PackedInt32Array = a[Mesh.ARRAY_BONES]
-	var idx: PackedInt32Array = a[Mesh.ARRAY_INDEX]
-	var poses := bone_poses(stance)
-	var posed := PackedVector3Array()
-	posed.resize(verts.size())
-	for i in verts.size():
+	var bones: PackedInt32Array = a[Mesh.ARRAY_BONES]
+	var weights: PackedFloat32Array = a[Mesh.ARRAY_WEIGHTS]
+	var to_fig := Transform3D.IDENTITY
+	var n: Node = mi
+	while n != fig:
+		to_fig = (n as Node3D).transform * to_fig
+		n = n.get_parent()
+	sk.force_update_all_bone_transforms()
+	var mats: Array[Transform3D] = []
+	for b in mi.skin.get_bind_count():
+		mats.append(to_fig * sk.get_bone_global_pose(mi.skin.get_bind_bone(b)) * mi.skin.get_bind_pose(b))
+	var out := PackedVector3Array()
+	var first := 0 if only < 0 else only
+	var last := verts.size() if only < 0 else only + 1
+	out.resize(last - first)
+	for i in range(first, last):
 		var p := Vector3.ZERO
-		for b in 4:
-			if w[i * 4 + b] > 0.0:
-				p += (poses[bi[i * 4 + b]] * verts[i]) * w[i * 4 + b]
-		posed[i] = p
-	var faces := PackedVector3Array()
-	faces.resize(idx.size())
-	for i in idx.size():
-		faces[i] = posed[idx[i]]
-	var tm := TriangleMesh.new()
-	tm.create_from_faces(faces)
-	_fig_posed[stance] = [posed, tm]
-	return _fig_posed[stance]
+		for j in 4:
+			var w := weights[i * 4 + j]
+			if w > 0.0:
+				p += (mats[bones[i * 4 + j]] * verts[i]) * w
+		out[i - first] = p
+	return out
+
+var _arrays_cache := {}
+func _fig_arrays(fig: Node3D) -> Array:
+	var mesh: Mesh = (fig.get_meta("mesh") as MeshInstance3D).mesh
+	if not _arrays_cache.has(mesh):
+		_arrays_cache[mesh] = mesh.surface_get_arrays(0)
+	return _arrays_cache[mesh]
+
+## Bout du canon, dans le monde (éclair du tir).
+func muzzle(fig: Node3D) -> Vector3:
+	return fig.global_transform * _skinned(fig, MUZZLE)[0]
 
 func pick_part(fig: Node3D, from: Vector3, dir: Vector3) -> Dictionary:
-	# Rayon de la souris contre le corps (dans la pose courante).
+	# Rayon de la souris contre le corps (dans la pose affichée, figée pendant l'atelier).
 	# Renvoie le point touché dans le repère « debout », celui de la peinture.
-	var stance: String = fig.get_meta("stance", "debout")
-	var data := _posed(stance)
+	var ap: AnimationPlayer = fig.get_meta("anim")
+	var key := "%s@%.3f" % [ap.assigned_animation, ap.current_animation_position]
+	var cache: Array = fig.get_meta("pick_cache", [])
+	if cache.is_empty() or cache[0] != key or ap.is_playing():
+		var posed := _skinned(fig)
+		var idx: PackedInt32Array = _fig_arrays(fig)[Mesh.ARRAY_INDEX]
+		var faces := PackedVector3Array()
+		faces.resize(idx.size())
+		for i in idx.size():
+			faces[i] = posed[idx[i]]
+		var tm := TriangleMesh.new()
+		tm.create_from_faces(faces)
+		cache = [key, posed, tm]
+		fig.set_meta("pick_cache", cache)
 	var inv := fig.global_transform.affine_inverse()
-	var hit: Dictionary = (data[1] as TriangleMesh).intersect_ray(inv * from, (inv.basis * dir).normalized())
+	var hit: Dictionary = (cache[2] as TriangleMesh).intersect_ray(inv * from, (inv.basis * dir).normalized())
 	if hit.is_empty():
 		return {}
-	var a := _model_arrays()
-	var verts: PackedVector3Array = a[Mesh.ARRAY_VERTEX]
+	var a := _fig_arrays(fig)
+	var ref: PackedFloat32Array = a[Mesh.ARRAY_CUSTOM0]
 	var idx: PackedInt32Array = a[Mesh.ARRAY_INDEX]
-	var posed: PackedVector3Array = data[0]
+	var posed: PackedVector3Array = cache[1]
 	var f: int = hit["face_index"]
 	var i0 := idx[f * 3]
 	var i1 := idx[f * 3 + 1]
 	var i2 := idx[f * 3 + 2]
 	var bc := Geometry3D.get_triangle_barycentric_coords(hit["position"], posed[i0], posed[i1], posed[i2])
-	var ref := verts[i0] * bc.x + verts[i1] * bc.y + verts[i2] * bc.z
-	return {"ref": ref, "world": fig.global_transform * (hit["position"] as Vector3)}
+	var r := Vector3.ZERO
+	for c in 3:
+		var i: int = [i0, i1, i2][c]
+		r += Vector3(ref[i * 4], ref[i * 4 + 1], ref[i * 4 + 2]) * bc[c]
+	return {"ref": r, "world": fig.global_transform * (hit["position"] as Vector3)}
 
 ## Points répartis sur tout le corps (pose debout), pour mesurer le camouflage.
 func figure_samples() -> Array[Vector3]:
-	var a := _model_arrays()
-	var verts: PackedVector3Array = a[Mesh.ARRAY_VERTEX]
+	var a := _fig_arrays(player)
+	var ref: PackedFloat32Array = a[Mesh.ARRAY_CUSTOM0]
 	var idx: PackedInt32Array = a[Mesh.ARRAY_INDEX]
+	var verts := PackedVector3Array()
+	verts.resize(ref.size() / 4)
+	for i in verts.size():
+		verts[i] = Vector3(ref[i * 4], ref[i * 4 + 1], ref[i * 4 + 2])
 	var areas := PackedFloat32Array()
 	var total := 0.0
 	for f in idx.size() / 3:
