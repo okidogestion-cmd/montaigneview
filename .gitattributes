@@ -40,3 +40,6 @@ sources/*.glb -filter -diff -merge binary
 game/art/arbres/* -filter -diff -merge binary
 sources/tree_pack_1.1/** -filter -diff -merge binary
 game/art/accessoires/* -filter -diff -merge binary
+game/art/*.wav -filter -diff -merge binary
+game/art/*.ogg -filter -diff -merge binary
+sources/*.mp3 -filter -diff -merge binary

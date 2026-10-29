@@ -34,8 +34,11 @@ var touch_mode := false   # téléphone / tablette (ou PC lancé avec -- --tacti
 var camera: Camera3D
 var inset_cam: Camera3D
 var env: Environment
-var bang_near: AudioStreamWAV
-var bang_far: AudioStreamWAV
+# Sons de tir : vrai Kar98k (sources/k98_pixabay.mp3, découpé par tools/sons_k98.sh) pour ton tir (avec la
+# culasse) et celui de l'ennemi (étouffé, avec l'écho) ; balle qui passe tout près : tools/sons.py.
+const SON_TIR := preload("res://art/son_tir.ogg")
+const SON_LOIN := preload("res://art/son_loin.ogg")
+const SON_IMPACT := preload("res://art/son_impact.wav")
 
 var level := "normal"
 var phase := "menu"
@@ -163,8 +166,6 @@ func _ready() -> void:
 	paint.wear(outfit)
 	hud.ready_pressed.connect(_on_ready_pressed)
 	hud.set_level(level)
-	bang_near = _make_bang(5000.0)
-	bang_far = _make_bang(900.0)
 	to_menu()
 	loading.queue_free()
 
@@ -262,25 +263,7 @@ func set_fog(near: float, far: float) -> void:
 
 
 # ---------- Son (bruit blanc filtré, généré au lancement) ----------
-func _make_bang(cutoff: float) -> AudioStreamWAV:
-	var rate := 22050
-	var n := int(rate * 0.9)
-	var data := PackedByteArray()
-	data.resize(n * 2)
-	var a := 1.0 - exp(-TAU * cutoff / rate)
-	var y := 0.0
-	for i in n:
-		var x := (randf() * 2 - 1) * pow(1.0 - float(i) / n, 5)
-		y += a * (x - y)
-		data.encode_s16(i * 2, int(clampf(y * 1.6, -1, 1) * 32767))
-	var s := AudioStreamWAV.new()
-	s.format = AudioStreamWAV.FORMAT_16_BITS
-	s.mix_rate = rate
-	s.stereo = false
-	s.data = data
-	return s
-
-func bang(stream: AudioStreamWAV, vol: float, delay := 0.0) -> void:
+func bang(stream: AudioStream, vol: float, delay := 0.0) -> void:
 	var g := gid
 	if delay > 0:
 		await get_tree().create_timer(delay).timeout
@@ -664,7 +647,7 @@ func shoot() -> void:
 		hit = ray(hit.position + dir * 0.05, camera.global_position + dir * 3000)
 	recoil = 0.012
 	hud.pulse(hud.flash, 0.35, 0.16)
-	bang(bang_near, 0.9)
+	bang(SON_TIR, 1.0)
 	ai_reveal = minf(1, ai_reveal + D().shot_reveal)
 	if ammo == 0:
 		ai_next = minf(ai_next, 2.5)
@@ -689,7 +672,7 @@ func ai_shoot() -> void:
 	get_tree().create_timer(0.11).timeout.connect(func(): world.flash_sprite.visible = false)
 	puff(tip, Color("#e8e4dc"), 1.4)
 	var dist := camera.global_position.distance_to(tip)
-	bang(bang_far, 0.35, dist / 343.0)
+	bang(SON_LOIN, 0.8, dist / 343.0)
 	ai_reveal = minf(1, ai_reveal + 0.06)
 	ai_next = randf_range(L.interval[0], L.interval[1]) * (0.4 if ammo == 0 else 1.0)
 	var g := gid
@@ -706,7 +689,7 @@ func ai_shoot() -> void:
 	puff(Vector3(px, world.height_at(px, pz) + 0.4, pz))
 	hud.pulse(hud.hurt, 0.35, 0.5)
 	recoil -= 0.006
-	bang(bang_near, 0.25)
+	bang(SON_IMPACT, 0.8)
 	hud.toast("Un tir a frappé à %d m de toi !" % roundi(r))
 
 
@@ -766,7 +749,7 @@ func win() -> void:
 
 func lose() -> void:
 	hud.pulse(hud.hurt, 1.0, 1.4)
-	bang(bang_near, 0.6)
+	bang(SON_IMPACT, 1.0)
 	finish(false)
 
 

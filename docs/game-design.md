@@ -354,3 +354,10 @@ Le jeu devient une **appli mobile** (même jeu : cachette, peinture, duel), plus
   corps par le shader camo (`camo_tex`). Le camouflage de chaque tenue sur chaque terrain est réglé dans
   `paint.gd` → `OUTFITS` ; l'ennemi prend la tenue de son terrain (`ZONE_OUTFIT`). Les nids de sacs de sable sont
   retirés des cachettes (de loin, ils ressemblaient à des tas de pierres) ; le muret reste disponible (`_make_cover("sacs")`).
+
+### Vrai son de sniper (29/10/2026)
+- Enregistrement de Kar98k fourni par l'utilisateur (`sources/k98_pixabay.mp3`, Pixabay, auteur sovetsky_rastov72 :
+  licence Pixabay, utilisable dans un jeu vendu ; à revérifier sur la page du son avant Steam).
+- `tools/sons_k98.sh` (ffmpeg) le découpe : `art/son_tir.ogg` = premier tir puis la culasse qu'on réarme ;
+  `art/son_loin.ogg` = second tir, étouffé et avec plus d'écho (le tir de l'ennemi, entendu de l'autre île, arrive
+  avec le retard du son). La balle qui passe tout près (`art/son_impact.wav`) reste calculée par `tools/sons.py`.
