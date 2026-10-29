@@ -527,8 +527,7 @@ func _build_spots(cz: float, facing: int) -> Array:
 				z = cz + facing * cos(ang) * rr
 				h = height_at(x, z)
 			var zone := zone_of(x, z)
-			# Une cachette sur quatre est un nid de sacs de sable (sauf dans la neige).
-			var cover := _make_cover("sacs" if list.size() % 4 == 2 and zone != "neige" else zone)
+			var cover := _make_cover(zone)
 			cover.position = Vector3(x, h, z)
 			if facing < 0:
 				cover.rotation.y = PI

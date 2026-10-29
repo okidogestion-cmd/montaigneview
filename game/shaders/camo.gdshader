@@ -15,6 +15,10 @@ uniform vec4 base_color = vec4(0.57, 0.56, 0.53, 1.0);
 uniform sampler2D albedo_tex : source_color, filter_linear_mipmap;
 uniform float tex_mix = 0.0;
 uniform float avg_lum = 0.043;
+// Tenue à motif (mode normal) : image de camouflage plaquée sur le corps, dans le repère debout.
+uniform sampler2D camo_tex : source_color, filter_linear_mipmap, repeat_enable;
+uniform float camo_mix = 0.0;
+uniform float camo_scale = 1.3;   // répétitions du motif par mètre
 uniform sampler2D stroke_tex : filter_nearest, repeat_disable;
 uniform int stroke_count = 0;
 uniform vec4 cursor = vec4(0.0, 0.0, 0.0, -1.0);  // cercle du pinceau (atelier)
@@ -38,6 +42,10 @@ void fragment() {
 	vec3 t = texture(albedo_tex, UV).rgb;
 	float fold = mix(1.0, clamp(dot(t, vec3(0.2126, 0.7152, 0.0722)) / avg_lum, 0.45, 1.6), 0.65);
 	vec3 c = mix(grade(pow(base_color.rgb, vec3(2.2))) * fold, t, tex_mix);
+	if (camo_mix > 0.0) {
+		vec2 cuv = vec2(ref_pos.x + ref_pos.z, ref_pos.y + ref_pos.z * 0.5) * camo_scale;
+		c = mix(c, grade(texture(camo_tex, cuv).rgb) * fold * 0.78, camo_mix);
+	}
 	for (int i = 0; i < stroke_count; i++) {
 		vec4 s = texelFetch(stroke_tex, ivec2(i, 0), 0);
 		if (distance(ref_pos, s.xyz) < s.w) {

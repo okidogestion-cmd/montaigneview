@@ -631,13 +631,16 @@ func _build_paint() -> void:
 	# Mode normal : on choisit une tenue de camouflage (la peinture libre reviendra dans un mode à part).
 	var os := _section("Tenue")
 	var og := GridContainer.new()
-	og.columns = 2
+	og.columns = 2   # quatre motifs
 	og.add_theme_constant_override("h_separation", 6)
 	og.add_theme_constant_override("v_separation", 6)
 	for k in PaintScript.OUTFITS:
 		var o: Array = PaintScript.OUTFITS[k]
 		var b := _button(o[0], Color(1, 1, 1, 0.06), PAPER, 15)
-		b.icon = _swatch_icon(Color(o[1]))
+		var img: Image = (load(o[1]) as Texture2D).get_image()
+		img.decompress()
+		img.resize(34, 24)
+		b.icon = ImageTexture.create_from_image(img)
 		b.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 		b.alignment = HORIZONTAL_ALIGNMENT_LEFT
 		b.pressed.connect(func(): paint_outfit.emit(k))

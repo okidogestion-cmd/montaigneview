@@ -349,3 +349,8 @@ Le jeu devient une **appli mobile** (même jeu : cachette, peinture, duel), plus
   un motif de taches aux teintes du terrain, et on peut ajouter la **tenue de feuillage (ghillie)** : 260 touffes
   d'herbe accrochées au corps, qui suivent les os (`world.gd` → `set_ghillie`), bonus de camouflage +10 %.
   L'ennemi porte aussi une tenue (et parfois le feuillage).
+- *29/10/2026* : les tenues prennent les **quatre motifs de camouflage donnés par l'utilisateur** (`art/camo_woodland.jpg`,
+  `camo_terrain_sec.jpg`, `camo_arctique.jpg`, `camo_digital_olive.jpg`, rendus raccordables par miroir), plaqués sur le
+  corps par le shader camo (`camo_tex`). Le camouflage de chaque tenue sur chaque terrain est réglé dans
+  `paint.gd` → `OUTFITS` ; l'ennemi prend la tenue de son terrain (`ZONE_OUTFIT`). Les nids de sacs de sable sont
+  retirés des cachettes (de loin, ils ressemblaient à des tas de pierres) ; le muret reste disponible (`_make_cover("sacs")`).

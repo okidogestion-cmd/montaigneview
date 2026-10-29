@@ -84,7 +84,7 @@ var _pinch := -1.0
 var matches_dirty := true
 # Mode normal : tenues de camouflage. La peinture libre (PAINT_MODE) reviendra dans un mode à part.
 const PAINT_MODE := false
-var outfit := "olive"
+var outfit := "digital_olive"
 var ghillie := false
 var paint_enemy
 var camo_score := 0.0       # ressemblance de ta peinture avec le terrain où tu te caches
@@ -360,13 +360,13 @@ func _paint_state() -> void:
 func _on_outfit(o: String) -> void:
 	outfit = o
 	paint.wear(o)
-	world.set_ghillie(world.player, ghillie, Color(PaintScript.OUTFITS[o][1]))
+	world.set_ghillie(world.player, ghillie, Color(PaintScript.OUTFITS[o][2]))
 	matches_dirty = true
 	_paint_state()
 
 func _on_ghillie(on: bool) -> void:
 	ghillie = on
-	world.set_ghillie(world.player, on, Color(PaintScript.OUTFITS[outfit][1]))
+	world.set_ghillie(world.player, on, Color(PaintScript.OUTFITS[outfit][2]))
 	matches_dirty = true
 	_paint_state()
 
@@ -583,8 +583,9 @@ func start_fire() -> void:
 	var L := D()
 	var others: Array = WorldScript.ZONE_KEYS.filter(func(k): return k != enemy_spot.zone)
 	enemy_camo = enemy_spot.zone if randf() < L.camo else others.pick_random()
-	paint_enemy.wear(enemy_camo)
-	world.set_ghillie(world.enemy, randf() < 0.5, Color(PaintScript.OUTFITS[enemy_camo][1]))
+	var eo: String = PaintScript.ZONE_OUTFIT[enemy_camo]
+	paint_enemy.wear(eo)
+	world.set_ghillie(world.enemy, randf() < 0.5, Color(PaintScript.OUTFITS[eo][2]))
 	camera.position = eye
 	aim_at(eye, Vector3(0, 78, -150))
 	base_yaw = yaw

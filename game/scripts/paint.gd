@@ -12,15 +12,16 @@ const PALETTE := [
 	Color("#3b7a3c"), Color("#2a5530"), Color("#1e2224"), Color("#c0503a"),
 ]
 # Tenues de camouflage (mode normal : on choisit une tenue au lieu de peindre ; la peinture reviendra dans un
-# mode à part). Couleurs inspirées des échantillons de la scène Higgsfield de l'utilisateur, accordées aux
-# teintes de chaque terrain : [nom affiché, fond, taches].
+# mode à part). Motifs donnés par l'utilisateur (art/camo_*.jpg). [nom, motif, couleur moyenne, camouflage par terrain]
 const OUTFITS := {
-	"foret": ["Forêt", "#3b7a3c", ["#2a5530", "#5a6b3a", "#2a5530"]],
-	"herbe": ["Herbe", "#6fae44", ["#9ccc5a", "#4c8a34"]],
-	"roche": ["Pierre", "#928e86", ["#b9b2a5", "#6d6a64"]],
-	"neige": ["Neige", "#eef3f9", ["#c9d3dc"]],
-	"olive": ["Olive", "#5a6b3a", ["#4c8a34", "#6d6a64", "#2a5530"]],
+	"woodland": ["Woodland", "res://art/camo_woodland.jpg", "#4a4c2d", {"foret": 0.9, "herbe": 0.6, "roche": 0.3, "neige": 0.05}],
+	"terrain_sec": ["Terrain sec", "res://art/camo_terrain_sec.jpg", "#a59059", {"herbe": 0.85, "roche": 0.55, "foret": 0.4, "neige": 0.1}],
+	"arctique": ["Arctique", "res://art/camo_arctique.jpg", "#d8d8d8", {"neige": 0.9, "roche": 0.75, "herbe": 0.15, "foret": 0.1}],
+	"digital_olive": ["Digital olive", "res://art/camo_digital_olive.jpg", "#3d4535", {"foret": 0.78, "herbe": 0.72, "roche": 0.4, "neige": 0.05}],
 }
+# Tenue de l'ennemi selon le terrain qu'il a choisi.
+const ZONE_OUTFIT := {"foret": "woodland", "herbe": "terrain_sec", "roche": "arctique", "neige": "arctique"}
+var outfit := ""   # tenue portée ("" : peinture libre)
 const GHILLIE_BONUS := 0.1   # tenue de feuillage : la silhouette se fond encore mieux
 
 const MATCH_DIST := 0.32               # au-delà de cet écart de couleur, ça ne ressemble plus du tout
@@ -96,36 +97,34 @@ func _add(p: Vector3, r: float, color: Color) -> void:
 
 func fill(color: Color) -> void:
 	_snapshot()
+	_no_outfit()
 	base = color
 	strokes.clear()
 	refresh()
 
 func clear() -> void:
 	_snapshot()
+	_no_outfit()
 	_set_default()
 	refresh()
+
+func _no_outfit() -> void:
+	outfit = ""
+	material.set_shader_parameter("camo_mix", 0.0)
 
 func _set_default() -> void:
 	# Tenue de départ : celle du modèle 3D (sa texture), sans peinture. À repeindre pour se camoufler.
 	base = DEFAULT_BASE
 	strokes = []
 
-## Met une tenue : fond de la tenue et taches réparties sur tout le corps (toujours le même motif).
-func wear(outfit: String) -> void:
-	var o: Array = OUTFITS[outfit]
-	base = Color(o[1])
+## Met une tenue : le motif est plaqué sur tout le corps ; son camouflage par terrain est donné par OUTFITS.
+func wear(o: String) -> void:
+	outfit = o
+	base = Color(OUTFITS[o][2])
 	strokes = []
-	var r := RandomNumberGenerator.new()
-	r.seed = 1234
-	var spots: Array = o[2]
-	for i in 130:
-		var p: Vector3 = samples[r.randi() % samples.size()]
-		var c := Color(spots[i % spots.size()])
-		var rad := r.randf_range(0.05, 0.11)
-		for j in 2:
-			var off := Vector3(r.randfn(), r.randfn(), r.randfn()) * rad * 0.5
-			strokes.append([Vector4(p.x + off.x, p.y + off.y, p.z + off.z, rad * r.randf_range(0.5, 0.85)), c])
 	history.clear()
+	material.set_shader_parameter("camo_tex", load(OUTFITS[o][1]))
+	material.set_shader_parameter("camo_mix", 1.0)
 	refresh()
 
 func undo() -> void:
@@ -190,6 +189,8 @@ const PATTERN_BONUS := 0.12   # motif d'au moins deux teintes du terrain : la si
 
 func match_zone(zone: String) -> float:
 	# 1 = le sniper se fond complètement dans ce terrain, 0 = rien à voir.
+	if outfit != "":
+		return OUTFITS[outfit][3][zone]
 	if _match_cache.has(zone):
 		return _match_cache[zone]
 	var pal: Array = ZONE_PALETTES[zone]
