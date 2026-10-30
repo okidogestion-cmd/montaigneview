@@ -41,6 +41,7 @@ var _grass_fields: Array[MultiMeshInstance3D] = []
 var _outline: ShaderMaterial
 var _rock_mesh: Mesh
 var _pebble_mesh: Mesh   # même forme que _rock_mesh, moins de facettes : les milliers de cailloux du champ d'herbe
+var _rock_variants: Array[Mesh] = []   # rochers du décor : bloc arrondi, bloc anguleux à facettes, bloc doux
 var _log_mesh: Mesh
 var _foliage_mats: Array[ShaderMaterial] = []   # feuillage et écorce : effacés près de la caméra
 var near_fade := 0.0                            # rayon actuel de cet effacement (m)
@@ -180,12 +181,13 @@ func _at(pos: Vector3, scl := Vector3.ONE, rot_y := 0.0) -> Transform3D:
 	return Transform3D(Basis(Vector3.UP, rot_y).scaled(scl), pos)
 
 ## Rocher : la sphère donnée, déformée par le bruit du rocher (dessous aplati), normales douces.
-func _rock_shape(sphere: SphereMesh) -> Mesh:
+## seed décale le bruit (autre forme) ; facets : faces planes (granit taillé) au lieu de normales douces.
+func _rock_shape(sphere: SphereMesh, seed := Vector2.ZERO, facets := false) -> Mesh:
 	var ra := sphere.get_mesh_arrays()
 	var rv: PackedVector3Array = ra[Mesh.ARRAY_VERTEX]
 	for i in rv.size():
 		var p := rv[i]
-		var k := 0.78 + vnoise(p.x * 1.7 + p.y * 0.6, p.z * 1.7 - p.y) * 0.3 + vnoise(p.x * 4.1 - p.y, p.z * 4.1 + p.y * 2.0) * 0.12
+		var k := 0.78 + vnoise(p.x * 1.7 + p.y * 0.6 + seed.x, p.z * 1.7 - p.y + seed.y) * 0.3 + vnoise(p.x * 4.1 - p.y + seed.y, p.z * 4.1 + p.y * 2.0 + seed.x) * 0.12
 		var q := p * k
 		q.y = maxf(q.y, -0.35) * (0.8 if q.y > 0 else 1.0)   # dessous aplati : il repose sur le sol
 		rv[i] = q
@@ -194,6 +196,8 @@ func _rock_shape(sphere: SphereMesh) -> Mesh:
 	rmesh.add_surface_from_arrays(Mesh.PRIMITIVE_TRIANGLES, ra)
 	var st := SurfaceTool.new()
 	st.create_from(rmesh, 0)
+	if facets:
+		st.deindex()
 	st.generate_normals()
 	return st.commit()
 
@@ -204,6 +208,8 @@ func _build_meshes() -> void:
 	# Cailloux et mottes de neige du champ d'herbe (≈ 2 700, vus jusqu'à 2 m à l'atelier) : même bruit, même forme,
 	# sphère de départ plus grossière : 160 triangles au lieu de 280, le contour reste rond.
 	_pebble_mesh = _rock_shape(_sphere(1.0, 10, 7))
+	# Rochers du décor (avec beaucoup de petits cailloux d'éboulis) : formes légères, 120 à 160 triangles.
+	_rock_variants = [_pebble_mesh, _rock_shape(_sphere(1.0, 9, 6), Vector2(13.7, -4.1), true), _rock_shape(_sphere(1.0, 10, 6), Vector2(-8.3, 21.9))]
 	# Arbres et buissons photo (art/arbres/) : plusieurs modèles par sorte, mélangés dans le décor.
 	for kind in PACK_TREES:
 		var meshes: Array[Mesh] = []
@@ -220,11 +226,20 @@ func _build_meshes() -> void:
 ## Arbres du « tree pack 1.1 » : un tronc et quatre cartes croisées avec la photo de l'arbre
 ## (128 px d'origine, agrandie à 256 px aux contours adoucis).
 ## [modèle, hauteur (m), vent, lumière qui traverse les feuilles]
+## Les premiers de chaque sorte (tree07, bush02, bush06) servent aussi aux cachettes : ne pas les déplacer.
 const PACK_TREES := {
-	"tree": [["tree07", 9.5, 0.12, 0.25], ["tree09", 9.0, 0.12, 0.25], ["tree12", 9.5, 0.12, 0.25]],
-	"round": [["tree19", 7.5, 0.1, 0.4], ["tree24", 7.5, 0.1, 0.4]],
-	"bush": [["bush02", 1.8, 0.05, 0.35], ["bush06", 1.7, 0.05, 0.35]],
+	"tree": [
+		["tree07", 9.5, 0.12, 0.25], ["tree12", 11.0, 0.12, 0.25], ["tree05", 11.5, 0.12, 0.25],   # épicéas sombres
+		["tree01", 11.0, 0.13, 0.3], ["tree11", 10.0, 0.13, 0.3], ["tree04", 10.0, 0.13, 0.3],     # pins et mélèzes, plus clairs
+		["tree09", 10.5, 0.12, 0.25], ["tree10", 10.5, 0.12, 0.25],                                # sapins
+		["tree06", 8.5, 0.1, 0.2],                                                                  # givré, vers la limite des arbres
+	],
+	"round": [["tree19", 7.5, 0.1, 0.4], ["tree24", 7.5, 0.1, 0.4], ["tree22", 7.0, 0.1, 0.4]],
+	"bush": [["bush02", 1.8, 0.05, 0.35], ["bush06", 1.7, 0.05, 0.35], ["bush04", 1.7, 0.05, 0.35], ["bush08", 1.6, 0.05, 0.3]],
 }
+const STANDS := [[0, 1, 2], [3, 4, 5], [6, 7]]   # peuplements : épicéas, pins/mélèzes, sapins (indices dans « tree »)
+const FROSTED := 8
+const TREE_REF := {"tree": 9.5, "round": 7.5}       # hauteur de référence des collisions (cylindres)
 var _tree_meshes := {}   # sorte → modèles
 
 ## Un arbre du pack, mis à la hauteur voulue. Le feuillage reçoit des normales « en boule » (éclairage doux,
@@ -640,80 +655,238 @@ func _near_spot(x: float, z: float, r2: float) -> bool:
 
 # ---------- Décor (instancié, avec une clairière autour des cachettes) ----------
 func _scatter() -> void:
-	var pines := []
+	# Composition forestière (et non plus des points semés au hasard sur toute la carte) :
+	#  - une carte de densité (bruit à grande échelle) fait des forêts, des bosquets, des clairières et des lisières ;
+	#  - la forêt suit le terrain : dense en bas et dans la zone forêt, rare sur les pentes raides, absente au-dessus
+	#    de la limite des arbres ; les arbres rapetissent avec l'altitude, puis quelques pins rabougris ;
+	#  - trois peuplements (épicéas, pins et mélèzes, sapins) en grandes taches, chacun avec ses modèles ;
+	#  - un espacement minimal entre les arbres (pas de paquets ni d'alignements) ;
+	#  - chaque arbre a sa nuance de couleur, sa taille, sa silhouette (étirement) ;
+	#  - les rochers en amas (gros blocs rares, petits nombreux), une forme de roche par versant (trois formes) ;
+	#  - la petite végétation (buissons bas) est décorative : ni collision, ni effet sur ce que voit l'ennemi.
+	# Grands arbres, buissons hauts et rochers gardent leur collision (couvert, balles) ; les cachettes restent dégagées.
+	var trees := []     # [x, y, z, échelle, rotation, étirement, modèle, couleur]
 	var rounds := []
-	var rocks := [[], []]
-	var bushes := []
-	var logs := []   # troncs couchés en forêt
-	var beach := [[], []]   # galets et bois flotté sur les plages
-	for i in 18000:
-		var x := (rng.randf() * 2 - 1) * 640
-		var z := (rng.randf() * 2 - 1) * 640
-		if _near_spot(x, z, 144):
-			continue
-		var h := height_at(x, z)
-		if h < WATER_Y + 0.3:
-			continue
-		var r := rng.randf()
-		var sc := 0.8 + rng.randf() * 0.6
-		var rot := rng.randf() * TAU
-		if h < WATER_Y + 2.5:
-			# Plage
-			if r < 0.05:
-				beach[0].append([x, h + 0.05, z, 0.3 + rng.randf() * 0.7, rot, 0.6])
-			elif r < 0.07:
-				beach[1].append([x, h + 0.12, z, 0.8 + rng.randf() * 0.6, rot, 1.0])
-			continue
-		var zn := zone_of(x, z)
-		if zn == "foret":
-			if r < 0.7:
-				pines.append([x, h - 0.3, z, sc, rot, 1.0])
-			elif r < 0.78:
-				bushes.append([x, h, z, sc, rot, 0.9])
-			elif r < 0.795:
-				logs.append([x, h - 0.1, z, sc, rot, 1.0])
-		elif zn == "herbe":
-			if r < 0.07:
-				bushes.append([x, h, z, sc + 0.1, rot, 0.85])
-			elif r < 0.105:
-				rounds.append([x, h - 0.3, z, sc, rot, 1.0])
-		elif zn == "roche":
-			if r < 0.12:
-				rocks[0].append([x, h + 0.2, z, 0.8 + rng.randf() * 2.2, rot, 0.7])
-		elif r < 0.04:
-			rocks[1].append([x, h + 0.2, z, 0.8 + rng.randf() * 2.0, rot, 0.7])
+	var bushes := []    # buissons hauts (≥ 1,2 m) : couvert
+	var shrubs := []    # buissons bas : décor
+	var rocks := []     # [x, y, z, échelle, rotation, aplatissement, forme, couleur]
+	var scree := []     # petits cailloux d'éboulis : décor
+	var snow_rocks := []
+	var logs := []
+	var beach := [[], []]
+	var taken := {}     # grille de 4 m : arbres déjà posés (espacement)
+	var step := 4.6
+	var n := int(1280.0 / step)
+	for gi in n:
+		for gj in n:
+			var x := -640.0 + (gi + rng.randf()) * step
+			var z := -640.0 + (gj + rng.randf()) * step
+			var h := height_at(x, z)
+			if h < WATER_Y + 0.3:
+				continue
+			var play_d := minf(Vector2(x, z - MZ).length(), Vector2(x, z + MZ).length())
+			if play_d < 180.0 and _near_spot(x, z, 144):   # cachettes : toutes à moins de 165 m du centre de leur île
+				continue
+			var r := rng.randf()
+			var rot := rng.randf() * TAU
+			if h < WATER_Y + 2.5:
+				# Plage : galets et bois flotté (même densité qu'avant).
+				if r < 0.012:
+					beach[0].append([x, h + 0.05, z, 0.3 + rng.randf() * 0.7, rot, 0.6])
+				elif r < 0.016:
+					beach[1].append([x, h + 0.12, z, 0.8 + rng.randf() * 0.6, rot, 1.0])
+				continue
+			var zn := zone_of(x, z)
+			if zn == "neige":
+				if r < 0.009:
+					snow_rocks.append([x, h + 0.2, z, 0.8 + rng.randf() * 2.0, rot, 0.7])
+				continue
+			var slope := (absf(height_at(x + 2.0, z) - height_at(x - 2.0, z)) + absf(height_at(x, z + 2.0) - height_at(x, z - 2.0))) / 4.0
+			var treeline := 104.0 + fbm(x * 0.02, z * 0.02) * 30.0
+			var alt := clampf((h - WATER_Y) / (treeline - WATER_Y), 0.0, 1.3)
+			# Densité de forêt : grandes taches + bords irréguliers, selon la zone, la pente et l'altitude.
+			var dens := (fbm(x * 0.011 + 3.1, z * 0.011 - 7.3) + 0.47) * 0.8 + (fbm(x * 0.045 - 11.0, z * 0.045 + 5.0) + 0.47) * 0.25
+			dens += 0.42 if zn == "foret" else (-0.1 if zn == "herbe" else -0.5)
+			dens -= maxf(0.0, slope - 0.65) * 1.4
+			dens -= maxf(0.0, alt - 0.8) * 2.5
+			var canopy := smoothstep(0.42, 0.72, dens)
+			# Zone de jeu (où l'on se cache et d'où l'on tire) : autant de couvert qu'avant, pour ne pas changer la
+			# difficulté ; au-delà (bas des îles, montagnes du fond), la forêt est pleine.
+			var play := play_d < PLAY_RADIUS
+			# Grands arbres
+			if canopy > 0.0 and r < canopy * (PLAY_FILL if play else FOREST_FILL):
+				# Grands arbres en bas (jusqu'à 18 m), de plus en plus petits en montant.
+				var sc := lerpf(1.6 if not play else PLAY_MAX_SCALE, 0.6, pow(minf(alt, 1.0), 1.3)) * (0.8 + rng.randf() * 0.35)
+				if _free(taken, x, z, 2.2 + 1.7 * sc):
+					var model := _stand_model(x, z, alt)
+					trees.append([x, h - 0.3, z, sc, rot, 0.9 + rng.randf() * 0.25, model, _tree_tint(x, z, alt)])
+					_take(taken, x, z, 2.2 + 1.7 * sc)
+					continue
+			var r2 := rng.randf()
+			# Lisières : jeunes arbres et buissons hauts là où la forêt s'éclaircit.
+			if canopy > 0.02 and canopy < 0.7 and r2 < 0.05:
+				if r2 < 0.012 and alt < 0.4 and _free(taken, x, z, 4.0):
+					rounds.append([x, h - 0.3, z, 0.7 + rng.randf() * 0.4, rot, 0.95 + rng.randf() * 0.15, rng.randi() % 3, _tree_tint(x, z, alt)])
+					_take(taken, x, z, 4.0)
+				elif r2 < 0.026 and _free(taken, x, z, 2.5):
+					trees.append([x, h - 0.2, z, 0.38 + rng.randf() * 0.2, rot, 0.95 + rng.randf() * 0.2, _stand_model(x, z, alt), _tree_tint(x, z, alt)])
+					_take(taken, x, z, 2.5)
+				elif _free(taken, x, z, 1.8):
+					bushes.append([x, h, z, 0.85 + rng.randf() * 0.45, rot, 0.85, rng.randi() % 3, _tree_tint(x, z, alt)])
+					_take(taken, x, z, 1.8)
+				continue
+			# Sous-bois : buissons bas (décor).
+			if canopy > 0.3 and r2 < 0.09:
+				shrubs.append([x, h - 0.05, z, 0.35 + rng.randf() * 0.25, rot, 0.8, SHRUB_MODELS[rng.randi() % 2], _tree_tint(x, z, alt)])
+				continue
+			# Prés : quelques arbres isolés (feuillus en bas, conifères plus haut) et touffes de buissons.
+			if zn == "herbe" and canopy < 0.02 and slope < 0.7:
+				if r2 < 0.007 and _free(taken, x, z, 6.0):
+					if alt < 0.5 and rng.randf() < 0.6:
+						rounds.append([x, h - 0.3, z, 0.85 + rng.randf() * 0.35, rot, 0.95 + rng.randf() * 0.15, rng.randi() % 3, _tree_tint(x, z, alt)])
+					else:
+						trees.append([x, h - 0.3, z, lerpf(1.15, 0.7, alt) * (0.85 + rng.randf() * 0.3), rot, 1.0, _stand_model(x, z, alt), _tree_tint(x, z, alt)])
+					_take(taken, x, z, 6.0)
+					continue
+				if r2 < 0.012:
+					shrubs.append([x, h - 0.05, z, 0.3 + rng.randf() * 0.3, rot, 0.75, SHRUB_MODELS[rng.randi() % 2], _tree_tint(x, z, alt)])
+					continue
+			# Limite des arbres : pins rabougris en petits groupes, avec des buissons bas.
+			if alt > 0.82 and alt < 1.12 and slope < 0.85 and zn != "foret":
+				if r2 < 0.012 and _free(taken, x, z, 2.2):
+					trees.append([x, h - 0.15, z, 0.3 + rng.randf() * 0.16, rot, 0.85 + rng.randf() * 0.2, FROSTED if rng.randf() < 0.4 else _stand_model(x, z, alt), _tree_tint(x, z, alt)])
+					_take(taken, x, z, 2.2)
+					continue
+				if r2 < 0.03:
+					shrubs.append([x, h - 0.05, z, 0.28 + rng.randf() * 0.2, rot, 0.7, SHRUB_MODELS[rng.randi() % 2], _tree_tint(x, z, alt)])
+					continue
+			# Rochers : amas dans la roche, quelques blocs en forêt ; éboulis sur les pentes raides.
+			var rock_seed := 0.008 if zn == "roche" else (0.0015 if zn != "neige" else 0.0)
+			if r2 < rock_seed:
+				_rock_cluster(rocks, scree, x, z, 3 + rng.randi() % 5, 3.0 + rng.randf() * 7.0)
+				continue
+			if zn == "roche" and slope > 0.75 and r2 < 0.025:
+				scree.append([x, h + 0.05, z, 0.25 + rng.randf() * 0.45, rot, 0.55, _rock_region(x, z), _rock_tint(x, z)])
+				continue
+			# Troncs couchés en forêt.
+			if canopy > 0.55 and r2 < 0.004:
+				logs.append([x, h - 0.1, z, 0.8 + rng.randf() * 0.6, rot, 1.0])
 	var body := StaticBody3D.new()
 	add_child(body)
 	var leafy := StaticBody3D.new()   # arbres et buissons : traversés par les balles quand ils sont effacés
 	leafy.set_meta("foliage", true)
 	add_child(leafy)
-	_inst_mixed("tree", pines, leafy)
-	_inst_mixed("round", rounds, leafy)
-	_inst(_rock_mesh, toon(Color("#86837c"), false, true, 0.0, 7.0, "roche"), rocks[0], body, "rock")
-	_inst(_rock_mesh, toon(Color("#e3eaf2"), false, true, 0.0, 7.0, "neige"), rocks[1], body, "rock")
-	_inst_mixed("bush", bushes, leafy)
+	_inst_models("tree", trees, leafy)
+	_inst_models("round", rounds, leafy)
+	# Buissons hauts (collision) et bas (décor) d'un même modèle dessinés ensemble.
+	_inst_models("bush", bushes, leafy, shrubs)
+	# Rochers et cailloux d'éboulis d'une même forme dessinés ensemble ; collision pour les rochers seulement.
+	for i in _rock_variants.size():
+		var big := rocks.filter(func(p): return p[6] == i)
+		var small := scree.filter(func(p): return p[6] == i)
+		_collide(big, body, "rock")
+		_inst(_rock_variants[i], toon(Color.WHITE, true, true, 0.0, 7.0, "roche"), big + small, null, "rock")
+	_inst(_rock_mesh, toon(Color("#e3eaf2"), false, true, 0.0, 7.0, "neige"), snow_rocks, body, "rock")
 	_inst(prop("rondin"), null, logs, body, "rondin")
 	_inst(_rock_mesh, toon(Color("#b8ad98"), false, false, 0.0, 7.0, "roche"), beach[0], body, "pebble")
 	_inst(_log_mesh, toon(Color.WHITE, true, true), beach[1], body, "log")
+	print("décor : %d arbres, %d feuillus, %d buissons hauts, %d buissons bas, %d rochers, %d cailloux d'éboulis, plage %d + %d" % [
+		trees.size(), rounds.size(), bushes.size(), shrubs.size(), rocks.size(), scree.size(), beach[0].size(), beach[1].size()])
 
-## Répartit les arbres d'une sorte entre ses modèles (choix fixé par la position).
-func _inst_mixed(kind: String, list: Array, body: StaticBody3D) -> void:
+const FOREST_FILL := 0.8
+const SHRUB_MODELS := [0, 1]   # buissons bas : les modèles des buissons hauts (dessinés avec eux)
+const PLAY_RADIUS := 210.0     # zone de jeu autour du centre de chaque île
+const PLAY_FILL := 0.42        # forêt de la zone de jeu (réglée pour garder le couvert d'avant)
+const PLAY_MAX_SCALE := 1.3   # part des emplacements libres de la forêt dense qui portent un grand arbre
+
+## Un amas de rochers autour de (cx, cz) : beaucoup de petits, quelques gros, formes et nuances mêlées.
+func _rock_cluster(rocks: Array, scree: Array, cx: float, cz: float, count: int, spread: float) -> void:
+	var tint := _rock_tint(cx, cz)
+	var shape := _rock_region(cx, cz)
+	for k in count:
+		var a := rng.randf() * TAU
+		var d := spread * sqrt(rng.randf())
+		var x := cx + cos(a) * d
+		var z := cz + sin(a) * d
+		if _near_spot(x, z, 144):
+			continue
+		var h := height_at(x, z)
+		if h < WATER_Y + 2.5:
+			continue
+		var sc := 0.35 + 2.4 * pow(rng.randf(), 2.2)
+		var flat := 0.45 + rng.randf() * 0.4
+		var form := shape
+		var c := tint * (0.9 + rng.randf() * 0.18)
+		c.a = 1.0
+		var p := [x, h + 0.15 * sc, z, sc, rng.randf() * TAU, flat, form, c]
+		if sc < 0.7:
+			scree.append(p)
+		else:
+			rocks.append(p)
+
+## Nuance d'un arbre : variation propre (clarté, chaleur), celle de son peuplement, un peu plus sombre en altitude.
+func _tree_tint(x: float, z: float, alt: float) -> Color:
+	var v := 0.86 + hash2(x * 1.31, z * 0.77) * 0.22
+	var warm := (hash2(z * 0.53, x * 1.07) - 0.5) * 0.12 + fbm(x * 0.008 + 40.0, z * 0.008) * 0.25
+	var high := clampf(alt - 0.5, 0.0, 0.5) * 0.18
+	return Color(v * (1.0 + warm - high * 0.6), v * (1.0 + warm * 0.4 - high * 0.3), v * (1.0 - warm * 0.6 + high * 0.2))
+
+## Forme des rochers d'une région (grandes taches) : un versant garde la même roche, d'un versant à l'autre elle change.
+func _rock_region(x: float, z: float) -> int:
+	return clampi(int((fbm(x * 0.004 + 77.0, z * 0.004 - 31.0) + 0.47) * 3.2), 0, 2)
+
+func _rock_tint(x: float, z: float) -> Color:
+	var g := 0.48 + (fbm(x * 0.02 - 9.0, z * 0.02 + 4.0) + 0.47) * 0.16
+	var warm := fbm(x * 0.03 + 2.0, z * 0.03 - 3.0) * 0.08
+	return Color(g + warm, g + warm * 0.4, g - warm * 0.3)
+
+## Modèle d'arbre : son peuplement (grandes taches de bruit), un modèle du peuplement selon la position ;
+## près de la limite des arbres, parfois le sapin givré.
+func _stand_model(x: float, z: float, alt: float) -> int:
+	if alt > 0.86 and hash2(x * 0.61, z * 0.29) < 0.3:
+		return FROSTED
+	var sv := fbm(x * 0.0042 + 50.0, z * 0.0042 - 20.0) + 0.47
+	var stand: Array = STANDS[0] if sv < 0.42 else (STANDS[1] if sv > 0.56 else STANDS[2])
+	if alt > 0.6 and sv > 0.5:
+		stand = STANDS[1]   # en altitude, plutôt pins et mélèzes
+	return stand[mini(int(hash2(x * 0.37, z * 0.37) * stand.size()), stand.size() - 1)]
+
+func _free(taken: Dictionary, x: float, z: float, r: float) -> bool:
+	var cx := floori(x / 4.0)
+	var cz := floori(z / 4.0)
+	var k := ceili(r / 4.0) + 1
+	for i in range(cx - k, cx + k + 1):
+		for j in range(cz - k, cz + k + 1):
+			for t in taken.get(Vector2i(i, j), []):
+				if (t.x - x) ** 2 + (t.y - z) ** 2 < (r + t.z) * (r + t.z) * 0.25:
+					return false
+	return true
+
+func _take(taken: Dictionary, x: float, z: float, r: float) -> void:
+	var key := Vector2i(floori(x / 4.0), floori(z / 4.0))
+	if not taken.has(key):
+		taken[key] = []
+	taken[key].append(Vector3(x, z, r))
+
+## Arbres ou buissons d'une sorte, regroupés par modèle (p[6]) ; « shrub » utilise les modèles de buissons.
+func _inst_models(kind: String, list: Array, body: StaticBody3D, decor: Array = []) -> void:
 	var meshes: Array = _tree_meshes[kind]
-	var parts := []
-	for m in meshes:
-		parts.append([])
-	for p in list:
-		parts[mini(int(hash2(p[0] * 0.37, p[2] * 0.37) * meshes.size()), meshes.size() - 1)].append(p)
 	for i in meshes.size():
-		_inst(meshes[i], null, parts[i], body, kind)
+		var k: float = float(PACK_TREES[kind][i][1]) / float(TREE_REF.get(kind, 1.0))
+		var mine := list.filter(func(p): return p[6] == i)
+		_collide(mine, body, kind, k)
+		_inst(meshes[i], null, mine + decor.filter(func(p): return p[6] == i), null, kind, k)
 
-func _multimesh(mesh: Mesh, m: Material, xforms: Array) -> MultiMeshInstance3D:
+func _multimesh(mesh: Mesh, m: Material, xforms: Array, colors: Array = []) -> MultiMeshInstance3D:
 	var mm := MultiMesh.new()
 	mm.transform_format = MultiMesh.TRANSFORM_3D
+	mm.use_colors = not colors.is_empty()
 	mm.mesh = mesh
 	mm.instance_count = xforms.size()
 	for i in xforms.size():
 		mm.set_instance_transform(i, xforms[i])
+		if not colors.is_empty():
+			mm.set_instance_color(i, colors[i])
 	var mmi := MultiMeshInstance3D.new()
 	mmi.multimesh = mm
 	mmi.material_override = m
@@ -722,46 +895,57 @@ func _multimesh(mesh: Mesh, m: Material, xforms: Array) -> MultiMeshInstance3D:
 
 const CHUNK := 175.0   # taille d'une zone de décor (m)
 
-func _multimesh_chunked(mesh: Mesh, m: Material, xforms: Array, shadows: bool) -> void:
+func _multimesh_chunked(mesh: Mesh, m: Material, xforms: Array, shadows: bool, colors: Array = []) -> void:
 	# Le décor est découpé en zones : la carte graphique ignore celles hors de la vue.
 	var cells := {}
-	for t in xforms:
+	for i in xforms.size():
+		var t: Transform3D = xforms[i]
 		var key := Vector2i(floori(t.origin.x / CHUNK), floori(t.origin.z / CHUNK))
 		if not cells.has(key):
-			cells[key] = []
-		cells[key].append(t)
+			cells[key] = [[], []]
+		cells[key][0].append(t)
+		if not colors.is_empty():
+			cells[key][1].append(colors[i])
 	for key in cells:
-		var mmi := _multimesh(mesh, m, cells[key])
+		var mmi := _multimesh(mesh, m, cells[key][0], cells[key][1])
 		if not shadows:
 			mmi.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
 
-func _inst(mesh: Mesh, m: Material, list: Array, body: StaticBody3D, kind: String) -> void:
+## Pose les instances (p = [x, y, z, échelle, rotation, étirement, (modèle), (couleur)]) ; k : taille du modèle
+## par rapport à la référence des collisions. Collision pour le couvert seulement (arbres, buissons hauts, rochers).
+func _inst(mesh: Mesh, m: Material, list: Array, body: StaticBody3D, kind: String, k := 1.0) -> void:
 	if list.is_empty():
 		return
 	var xforms := []
+	var colors := []
 	for p in list:
 		var basis := Basis(Vector3.UP, p[4]).scaled(Vector3(p[3], p[3] * p[5], p[3]))
 		xforms.append(Transform3D(basis, Vector3(p[0], p[1], p[2])))
-		if kind == "pebble" or kind == "log":
-			continue  # petits détails de plage : pas de collision
+		if p.size() > 7:
+			colors.append(p[7])
+	if body != null and kind != "pebble" and kind != "log":
+		_collide(list, body, kind, k)
+	_multimesh_chunked(mesh, m, xforms, kind == "tree" or kind == "round" or kind == "rock", colors)
+
+## Collisions du décor (couvert) : arrêtent les balles et les regards ; seulement près des deux îles de jeu.
+func _collide(list: Array, body: StaticBody3D, kind: String, k := 1.0) -> void:
+	for p in list:
 		if minf(Vector2(p[0], p[2] - MZ).length(), Vector2(p[0], p[2] + MZ).length()) > 260.0:
 			continue  # loin des deux îles de jeu : rien ne peut s'y cogner
-		# Collision : le décor arrête les balles.
 		var cs := CollisionShape3D.new()
 		var s: float = p[3]
 		if kind == "tree" or kind == "round":
 			var cyl := CylinderShape3D.new()
-			cyl.radius = (1.0 if kind == "tree" else 1.7) * s
-			cyl.height = (8.0 if kind == "tree" else 6.0) * s
+			cyl.radius = (1.0 if kind == "tree" else 1.7) * s * k
+			cyl.height = (8.0 if kind == "tree" else 6.0) * s * k
 			cs.shape = cyl
 			cs.position = Vector3(p[0], p[1] + cyl.height / 2, p[2])
 		else:
 			var sph := SphereShape3D.new()
-			sph.radius = 0.8 * s
+			sph.radius = 0.8 * s * (clampf(p[5] / 0.7, 0.6, 1.0) if kind == "rock" else 1.0)
 			cs.shape = sph
 			cs.position = Vector3(p[0], p[1] + (0.4 * s if kind == "bush" else 0.0), p[2])
 		body.add_child(cs)
-	_multimesh_chunked(mesh, m, xforms, kind == "tree" or kind == "round" or kind == "rock")
 
 
 # ---------- Herbe et fleurs (seulement pour le décor, n'arrêtent pas les balles) ----------
@@ -774,7 +958,7 @@ func _grass() -> void:
 		# [forme, teinte, canal du masque, densité, touffes par m², vent, garder les normales, taille min, taille max, aplatissement]
 		[VEG.tuft(0.9, 0.55), Color("#f2f7e6"), 0, 1.0, 1.6, 0.12, false, 0.8, 1.4, 1.0, "vege_herbe.png"],
 		[VEG.tuft(0.8, 0.5), Color.WHITE, 1, 0.6, 0.07, 0.08, false, 0.9, 1.3, 1.0, "vege_fleurs.png"],
-		[_pebble_mesh, Color("#6f6b64"), 2, 1.0, 0.3, 0.0, true, 0.1, 0.45, 0.6],
+		[_pebble_mesh, Color("#4a4742"), 2, 1.0, 0.3, 0.0, true, 0.08, 0.36, 0.42],   # graviers sombres et plats, comme la roche
 		[_pebble_mesh, Color("#f4f8fc"), 3, 1.0, 0.12, 0.0, true, 0.3, 1.0, 0.35],
 	]
 	for f in fields:

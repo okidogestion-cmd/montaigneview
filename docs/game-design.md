@@ -423,3 +423,26 @@ Le jeu devient une **appli mobile** (même jeu : cachette, peinture, duel), plus
   38 vues comparées (deux îles sous 4 angles, crêtes x1/x4/x10, cachette, ombres, vue ennemie, 15 vues de référence) :
   au plus 0,06 % de pixels différents, des pixels isolés sur le bord des ombres et sur la ligne où l'eau touche la
   plage (cadrage des ombres et ordre de dessin) ; rien sur les personnages. Planches : `docs/audit/perf/terrain_*.jpg`.
+
+### Forêt alpine : composition du décor (30/10/2026)
+- `_scatter` ne sème plus des points au hasard sur toute la carte : grille de 4,6 m légèrement décalée, et pour chaque
+  point une **carte de densité** (bruit à grande échelle + bords irréguliers) selon la zone, la pente et l'altitude.
+  Forêts, bosquets, clairières et lisières ; forêt dense en bas, rare sur les pentes raides, absente au-dessus de la
+  limite des arbres (≈ 104 m ± 15) ; arbres jusqu'à 18 m en bas, de plus en plus petits en montant, puis pins rabougris
+  (et sapin givré) à la limite ; quelques arbres isolés dans les prés (feuillus en bas) ; espacement minimal entre arbres.
+- **Peuplements** en grandes taches : épicéas (`tree07`, `tree12`, `tree05`), pins et mélèzes (`tree01`, `tree11`,
+  `tree04`), sapins (`tree09`, `tree10`) ; `tree06` givré vers la limite ; feuillus `tree19`, `tree24`, `tree22` ;
+  buissons `bush02`, `bush06`, `bush04` (9 modèles ajoutés depuis `sources/tree_pack_1.1`, préparés comme les autres :
+  photo 128 px agrandie à 256 px). Chaque arbre a sa nuance (`_tree_tint`, couleur par instance du MultiMesh).
+- **Rochers** en amas (`_rock_cluster` : beaucoup de petits, quelques gros), une forme par versant (`_rock_region`,
+  trois formes légères dont une à facettes), nuance par endroit (`_rock_tint`). Les cailloux du champ d'herbe de la zone
+  de roche sont plus sombres, plats et petits (ils ressemblaient à des œufs blancs).
+- **Gameplay inchangé** : dans la zone de jeu (210 m autour du centre de chaque île) la forêt est réglée pour garder le
+  couvert d'avant (`PLAY_FILL`) ; au-delà, forêt pleine (`FOREST_FILL`). Grands arbres, buissons hauts (≥ 1,2 m) et
+  rochers gardent leur collision (taille de collision proportionnelle au modèle) ; buissons bas et petits cailloux
+  (< 1,1 m) sont du décor sans collision ; cachettes dégagées (12 m) comme avant.
+  Mesuré (800 lignes de vue entre les îles, exposition du joueur en 400 endroits × 3 postures) : lignes de vue dégagées
+  17,8 % → 17,5 % ; exposition moyenne −1 à −2 %.
+- Coût mesuré : triangles +2 à +9 %, appels de dessin +1 à +8 % (chaque zone de 175 m n'utilise que 2 ou 3 modèles
+  d'arbres et 1 ou 2 formes de rocher) ; construction du monde 0,7–0,9 s → 1,2 s (sur ordinateur).
+- Planches avant/après : `docs/audit/foret/`.
