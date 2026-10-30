@@ -498,7 +498,7 @@ func start_hide() -> void:
 	world.player.visible = true
 	world.enemy.visible = false
 	world.end_marker.visible = false
-	hider.reset(0.0, _shore_start(WorldScript.MZ - 105.0, 1.0))
+	hider.reset(0.0, _shore_start(WorldScript.MZ - 105.0, 1.0) + 20.0)   # un peu au-dessus du rivage
 	hide_left = HIDE_TIME
 	hide_exposure = 1.0
 	expo_t = 0.0
