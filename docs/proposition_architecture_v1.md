@@ -196,3 +196,54 @@ il faudra un réglage par plateforme. Le code de jeu reste commun.
 
 **Arme et animations.** Le rig expose déjà le point de visée : l'arme 1re personne sera un enfant de `Camera3D`, visible
 seulement en `SCOPE` / `PREVIEW`, et le fusil du dos masqué à ce moment (pas de doublon visible).
+
+---
+
+## Précisions demandées à la validation (30/10/2026)
+
+### SpringArm3D : comment il commande vraiment la caméra (pas E)
+
+Le bras n'est pas décoratif : **en mode `EXPLORE`, la distance de la caméra ne peut jamais dépasser la longueur libre
+mesurée par le `SpringArm3D`.**
+1. À chaque image, le rig place `Follow` sur le sniper et oriente `Pitch` et le bras vers l'épaule ; le bras lance sa
+   sphère dans le décor et donne `get_hit_length()` (distance libre).
+2. Le rig lisse la distance comme aujourd'hui, mais avec une règle stricte : on **recule lentement** vers la longueur
+   libre, on **avance instantanément** si un obstacle apparaît (`distance = min(distance lissée, hit_length)`).
+   Aujourd'hui, le rapprochement est rapide mais pas instantané (la caméra peut entrer d'une image dans un rocher) :
+   ce sera corrigé au pas E.
+3. La pose 3e personne = départ du bras + axe du bras × cette distance ; c'est elle que le rig écrit dans `Camera3D`.
+4. Pendant une transition qui part de la 3e personne ou y arrive, la pose mélangée est elle aussi contrôlée par un
+   lancer de forme depuis le sniper : elle ne traverse pas le décor.
+5. Test du pas E : sniper dos à un rocher et à un arbre, la caméra n'est jamais dans le décor ni plus loin que le bras.
+
+Pourquoi `Camera3D` n'est pas enfant du bras : la même caméra sert aux cinq modes ; si elle était fixée au bout du bras,
+les modes 1re personne et atelier devraient la détacher et la rattacher, et les transitions sauteraient.
+Au pas A, **aucun bras n'est créé** : il n'apparaîtra qu'au pas E, au moment où il commande la caméra.
+
+### PREVIEW et SCOPE
+
+| | `PREVIEW` (cachette, clic droit / « viser ») | `SCOPE` (révélation, tir, fin) |
+|---|---|---|
+| But | Regarder depuis sa cachette, à l'œil | Viser et tirer |
+| Regard | **Le même** yaw/pitch que `EXPLORE` (en relâchant, on retrouve la même direction) ; limites −1,2…0,5 | Yaw/pitch propres, ±1,1 rad autour de l'axe de départ, pitch −0,9…0,7 ; sensibilité proportionnelle au zoom |
+| Angle de vue | x1 fixe (55°) | x1 / x4 / x10 |
+| Effets | aucun | balancement (selon le souffle), recul |
+| Tir | impossible | `aim_origin()` / `aim_direction()` fournis au tir |
+| Corps | masqué | masqué |
+
+Pièces communes (sans mélange des rôles) : le calcul du point de vue à l'œil (`hider.eye()`), l'orientation
+yaw/pitch → rotation (ordre YXZ) et le réglage de l'angle de vue. Chaque mode garde son propre état
+(regard, zoom, effets) : entrer en `PREVIEW` ne touche jamais au zoom ni au recul du tir.
+
+### Transitions
+
+- Réglables dans `camera_rig.tscn` (propriétés exportées) : durée par passage (ex. `EXPLORE → PREVIEW` 0,15 s,
+  `PREVIEW → EXPLORE` 0,25 s, `WORKSHOP → EXPLORE` 0,35 s), courbe, et un interrupteur général (0 s = coupure nette, comme aujourd'hui).
+- Elles ne changent que **l'image** : `aim_origin()`, `aim_direction()` et `rig.yaw` (direction de marche) renvoient toujours
+  la pose **logique** du mode, jamais la pose mélangée. L'arrivée en `SCOPE` reste une coupure (cachée par le brouillard),
+  donc au moment où l'on peut tirer, l'image et la visée sont identiques.
+- Le rig ne déplace jamais le personnage : il lit sa position, il ne l'écrit pas.
+
+### Rendu
+
+Inchangé : Compatibility, navigateur et iPhone comme aujourd'hui. Aucun pas ne touche `project.godot` ni le rendu.

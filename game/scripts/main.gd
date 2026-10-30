@@ -8,6 +8,7 @@ const HiderScript := preload("res://scripts/hider.gd")
 const PaintScript := preload("res://scripts/paint.gd")
 const LifeScript := preload("res://scripts/life.gd")
 const TouchScript := preload("res://scripts/touch_controls.gd")
+const CameraRigScene := preload("res://scenes/camera_rig.tscn")
 
 const LEVELS := {
 	"facile":    {"first": 22.0, "interval": [9.0, 13.0], "rate_good": 0.006, "rate_bad": 0.02,  "acc": 0.6,  "camo": 0.35, "glint": 0.02,  "shot_reveal": 0.18},
@@ -31,7 +32,8 @@ var paint
 var life
 var touch
 var touch_mode := false   # téléphone / tablette (ou PC lancé avec -- --tactile)
-var camera: Camera3D
+var rig            # CameraRig : propriétaire de la caméra
+var camera: Camera3D   # = rig.camera (pas A : encore placée par main.gd et hider.gd)
 var inset_cam: Camera3D
 var env: Environment
 # Sons de tir : vrai Kar98k (sources/k98_pixabay.mp3, découpé par tools/sons_k98.sh) pour ton tir (avec la
@@ -119,12 +121,9 @@ func _ready() -> void:
 	add_child(life)
 	life.setup(world)
 	hider = HiderScript.new(world)
-	camera = Camera3D.new()
-	camera.near = 0.1
-	camera.far = 3000
-	camera.rotation_order = EULER_ORDER_YXZ
-	add_child(camera)
-	camera.make_current()
+	rig = CameraRigScene.instantiate()
+	add_child(rig)
+	camera = rig.camera
 	hud = HudScript.new()
 	add_child(hud)
 	# Commandes tactiles : sur téléphone, ou sur PC avec « -- --tactile » (la souris fait le doigt).
@@ -190,9 +189,8 @@ func _on_touch_tap(name: String) -> void:
 		"zoom":
 			cycle_zoom()
 
-## Debout, l'angle de vue se règle sur la largeur (sinon on ne verrait qu'une tranche de l'île d'en face).
 func _on_orientation(portrait: bool) -> void:
-	camera.keep_aspect = Camera3D.KEEP_WIDTH if portrait else Camera3D.KEEP_HEIGHT
+	rig.set_portrait(portrait)
 
 func _on_level(lv: String) -> void:
 	level = lv
@@ -255,7 +253,7 @@ func aim_at(from: Vector3, to: Vector3) -> void:
 	pitch = atan2(d.y, Vector2(d.x, d.z).length())
 
 func set_fov(f: float) -> void:
-	camera.fov = f
+	rig.set_fov(f)
 
 func set_fog(near: float, far: float) -> void:
 	env.fog_depth_begin = near

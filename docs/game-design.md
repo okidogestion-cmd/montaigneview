@@ -361,3 +361,12 @@ Le jeu devient une **appli mobile** (même jeu : cachette, peinture, duel), plus
 - `tools/sons_k98.sh` (ffmpeg) le découpe : `art/son_tir.ogg` = premier tir puis la culasse qu'on réarme ;
   `art/son_loin.ogg` = second tir, étouffé et avec plus d'écho (le tir de l'ennemi, entendu de l'autre île, arrive
   avec le retard du son). La balle qui passe tout près (`art/son_impact.wav`) reste calculée par `tools/sons.py`.
+
+### CameraRig, pas A (30/10/2026)
+- Architecture caméra : `docs/audit_architecture_v1.md` (audit), `docs/proposition_architecture_v1.md` (proposition validée, migration en 7 pas).
+- Pas A : `scenes/camera_rig.tscn` + `scripts/camera_rig.gd` possèdent la seule caméra du jeu (création, caméra active,
+  angle de vue, portrait/paysage). `main.gd` (`rig`, `camera = rig.camera`) et `hider.gd` la placent encore comme avant.
+  Aucun changement visible ni de jeu.
+- Tests : `tools/tests/test_camera.gd` (toutes les phases, 46 vérifications) et `tools/tests/captures_camera.gd`
+  (6 vues à hasard fixé : deux versions identiques donnent les mêmes pixels). Les deux demandent un affichage (xvfb),
+  pas `--headless` (le jeu attend la première image avant de construire l'archipel).
