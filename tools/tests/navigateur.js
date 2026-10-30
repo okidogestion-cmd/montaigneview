@@ -74,6 +74,24 @@ const out = process.argv[2], mode = process.argv[3] || 'souris';
     for (let k = 0; k < 4; k++) { await page.mouse.wheel(0, -120); await page.waitForTimeout(50); }
   }
   await shot('5_atelier_zoom');
+  if (!portrait) {
+    // Fin de l'atelier (TERMINÉ), révélation, puis tir : zoom (touche Z) et tir (Espace).
+    const [tx, ty] = orange(out + '/5_atelier_zoom.png');
+    console.log('TERMINE', tx, ty);
+    await tap(tx, ty);
+    // Rendu logiciel : le jeu tourne lentement ; on attend la fin du brouillard (le zoom n'agit qu'au tir).
+    await page.waitForTimeout(150000);
+    await shot('6_tir_x1');
+    await page.keyboard.press('z');
+    await page.waitForTimeout(10000);
+    await shot('7_tir_x4');
+    await page.keyboard.press('z');
+    await page.waitForTimeout(10000);
+    await shot('8_tir_x10');
+    await page.keyboard.press('Space');
+    await page.waitForTimeout(1000);
+    await shot('9_tir_recul');
+  }
   require('fs').writeFileSync(out + '/console.txt', logs.join('\n'));
   await browser.close();
 })();

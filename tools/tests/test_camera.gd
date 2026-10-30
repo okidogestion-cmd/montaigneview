@@ -152,36 +152,102 @@ func _run() -> void:
 	main._on_paint_pose("debout")
 	# ---------- Tir ----------
 	main.start_fire()
+	check(rig.mode == rig.Mode.SCOPE, "révélation : la caméra de tir est pilotée par le CameraRig")
 	main.reveal_t = 3.0
 	await _wait(5)
+	main.ai_next = 999.0
 	cam_sane("tir")
 	check(main.phase == "fire", "tir : la révélation mène au tir")
-	check(rig.mode == rig.Mode.EXTERNAL, "tir : la caméra reste placée par main.gd (pas encore migrée)")
 	check(cam().global_position.distance_to(h.eye()) < 0.01, "tir : caméra à l'œil")
+	check(rig.zoom_level == 0 and is_equal_approx(cam().fov, 55.0) and main.hud.zoom_label.text == "x1", "tir : on commence en x1")
 	var fovs := []
+	var scopes := []
 	for i in 4:
 		fovs.append(snappedf(cam().fov, 0.01))
+		scopes.append([rig.zoom_level, main.hud.zoom_label.text, main.hud.scope.visible])
 		main.cycle_zoom()
 	check(fovs == [55.0, 14.0, 5.5, 55.0], "tir : zoom x1 → x4 → x10 → x1 %s" % [fovs])
-	main._look(Vector2(1e6, 1e6))
-	check(main.yaw >= main.base_yaw - 1.1 - 1e-6 and main.pitch >= -0.9 - 1e-6, "tir : regard limité (droite / bas)")
-	main._look(Vector2(-2e6, -2e6))
-	check(main.yaw <= main.base_yaw + 1.1 + 1e-6 and main.pitch <= 0.7 + 1e-6, "tir : regard limité (gauche / haut)")
-	main.aim_at(cam().global_position, main.world.enemy.position + Vector3(0, 0.7, 0))
-	await _wait(3)
-	# La direction du tir est celle de la caméra : regard + balancement + recul.
-	var ammo: int = main.ammo
-	main.shoot()
-	check(main.ammo == ammo - 1 and is_equal_approx(main.recoil, 0.012), "tir : une balle partie, recul appliqué")
+	check(scopes == [[0, "x1", false], [1, "x4", true], [2, "x10", true], [0, "x1", false]], "tir : étiquette et cache de lunette suivent le zoom %s" % [scopes])
+	# Regard : limité autour de l'axe de départ ; plus fin quand on zoome.
+	rig.look(Vector2(1e6, 1e6))
+	check(rig.scope_yaw >= rig.scope_base_yaw - 1.1 - 1e-6 and rig.scope_pitch >= -0.9 - 1e-6, "tir : regard limité (droite / bas)")
+	rig.look(Vector2(-2e6, -2e6))
+	check(rig.scope_yaw <= rig.scope_base_yaw + 1.1 + 1e-6 and rig.scope_pitch <= 0.7 + 1e-6, "tir : regard limité (gauche / haut)")
+	main.aim_at(cam().global_position, Vector3(0, 70, -main.world.MZ))
+	_zoom_to(0)
+	var y0: float = rig.scope_yaw
+	main._look(Vector2(10, 0))
+	var d1: float = y0 - rig.scope_yaw
+	_zoom_to(2)
+	var y1: float = rig.scope_yaw
+	main._look(Vector2(10, 0))
+	var d10: float = y1 - rig.scope_yaw
+	check(absf(d1 / d10 - 10.0) < 0.01, "tir : au x10, le regard est 10 fois plus fin (%.2f)" % (d1 / d10))
+	_zoom_to(0)
+	# Balancement : au repos, souffle retenu, à bout de souffle.
+	var calm := await _sway_amp(120)
+	main.breath_held = true
+	var held := await _sway_amp(60)
+	main.breath_held = false
+	main.gasp = 2.0
+	var gasping := await _sway_amp(60)
+	check(calm > 0.001 and calm < 0.006, "tir : la lunette balance au repos (%.4f rad)" % calm)
+	check(held < calm * 0.3, "tir : souffle retenu, presque immobile (%.4f rad)" % held)
+	check(gasping > calm * 1.3, "tir : à bout de souffle, ça tremble plus (%.4f rad)" % gasping)
+	await _wait(80)
+	main.breath = 100.0
+	# Reflet de la lunette : après 5 s au x10 (affichage coupé pendant l'attente : le jeu tourne, rien n'est dessiné).
+	_zoom_to(2)
+	main.ai_next = 999.0
+	RenderingServer.render_loop_enabled = false
+	await _wait(200)
+	check(not main.glinted, "tir : pas de reflet avant 5 s au x10")
+	await _wait(140)
+	RenderingServer.render_loop_enabled = true
+	main.ai_next = 999.0
+	check(main.glinted and main.hud.scope.visible, "tir : la lunette brille après 5 s au x10")
+	_zoom_to(0)
 	await _wait(2)
-	var r: Vector3 = cam().rotation
-	check(absf(r.z) < 1e-6 and absf(r.x - main.pitch) < 0.05 and absf(r.y - main.yaw) < 0.05, "tir : caméra = regard + petits effets (balancement, recul)")
+	check(main.scope_time == 0.0, "tir : en quittant le x10, le compteur du reflet repart à zéro")
+	# Recul : un tir à côté, puis un tir ennemi qui manque.
+	main.aim_at(cam().global_position, Vector3(0, 70, -main.world.MZ))
+	await _wait(2)
+	var ammo: int = main.ammo
+	main.cool = 0.0
+	main.shoot()
+	check(main.ammo == ammo - 1 and is_equal_approx(rig.recoil, 0.012), "tir : une balle partie, recul de 0,012 rad")
+	await _wait(1)
+	check(cam().rotation.x > rig.scope_pitch + 0.008, "tir : la caméra relève avec le recul")
 	await _wait(60)
-	check(absf(main.recoil) < 0.001, "tir : le recul retombe")
-	# ---------- Fin et retour au menu ----------
-	main.win()
+	check(absf(rig.recoil) < 0.001, "tir : le recul retombe")
+	main.ai_reveal = 0.0
+	main.ai_shoot()
+	var low := 0.0
+	for i in 60:
+		await process_frame
+		low = minf(low, rig.recoil)
+	main.ai_next = 999.0
+	check(low < -0.004 and main.phase == "fire", "tir : une balle ennemie qui frappe tout près fait sursauter (%.4f)" % low)
+	# La balle part exactement de la caméra : visée sur l'ennemi, souffle retenu, le tir le touche.
 	await _wait(30)
+	main.breath_held = true
+	var target: Vector3 = main.world.enemy_hitbox.global_position
+	main.aim_at(cam().global_position, target)
+	await _wait(3)
+	check(rig.aim_origin() == cam().global_position and rig.aim_direction().is_equal_approx(-cam().global_transform.basis.z), "tir : position et direction du tir = celles de la caméra")
+	var q := PhysicsRayQueryParameters3D.create(rig.aim_origin(), rig.aim_origin() + rig.aim_direction() * 3000, 1)
+	var seen: Dictionary = main.get_world_3d().direct_space_state.intersect_ray(q)
+	var aimed_ok: bool = not seen.is_empty() and seen.collider == main.world.enemy_hitbox
+	main.cool = 0.0
+	main.shoot()
+	await _wait(90)
+	check(aimed_ok and main.phase == "end" and main.hud.end_title.text == "Touché !", "tir : visé sur l'ennemi, le tir le touche (rayon caméra : %s)" % aimed_ok)
+	main.breath_held = false
+	# ---------- Fin ----------
 	cam_sane("fin")
+	check(rig.zoom_level == 2 and is_equal_approx(cam().fov, 5.5), "fin : l'ennemi montré au x10")
+	var to_enemy: Vector3 = (main.world.enemy.position + Vector3(0, 0.9, 0) - cam().global_position).normalized()
+	check(-cam().global_transform.basis.z.dot(to_enemy) > 0.9999, "fin : la lunette montre l'ennemi")
 	main.to_menu()
 	await _wait(5)
 	cam_sane("retour au menu")
@@ -189,6 +255,22 @@ func _run() -> void:
 	check(rig.mode == rig.Mode.MENU and cam().global_position.is_equal_approx(Vector3(330, 110, 40)), "retour au menu : vue de la vallée")
 	print("%d vérifications, %d échec(s)" % [checks, fails])
 	quit(1 if fails > 0 else 0)
+
+func _zoom_to(level: int) -> void:
+	for i in 3:
+		if main.rig.zoom_level == level:
+			return
+		main.cycle_zoom()
+
+## Écart maximal de la caméra par rapport au regard, sur n images (balancement).
+func _sway_amp(n: int) -> float:
+	var m := 0.0
+	for i in n:
+		await process_frame
+		main.ai_next = 999.0
+		var r := cam().rotation
+		m = maxf(m, maxf(absf(r.y - main.rig.scope_yaw), absf(r.x - main.rig.scope_pitch - main.rig.recoil)))
+	return m
 
 func _mouse_button(button: int, pressed: bool) -> void:
 	var e := InputEventMouseButton.new()

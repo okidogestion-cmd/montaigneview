@@ -379,3 +379,15 @@ Le jeu devient une **appli mobile** (même jeu : cachette, peinture, duel), plus
   `rig.orbit_wheel()`, `rig.orbit_pinch()` ; `_workshop_center()` donne le point regardé.
 - Vérifié : trace chiffrée de la caméra image par image identique avant/après (`tools/tests/trace_camera.gd`),
   11 captures identiques au pixel près, 70 vérifications automatiques, version web dans Chromium.
+
+### CameraRig, pas C (30/10/2026)
+- Le rig pilote la **caméra de tir** (mode `SCOPE` : révélation, tir, fin) : position à l'œil, regard limité à ±1,1 rad
+  autour de l'axe de départ (plus fin quand on zoome), zoom x1/x4/x10 (`ZOOM_FOV`), balancement, recul.
+- Le **tir** lit `rig.aim_origin()` / `rig.aim_direction()` : exactement la caméra affichée, balancement et recul compris.
+  Sa logique (rayon, arbres traversés, temps de vol, dégâts) ne change pas.
+- La **jauge de souffle** reste dans `main.gd` (ressource de jeu) ; le rig reçoit seulement « souffle retenu / à bout
+  de souffle » (`rig.sway()`), avec la même formule de balancement. Le **reflet** lit `rig.zoom_level`.
+- Recul : `rig.recoil_kick()` (tir, 0,012 rad), `rig.recoil_flinch()` (balle ennemie tout près, −0,006), `rig.reset_recoil()`.
+- Reste en mode `EXTERNAL` : la cachette (pas D).
+- Vérifié : trace chiffrée (179 relevés : regard, butées, zoom, reflet après 5 s au x10, souffle retenu puis
+  essoufflement, recul, sursaut, fin) identique avant/après ; captures avant/après ; 84 vérifications automatiques.

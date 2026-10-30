@@ -75,10 +75,24 @@ func _run() -> void:
 	await _wait(10)
 	await _shot("vue_tir_x1")
 	main.cycle_zoom()
+	main.aim_at(eye, Vector3(-60, 80, -main.world.MZ + 40))
+	await _wait(10)
+	await _shot("lunette_x4")
 	main.cycle_zoom()
 	main.aim_at(eye, main.world.enemy.position + Vector3(0, 0.7, 0))
 	await _wait(20)
 	await _shot("lunette_x10")
+	main.breath_held = true
+	await _wait(60)
+	await _shot("lunette_x10_souffle")
+	main.breath_held = false
+	main.ai_next = 999.0
+	main.shoot()
+	await _wait(3)
+	await _shot("lunette_x10_recul")
+	main.win()
+	await _wait(60)
+	await _shot("fin_ennemi")
 	quit()
 
 ## Entrées de l'atelier envoyées comme le ferait le moteur (mêmes fonctions avant et après le pas B).

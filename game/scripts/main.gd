@@ -9,6 +9,7 @@ const PaintScript := preload("res://scripts/paint.gd")
 const LifeScript := preload("res://scripts/life.gd")
 const TouchScript := preload("res://scripts/touch_controls.gd")
 const CameraRigScene := preload("res://scenes/camera_rig.tscn")
+const CameraRigScript := preload("res://scripts/camera_rig.gd")
 
 const LEVELS := {
 	"facile":    {"first": 22.0, "interval": [9.0, 13.0], "rate_good": 0.006, "rate_bad": 0.02,  "acc": 0.6,  "camo": 0.35, "glint": 0.02,  "shot_reveal": 0.18},
@@ -18,7 +19,7 @@ const LEVELS := {
 const AMMO := 5
 const HIDE_TIME := 60.0
 const HIDE_FOV := 62.0
-const FIRE_FOV := [55.0, 14.0, 5.5]
+const FIRE_FOV := CameraRigScript.ZOOM_FOV   # x1, x4, x10 (gérés par le CameraRig)
 const ZOOM_LABELS := ["x1", "x4", "x10"]
 const SKY := Color("#efd9c9")   # couleur de l'horizon (lever de soleil du panorama), reprise par le brouillard
 const FOG_NEAR := 200.0
@@ -33,7 +34,7 @@ var life
 var touch
 var touch_mode := false   # téléphone / tablette (ou PC lancé avec -- --tactile)
 var rig            # CameraRig : propriétaire de la caméra
-var camera: Camera3D   # = rig.camera (cachette et tir : encore placée par main.gd et hider.gd)
+var camera: Camera3D   # = rig.camera (cachette : encore placée par hider.gd)
 var inset_cam: Camera3D
 var env: Environment
 # Sons de tir : vrai Kar98k (sources/k98_pixabay.mp3, découpé par tools/sons_k98.sh) pour ton tir (avec la
@@ -45,11 +46,6 @@ const SON_IMPACT := preload("res://art/son_impact.wav")
 var level := "normal"
 var phase := "menu"
 var gid := 0
-var yaw := 0.0
-var pitch := 0.0
-var base_yaw := 0.0
-var zoom_idx := 0
-var recoil := 0.0
 var player_zone := "roche"
 var enemy_spot = null
 var enemy_camo := "roche"
@@ -65,7 +61,6 @@ var fight_time := 0.0
 var breath := 100.0
 var breath_held := false
 var gasp := 0.0
-var sway_t := 0.0
 var scope_time := 0.0
 var glint_warned := false
 var glinted := false
@@ -244,9 +239,7 @@ func D() -> Dictionary:
 	return LEVELS[level]
 
 func aim_at(from: Vector3, to: Vector3) -> void:
-	var d := to - from
-	yaw = atan2(-d.x, -d.z)
-	pitch = atan2(d.y, Vector2(d.x, d.z).length())
+	rig.aim_at(from, to)
 
 func set_fov(f: float) -> void:
 	rig.set_fov(f)
@@ -486,7 +479,7 @@ func start_hide() -> void:
 	hide_left = HIDE_TIME
 	hide_exposure = 1.0
 	expo_t = 0.0
-	zoom_idx = 0
+	rig.reset_zoom()
 	set_fov(HIDE_FOV)
 	set_fog(FOG_NEAR, FOG_FAR)
 	hud.toast("Marche sur ton île et trouve une cachette avant la fin du temps.", 3.5)
@@ -532,7 +525,6 @@ func start_fire() -> void:
 	gid += 1
 	touch.set_mode("fire" if touch_mode else "")
 	phase = "reveal"
-	rig.release()
 	# Vue de tir : les arbres et buissons proches s'effacent (rayon de 35 m), ils ne bouchent pas la lunette.
 	world.set_near_fade(35.0)
 	reveal_t = 0.0
@@ -557,17 +549,12 @@ func start_fire() -> void:
 	var eo: String = PaintScript.ZONE_OUTFIT[enemy_camo]
 	paint_enemy.wear(eo)
 	world.set_ghillie(world.enemy, randf() < 0.5, Color(PaintScript.OUTFITS[eo][2]))
-	camera.position = eye
-	aim_at(eye, Vector3(0, 78, -150))
-	base_yaw = yaw
-	zoom_idx = 0
-	set_fov(FIRE_FOV[0])
+	rig.enter_scope(eye, Vector3(0, 78, -150))   # à l'œil, x1, sans recul
 	hud.zoom_label.text = "x1"
 	ammo = AMMO
 	cool = 0.0
 	shots_fired = 0
 	fight_time = 0.0
-	recoil = 0.0
 	breath = 100.0
 	breath_held = false
 	gasp = 0.0
@@ -595,11 +582,10 @@ func detect_rate() -> float:
 func cycle_zoom() -> void:
 	if phase != "fire":
 		return
-	zoom_idx = (zoom_idx + 1) % 3
-	set_fov(FIRE_FOV[zoom_idx])
-	hud.zoom_label.text = ZOOM_LABELS[zoom_idx]
-	hud.set_scope(zoom_idx > 0)
-	hud.dot.visible = zoom_idx == 0
+	var z: int = rig.cycle_zoom()
+	hud.zoom_label.text = ZOOM_LABELS[z]
+	hud.set_scope(z > 0)
+	hud.dot.visible = z == 0
 
 func puff(p: Vector3, color := Color("#cdbf9f"), size := 2.6) -> void:
 	var m := MeshInstance3D.new()
@@ -626,21 +612,23 @@ func shoot() -> void:
 	shots_fired += 1
 	cool = 1.3
 	hud.render_ammo(ammo, AMMO)
-	var dir := -camera.global_transform.basis.z
-	var hit := ray(camera.global_position, camera.global_position + dir * 3000)
+	# La balle part exactement de la caméra affichée (balancement et recul compris).
+	var origin: Vector3 = rig.aim_origin()
+	var dir: Vector3 = rig.aim_direction()
+	var hit := ray(origin, origin + dir * 3000)
 	# Les arbres effacés près du tireur ne retiennent pas la balle : elle repart juste derrière.
 	for i in 8:
-		if hit.is_empty() or not world.is_foliage(hit.collider) or camera.global_position.distance_to(hit.position) > world.near_fade:
+		if hit.is_empty() or not world.is_foliage(hit.collider) or origin.distance_to(hit.position) > world.near_fade:
 			break
-		hit = ray(hit.position + dir * 0.05, camera.global_position + dir * 3000)
-	recoil = 0.012
+		hit = ray(hit.position + dir * 0.05, origin + dir * 3000)
+	rig.recoil_kick()
 	hud.pulse(hud.flash, 0.35, 0.16)
 	bang(SON_TIR, 1.0)
 	ai_reveal = minf(1, ai_reveal + D().shot_reveal)
 	if ammo == 0:
 		ai_next = minf(ai_next, 2.5)
 	var g := gid
-	var travel: float = camera.global_position.distance_to(hit.position) / 900.0 if not hit.is_empty() else 0.3
+	var travel: float = origin.distance_to(hit.position) / 900.0 if not hit.is_empty() else 0.3
 	await get_tree().create_timer(travel).timeout
 	if g != gid or phase != "fire":
 		return
@@ -676,19 +664,18 @@ func ai_shoot() -> void:
 	var pz: float = hider.pos.z + sin(a) * r
 	puff(Vector3(px, world.height_at(px, pz) + 0.4, pz))
 	hud.pulse(hud.hurt, 0.35, 0.5)
-	recoil -= 0.006
+	rig.recoil_flinch()
 	bang(SON_IMPACT, 0.8)
 	hud.toast("Un tir a frappé à %d m de toi !" % roundi(r))
 
 
 # ---------- Fin ----------
 func show_enemy() -> void:
-	zoom_idx = 2
-	set_fov(FIRE_FOV[2])
+	rig.set_zoom(2)
 	hud.set_scope(true)
 	hud.dot.visible = false
 	aim_at(camera.position, world.enemy.position + Vector3(0, 0.9, 0))
-	recoil = 0.0
+	rig.reset_recoil()
 	world.end_marker.position = world.enemy.position + Vector3(0, 3.2, 0)
 	world.end_marker.visible = true
 
@@ -743,9 +730,7 @@ func lose() -> void:
 
 # ---------- Commandes ----------
 func _look(rel: Vector2) -> void:
-	var k := deg_to_rad(camera.fov) / get_viewport().get_visible_rect().size.y
-	yaw = clampf(yaw - rel.x * k, base_yaw - 1.1, base_yaw + 1.1)
-	pitch = clampf(pitch - rel.y * k, -0.9, 0.7)
+	rig.look(rel)
 
 func _unhandled_input(e: InputEvent) -> void:
 	if hud == null:
@@ -805,8 +790,6 @@ func _process(dt: float) -> void:
 	if hud == null:
 		return
 	dt = minf(dt, 0.05)
-	var sx := 0.0
-	var sy := 0.0
 	if phase == "hide":
 		_process_hide(dt)
 	elif phase == "reveal":
@@ -837,22 +820,15 @@ func _process(dt: float) -> void:
 		if gasp > 0:
 			gasp -= dt
 		hud.breath_bar.value = breath
-		sway_t += dt
-		var amp := 0.0032
-		if holding:
-			amp *= 0.12
-		if gasp > 0:
-			amp *= 2.2
-		sx = amp * (sin(sway_t * 1.1) + 0.6 * sin(sway_t * 2.3 + 1.3))
-		sy = amp * (sin(sway_t * 1.7 + 0.5) + 0.5 * sin(sway_t * 3.1))
-		scope_time = scope_time + dt if zoom_idx == 2 else 0.0
+		rig.sway(dt, holding, gasp > 0)
+		scope_time = scope_time + dt if rig.zoom_level == 2 else 0.0
 		var glint := scope_time > 5
 		if glint:
 			glinted = true
 			if not glint_warned:
 				glint_warned = true
 				hud.toast("Ta lunette brille au soleil ! Change de zoom.", 3.0)
-		if zoom_idx > 0:
+		if rig.zoom_level > 0:
 			hud.set_scope(true, glint)
 		ai_reveal = minf(1, ai_reveal + dt * detect_rate() + (dt * L.glint if glint else 0.0))
 		hud.set_eye(ai_reveal)
@@ -874,8 +850,7 @@ func _process(dt: float) -> void:
 	elif phase != "hide":
 		if touch_mode and phase in ["fire", "reveal"]:
 			_look(touch.consume_look())
-		recoil *= exp(-dt * 7)
-		camera.rotation = Vector3(pitch + sy + recoil, yaw + sx, 0)
+		rig.update(dt)
 	world.update_grass(camera.global_position)
 	life.update(dt, camera.global_position)
 
