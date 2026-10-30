@@ -10,6 +10,7 @@ const LifeScript := preload("res://scripts/life.gd")
 const TouchScript := preload("res://scripts/touch_controls.gd")
 const CameraRigScene := preload("res://scenes/camera_rig.tscn")
 const CameraRigScript := preload("res://scripts/camera_rig.gd")
+const PerfOverlayScript := preload("res://scripts/perf_overlay.gd")
 
 const LEVELS := {
 	"facile":    {"first": 22.0, "interval": [9.0, 13.0], "rate_good": 0.006, "rate_bad": 0.02,  "acc": 0.6,  "camo": 0.35, "glint": 0.02,  "shot_reveal": 0.18},
@@ -127,6 +128,14 @@ func _ready() -> void:
 			touch_mode = (str(loc.search) + str(loc.hash)).contains("tactile")
 	if touch_mode and not on_phone:
 		Input.emulate_touch_from_mouse = true
+	# Compteur de performances : « ?perf » dans l'adresse (web) ou « -- --perf » (PC). Absent : rien n'est créé.
+	var perf := "--perf" in OS.get_cmdline_user_args()
+	if OS.has_feature("web"):
+		var where = JavaScriptBridge.get_interface("location")
+		if where != null:
+			perf = perf or (str(where.search) + str(where.hash)).contains("perf")
+	if perf:
+		add_child(PerfOverlayScript.new())
 	touch = TouchScript.new()
 	hud.root.add_child(touch)
 	touch.tapped.connect(_on_touch_tap)

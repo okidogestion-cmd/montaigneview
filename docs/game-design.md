@@ -391,3 +391,10 @@ Le jeu devient une **appli mobile** (même jeu : cachette, peinture, duel), plus
 - Reste en mode `EXTERNAL` : la cachette (pas D).
 - Vérifié : trace chiffrée (179 relevés : regard, butées, zoom, reflet après 5 s au x10, souffle retenu puis
   essoufflement, recul, sursaut, fin) identique avant/après ; captures avant/après ; 84 vérifications automatiques.
+
+### Compteur de performances ?perf (30/10/2026)
+- Ajouter `?perf` (ou `#perf`) à l'adresse de la version web, ou lancer avec `-- --perf` sur PC : un petit encadré
+  affiche, sur chaque demi-seconde, les images par seconde, la durée moyenne et la pire durée d'une image, le nombre de
+  saccades (images de plus de 20 ms), le temps de process, le temps de rendu CPU/GPU (GPU : « n/d » si le navigateur
+  ne le donne pas), les appels de dessin et les triangles. Sans ce mot, `main.gd` ne crée pas le compteur : aucun coût.
+- `scripts/perf_overlay.gd` ; test : `tools/tests/test_perf.gd` (présent avec `--perf`, absent sans).
