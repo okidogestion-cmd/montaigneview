@@ -13,6 +13,7 @@ const ZONES := {
 const MZ := 230.0          # centre des deux montagnes sur l'axe z (+ joueur, - ennemi)
 const S := 1400.0          # taille de la vallée
 const SEG := 320           # finesse du relief (4,4 m entre deux points)
+const TERRAIN_CHUNKS := 8  # affichage du terrain en 8 × 8 morceaux de 40 mailles (175 m)
 const CELL := S / SEG
 const WATER_Y := 26.0      # niveau de la mer : le fond de la vallée est sous l'eau, les montagnes sont des îles
 const TOON := preload("res://shaders/toon.gdshader")
@@ -426,10 +427,17 @@ func _build_terrain() -> void:
 	m.set_shader_parameter("nrm_roche", load("res://art/relief_roche.jpg"))
 	m.set_shader_parameter("nrm_herbe", load("res://art/relief_herbe.jpg"))
 	m.set_shader_parameter("patches", 0.12)
-	var mi := MeshInstance3D.new()
-	mi.mesh = mesh
-	mi.material_override = m
-	add_child(mi)
+	# Affichage : le terrain est découpé en 8 × 8 morceaux (mêmes sommets, mêmes triangles, même matériau).
+	# La carte graphique ignore les morceaux hors de la vue, et seuls les morceaux proches (zone des ombres,
+	# 90 m) sont redessinés dans les ombres, au lieu du terrain entier deux fois.
+	var step := SEG / TERRAIN_CHUNKS
+	for br in TERRAIN_CHUNKS:
+		for bc in TERRAIN_CHUNKS:
+			var mi := MeshInstance3D.new()
+			mi.mesh = _terrain_chunk(arrays, br * step, bc * step, step)
+			mi.material_override = m
+			add_child(mi)
+	# Collision : le terrain entier, d'un seul bloc, comme avant.
 	var body := StaticBody3D.new()
 	var cs := CollisionShape3D.new()
 	var shape := mesh.create_trimesh_shape()
@@ -437,6 +445,46 @@ func _build_terrain() -> void:
 	cs.shape = shape
 	body.add_child(cs)
 	add_child(body)
+
+## Un morceau carré du terrain (step × step mailles à partir de la ligne r0, colonne c0) : les sommets sont recopiés
+## tels quels (position, normale, couleur, poids des textures) et les triangles gardent le même découpage.
+func _terrain_chunk(arrays: Array, r0: int, c0: int, step: int) -> ArrayMesh:
+	var w := SEG + 1
+	var src_v: PackedVector3Array = arrays[Mesh.ARRAY_VERTEX]
+	var src_n: PackedVector3Array = arrays[Mesh.ARRAY_NORMAL]
+	var src_c: PackedColorArray = arrays[Mesh.ARRAY_COLOR]
+	var src_uv: PackedVector2Array = arrays[Mesh.ARRAY_TEX_UV]
+	var src_uv2: PackedVector2Array = arrays[Mesh.ARRAY_TEX_UV2]
+	var cw := step + 1
+	var verts := PackedVector3Array()
+	var normals := PackedVector3Array()
+	var colors := PackedColorArray()
+	var uv1 := PackedVector2Array()
+	var uv2 := PackedVector2Array()
+	for r in range(r0, r0 + cw):
+		for c in range(c0, c0 + cw):
+			var g := r * w + c
+			verts.append(src_v[g])
+			normals.append(src_n[g])
+			colors.append(src_c[g])
+			uv1.append(src_uv[g])
+			uv2.append(src_uv2[g])
+	var idx := PackedInt32Array()
+	for r in step:
+		for c in step:
+			var a := r * cw + c
+			idx.append_array([a, a + 1, a + cw, a + 1, a + cw + 1, a + cw])
+	var chunk := []
+	chunk.resize(Mesh.ARRAY_MAX)
+	chunk[Mesh.ARRAY_VERTEX] = verts
+	chunk[Mesh.ARRAY_NORMAL] = normals
+	chunk[Mesh.ARRAY_COLOR] = colors
+	chunk[Mesh.ARRAY_TEX_UV] = uv1
+	chunk[Mesh.ARRAY_TEX_UV2] = uv2
+	chunk[Mesh.ARRAY_INDEX] = idx
+	var mesh := ArrayMesh.new()
+	mesh.add_surface_from_arrays(Mesh.PRIMITIVE_TRIANGLES, chunk)
+	return mesh
 
 func _build_water() -> void:
 	var plane := PlaneMesh.new()

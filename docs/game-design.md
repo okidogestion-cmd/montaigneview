@@ -409,3 +409,17 @@ Le jeu devient une **appli mobile** (même jeu : cachette, peinture, duel), plus
 - Choix définitif (30/10/2026) : 160 triangles. Comparé à 280 et 96 sur 14 vues (atelier à 3 m et 1,4 m,
   cachette sous 6 angles, marche, tir) : 96 gagnerait encore ≈ 170 000 triangles mais les cailloux deviennent
   anguleux de près et l'écart avec l'original est 1,5 fois plus grand partout. Planches : `cailloux_280_160_96_*.png`.
+
+### Terrain affiché en 64 morceaux (30/10/2026)
+- `_build_terrain` : l'affichage du terrain est découpé en 8 × 8 morceaux (`TERRAIN_CHUNKS`, `_terrain_chunk`) qui
+  recopient tels quels les sommets, normales, couleurs, poids des textures et le découpage des triangles ; même matériau.
+  La collision reste le terrain entier d'un seul bloc (`create_trimesh_shape` sur le maillage complet).
+- Effet : les morceaux hors de la vue ne sont plus dessinés, et seuls les morceaux à moins de 90 m (zone des ombres)
+  sont redessinés dans les ombres, au lieu du terrain entier deux fois.
+- Mesuré (moyennes par groupe de vues, triangles vus + ombres) : cachette 1 280 000 → 765 000 (−40 %) ; tir
+  1 209 000 → 662 000 (−45 %) ; vues des deux îles −36 % ; vue ennemie −47 %. Ombres : −86 à −98 %.
+  Appels de dessin : +10 à +15 %.
+- Vérifié : 300 rayons de visée et de tir entre les deux îles et la marche du sniper identiques au chiffre près ;
+  38 vues comparées (deux îles sous 4 angles, crêtes x1/x4/x10, cachette, ombres, vue ennemie, 15 vues de référence) :
+  au plus 0,06 % de pixels différents, des pixels isolés sur le bord des ombres et sur la ligne où l'eau touche la
+  plage (cadrage des ombres et ordre de dessin) ; rien sur les personnages. Planches : `docs/audit/perf/terrain_*.jpg`.
