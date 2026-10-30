@@ -22,10 +22,10 @@ const HIDE_TIME := 60.0
 const HIDE_FOV := 62.0
 const FIRE_FOV := CameraRigScript.ZOOM_FOV   # x1, x4, x10 (gérés par le CameraRig)
 const ZOOM_LABELS := ["x1", "x4", "x10"]
-const SKY := Color("#efd9c9")   # couleur de l'horizon (lever de soleil du panorama), reprise par le brouillard
+const SKY := Color("#dcb39c")   # brume chaude de l'heure dorée (horizon du ciel Higgsfield), reprise par le brouillard
 const FOG_NEAR := 200.0
 const FOG_FAR := 1100.0
-const ENEMY_VIEW := Vector3(0, 92, -125)   # d'où la petite lunette ennemie te regarde pendant la cachette
+var enemy_view := Vector3(0, 92, -125)   # d'où la petite lunette ennemie te regarde pendant la cachette (posée sur le relief au départ)
 
 var world
 var hud
@@ -206,14 +206,20 @@ func _build_environment() -> void:
 	sky_mat.shader = preload("res://shaders/sky.gdshader")
 	sky_mat.set_shader_parameter("panorama", preload("res://art/ciel.jpg"))
 	sky_mat.set_shader_parameter("clouds", preload("res://art/ciel_nuages.jpg"))
+	# Heure dorée (ciel Higgsfield) : haut du ciel bleu profond, nuages qui dérivent teintés par le couchant.
+	sky_mat.set_shader_parameter("top_color", Color("#1d3864"))
+	sky_mat.set_shader_parameter("horizon_color", SKY)
+	sky_mat.set_shader_parameter("cloud_color", Color("#ffd6b0"))
+	sky_mat.set_shader_parameter("cloud_shade", Color("#8a7a96"))
+	sky_mat.set_shader_parameter("cloud_lo", 0.22)
 	var sky := Sky.new()
 	sky.sky_material = sky_mat
 	env.background_mode = Environment.BG_SKY
 	env.sky = sky
 	# Ombres bleutées façon Wind Waker : la lumière ambiante colore le côté à l'ombre.
 	env.ambient_light_source = Environment.AMBIENT_SOURCE_COLOR
-	env.ambient_light_color = Color("#9fb4dc")
-	env.ambient_light_energy = 0.85
+	env.ambient_light_color = Color("#93a8d8")
+	env.ambient_light_energy = 0.8
 	env.tonemap_mode = Environment.TONE_MAPPER_FILMIC
 	env.tonemap_exposure = 1.12
 	env.tonemap_white = 6.0
@@ -233,8 +239,8 @@ func _build_environment() -> void:
 	we.environment = env
 	add_child(we)
 	var sun := DirectionalLight3D.new()
-	sun.light_color = Color("#fff3dc")
-	sun.light_energy = 0.42
+	sun.light_color = Color("#ffd9a6")   # soleil bas et doré
+	sun.light_energy = 0.5
 	sun.shadow_enabled = true
 	sun.shadow_bias = 0.05
 	# Ombres seulement autour de la caméra, en deux tranches : léger pour les téléphones.
@@ -242,7 +248,7 @@ func _build_environment() -> void:
 	sun.directional_shadow_max_distance = 90.0
 	sun.shadow_blur = 1.0
 	add_child(sun)
-	sun.look_at_from_position(Vector3(-0.8, 0.62, 0.15) * 100, Vector3.ZERO)
+	sun.look_at_from_position(Vector3(-0.85, 0.45, 0.25) * 100, Vector3.ZERO)   # 25° au-dessus de l'horizon : longues ombres
 
 func D() -> Dictionary:
 	return LEVELS[level]
@@ -464,7 +470,15 @@ func update_zone_info() -> void:
 		txt += "\n[color=#a3ada7]Bien caché… mais vois-tu encore l'île d'en face ? Maintiens le clic droit pour vérifier.[/color]"
 	hud.zone_info.text = txt
 
+## Premier point au sec (4 m au-dessus de l'eau) en partant de z vers le centre de l'île (dir = +1 : île du joueur).
+func _shore_start(z: float, dir: float) -> float:
+	while world.height_at(0.0, z) < WorldScript.WATER_Y + 4.0 and absf(z) < WorldScript.MZ:
+		z += 5.0 * dir
+	return z
+
 func start_hide() -> void:
+	var ez := _shore_start(-WorldScript.MZ + 105.0, -1.0) - 15.0
+	enemy_view = Vector3(0, world.height_at(0.0, ez) + 3.0, ez)
 	gid += 1
 	touch.set_mode("hide" if touch_mode else "")
 	phase = "hide"
@@ -484,7 +498,7 @@ func start_hide() -> void:
 	world.player.visible = true
 	world.enemy.visible = false
 	world.end_marker.visible = false
-	hider.reset(0.0, WorldScript.MZ - 105.0)
+	hider.reset(0.0, _shore_start(WorldScript.MZ - 105.0, 1.0))
 	hide_left = HIDE_TIME
 	hide_exposure = 1.0
 	expo_t = 0.0
@@ -916,8 +930,8 @@ func _process_hide(dt: float) -> void:
 		hide_exposure = exposure_from(hide_viewers())
 		update_zone_info()
 	var target: Vector3 = hider.pos + Vector3(0, hider.info().height * 0.5, 0)
-	inset_cam.position = ENEMY_VIEW
+	inset_cam.position = enemy_view
 	inset_cam.look_at(target)
-	inset_cam.fov = rad_to_deg(2 * atan(4.5 / ENEMY_VIEW.distance_to(target)))
+	inset_cam.fov = rad_to_deg(2 * atan(4.5 / enemy_view.distance_to(target)))
 	if Engine.get_process_frames() % 4 == 0:
 		hud.inset_viewport.render_target_update_mode = SubViewport.UPDATE_ONCE

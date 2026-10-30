@@ -27,6 +27,7 @@ void sky() {
 	float s = dot(d, normalize(LIGHT0_DIRECTION));
 	col = mix(col, vec3(1.0, 0.97, 0.85), smoothstep(0.9985, 0.9992, s));
 	col += vec3(1.0, 0.9, 0.7) * pow(max(s, 0.0), 60.0) * 0.25;
+	col += vec3(1.0, 0.68, 0.38) * pow(max(s, 0.0), 6.0) * 0.3;   // grand halo doré autour du soleil bas
 	// Nuages : la texture couvre la moitié haute du ciel (zénith en haut, horizon en bas) et tourne lentement.
 	if (d.y > 0.0) {
 		float v = acos(clamp(d.y, 0.0, 1.0)) / 1.5707963;

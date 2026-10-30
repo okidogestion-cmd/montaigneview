@@ -451,3 +451,22 @@ Le jeu devient une **appli mobile** (même jeu : cachette, peinture, duel), plus
 - Demande de l'utilisateur : les tours de tireur (une par île) et les rondins couchés en forêt, tirés de la scène
   Higgsfield, sont retirés du jeu (`_build_towers` et la pose des rondins supprimés de `world.gd`). Les fichiers
   `game/art/accessoires/` restent dans le dépôt (non utilisés). Comparaison avant/après : `docs/audit/pour_gpt/`.
+
+### Îles Higgsfield, heure dorée, feuillages (30/10/2026)
+- **Relief** : la forme des deux îles vient d'une carte de hauteurs générée par Higgsfield (`sources/higgsfield/relief_ile_*.png`,
+  crêtes, ravines et côtes de l'image). `python3 tools/relief.py relief.bin sources/higgsfield` puis `relief_vers_godot.gd`.
+  Réglages (`HF_*` en tête de `relief.py`) : grandes formes gardées, petites crêtes atténuées (`HF_DETAIL`), pied des montagnes
+  en pente (`HF_FOOT`), sommets à 125 m (`HF_PEAK`), crête principale reculée de 45 m derrière les cachettes (`HF_BACK`, sinon
+  elle cache la moitié de l'île). Seuils des zones relevés pour ces îles (même part de forêt et de roche), limite des arbres
+  relevée dans `world.gd` (forêt jusqu'à 140 m).
+- **Jouabilité mesurée** (avant → après) : lignes de vue entre îles 17,5 % → 17,2 % ; exposition debout 0,277 → 0,254 ;
+  endroits bien cachés 61,5 % → 65,2 % ; surface de couvert 21 900 → 24 900 m².
+- Départ du joueur et petite lunette ennemie posés sur le relief (`main._shore_start`) au lieu de positions fixes.
+- **Textures du sol** : 5 textures Higgsfield (`sources/higgsfield/textures/`) → `game/art/sol_*.jpg` et `relief_*.jpg`
+  par `python3 tools/textures_higgsfield.py` (raccordables, moyenne 0,5 : le camouflage ne change pas).
+- **Ciel et lumière** : ciel d'heure dorée Higgsfield (`art/ciel.jpg`, sans le disque du soleil), soleil bas (25°) et doré,
+  halo autour du soleil, nuages teintés, brume chaude.
+- **Feuillages** : planches Higgsfield découpées (`art/vege_*.png`) : grandes herbes, fleurs alpines (gentianes, edelweiss,
+  arnica), gazon ras sur l'herbe, fougères en forêt, bruyère entre les rochers (décor seulement, sans collision).
+- Essais non retenus : îles en 3D Meshy (maquettes rondes, détail trop faible à 870 m) ; faune Meshy en attente (bouquetin
+  et aigle réussis, chamois et pin nain ratés).

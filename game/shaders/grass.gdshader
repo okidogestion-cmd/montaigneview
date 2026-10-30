@@ -14,6 +14,7 @@ uniform vec3 cam_pos;
 uniform float wind = 0.12;
 uniform float density = 1.0;
 uniform int channel = 0;          // 0 : herbe, 1 : fleurs, 2 : cailloux, 3 : neige
+uniform vec2 mask_range = vec2(0.0, 2.0);   // ne pousse que là où le masque est dans cet intervalle (ex. forêt seule)
 uniform bool keep_normals = false;
 uniform vec4 tint : source_color = vec4(1.0);
 uniform sampler2D albedo_tex : source_color, filter_linear_mipmap, repeat_disable;
@@ -51,6 +52,7 @@ void vertex() {
 	float h = ground(origin.xz);
 	vec4 mk = texture(mask, uv);
 	float m = mk[channel];
+	m *= step(mask_range.x, m) * step(m, mask_range.y);
 	vec2 seed = fract(inst.xz * 0.0137 + k * vec2(0.3183, 0.6180));
 	float rnd = fract(sin(dot(seed, vec2(12.9898, 78.233))) * 43758.5453);
 	float d = length(origin.xz - cam_pos.xz);

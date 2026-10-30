@@ -665,12 +665,12 @@ func _scatter() -> void:
 					snow_rocks.append([x, h + 0.2, z, 0.8 + rng.randf() * 2.0, rot, 0.7])
 				continue
 			var slope := (absf(height_at(x + 2.0, z) - height_at(x - 2.0, z)) + absf(height_at(x, z + 2.0) - height_at(x, z - 2.0))) / 4.0
-			var treeline := 104.0 + fbm(x * 0.02, z * 0.02) * 30.0
+			var treeline := 140.0 + fbm(x * 0.02, z * 0.02) * 30.0   # îles Higgsfield : plus hautes, la forêt monte plus haut
 			var alt := clampf((h - WATER_Y) / (treeline - WATER_Y), 0.0, 1.3)
 			# Densité de forêt : grandes taches + bords irréguliers, selon la zone, la pente et l'altitude.
 			var dens := (fbm(x * 0.011 + 3.1, z * 0.011 - 7.3) + 0.47) * 0.8 + (fbm(x * 0.045 - 11.0, z * 0.045 + 5.0) + 0.47) * 0.25
 			dens += 0.42 if zn == "foret" else (-0.1 if zn == "herbe" else -0.5)
-			dens -= maxf(0.0, slope - 0.65) * 1.4
+			dens -= maxf(0.0, slope - 0.9) * 1.4
 			dens -= maxf(0.0, alt - 0.8) * 2.5
 			var canopy := smoothstep(0.42, 0.72, dens)
 			# Zone de jeu (où l'on se cache et d'où l'on tire) : autant de couvert qu'avant, pour ne pas changer la
@@ -917,6 +917,10 @@ func _grass() -> void:
 		# [forme, teinte, canal du masque, densité, touffes par m², vent, garder les normales, taille min, taille max, aplatissement]
 		[VEG.tuft(0.9, 0.55), Color("#f2f7e6"), 0, 1.0, 1.6, 0.12, false, 0.8, 1.4, 1.0, "vege_herbe.png"],
 		[VEG.tuft(0.8, 0.5), Color.WHITE, 1, 0.6, 0.07, 0.08, false, 0.9, 1.3, 1.0, "vege_fleurs.png"],
+		# Feuillages Higgsfield : gazon ras sur l'herbe, fougères en forêt, bruyère entre les rochers.
+		[VEG.tuft(0.9, 0.3), Color("#e8eedc"), 0, 1.0, 0.35, 0.06, false, 0.8, 1.3, 1.0, "vege_gazon.png", Vector2(0.75, 2.0)],
+		[VEG.tuft(1.1, 0.75), Color.WHITE, 0, 1.0, 0.18, 0.05, false, 0.8, 1.4, 1.0, "vege_fougere.png", Vector2(0.3, 0.65)],
+		[VEG.tuft(1.0, 0.55), Color.WHITE, 2, 0.5, 0.15, 0.04, false, 0.8, 1.3, 1.0, "vege_bruyere.png", Vector2(0.6, 2.0)],
 		[_pebble_mesh, Color("#4a4742"), 2, 1.0, 0.3, 0.0, true, 0.08, 0.36, 0.42],   # graviers sombres et plats, comme la roche
 		[_pebble_mesh, Color("#f4f8fc"), 3, 1.0, 0.12, 0.0, true, 0.3, 1.0, 0.35],
 	]
@@ -938,6 +942,8 @@ func _grass() -> void:
 		if f.size() > 10:
 			m.set_shader_parameter("albedo_tex", load("res://art/" + f[10]))
 			m.set_shader_parameter("use_tex", true)
+		if f.size() > 11:
+			m.set_shader_parameter("mask_range", f[11])
 		# Touffes réparties au hasard dans un carré autour de la caméra.
 		var count := int(4 * GRASS_RADIUS * GRASS_RADIUS * f[4])
 		var xforms := []
