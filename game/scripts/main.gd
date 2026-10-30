@@ -33,7 +33,7 @@ var life
 var touch
 var touch_mode := false   # téléphone / tablette (ou PC lancé avec -- --tactile)
 var rig            # CameraRig : propriétaire de la caméra
-var camera: Camera3D   # = rig.camera (pas A : encore placée par main.gd et hider.gd)
+var camera: Camera3D   # = rig.camera (cachette et tir : encore placée par main.gd et hider.gd)
 var inset_cam: Camera3D
 var env: Environment
 # Sons de tir : vrai Kar98k (sources/k98_pixabay.mp3, découpé par tools/sons_k98.sh) pour ton tir (avec la
@@ -72,15 +72,11 @@ var glinted := false
 var ai_reveal := 0.0
 var ai_next := 0.0
 var fx: Array = []
-var menu_t := 0.0
 # Atelier de peinture
 var brush_color := Color("#928e86")
 var brush_size := 1
 var brush_tool := "pinceau"
 var ws_pose := "debout"
-var ws_yaw := PI
-var ws_pitch := 0.15
-var ws_dist := 3.2
 var painting := false
 var orbiting := false
 var _fingers := {}          # doigts posés pendant la peinture (index → position)
@@ -293,10 +289,7 @@ func to_menu() -> void:
 	world.player.visible = false
 	world.enemy.visible = false
 	world.end_marker.visible = false
-	camera.position = Vector3(330, 110, 40)
-	aim_at(camera.position, Vector3(0, 55, 0))
-	base_yaw = yaw
-	set_fov(55)
+	rig.enter_menu(Vector3(330, 110, 40), Vector3(0, 55, 0), 55)
 	set_fog(FOG_NEAR, FOG_FAR)
 	hud.center_label.text = ""
 
@@ -323,11 +316,9 @@ func start_paint() -> void:
 	# On peint sur place, dans la cachette et la posture choisies : le terrain autour sert de modèle.
 	ws_pose = hider.stance
 	world.set_stance(world.player, ws_pose)
-	ws_yaw = hider.facing + 0.6   # de trois quarts face
-	ws_pitch = 0.6 if ws_pose == "couche" else 0.15
-	ws_dist = 3.2
 	hud.toast("Choisis la tenue de camouflage qui ressemble au terrain de ta cachette." if not PAINT_MODE else "Peins-toi aux couleurs du terrain autour de ta cachette.", 3.5)
-	set_fov(50)
+	# Caméra de l'atelier : de trois quarts face, plus haute si couché.
+	rig.enter_workshop(_workshop_center(), hider.facing + 0.6, 0.6 if ws_pose == "couche" else 0.15, 3.2, 50)
 	set_fog(FOG_NEAR, FOG_FAR)
 	matches_dirty = true
 	_paint_state()
@@ -358,12 +349,12 @@ func camo_match(zone: String) -> float:
 func _on_paint_pose(p: String) -> void:
 	ws_pose = p
 	hider.set_stance(p)
+	rig.set_orbit_center(_workshop_center())
 	_paint_state()
 
-func _place_workshop_camera() -> void:
-	var center: Vector3 = hider.pos + Vector3(0, {"debout": 1.0, "accroupi": 0.7, "couche": 0.3}[ws_pose], 0)
-	camera.position = center + Vector3(sin(ws_yaw) * cos(ws_pitch), sin(ws_pitch), cos(ws_yaw) * cos(ws_pitch)) * ws_dist
-	camera.look_at(center)
+## Le point que la caméra de l'atelier regarde : le sniper, à la hauteur de sa posture.
+func _workshop_center() -> Vector3:
+	return hider.pos + Vector3(0, {"debout": 1.0, "accroupi": 0.7, "couche": 0.3}[ws_pose], 0)
 
 func _paint_at(screen: Vector2, stroke: bool) -> void:
 	var hit: Dictionary = world.pick_part(world.player, camera.project_ray_origin(screen), camera.project_ray_normal(screen))
@@ -417,12 +408,10 @@ func _paint_touch(e: InputEvent) -> void:
 			var pts: Array = _fingers.values()
 			var d: float = (pts[0] as Vector2).distance_to(pts[1])
 			if _pinch > 0.0:
-				ws_dist = clampf(ws_dist * _pinch / maxf(d, 1.0), 1.4, 6.0)
+				rig.orbit_pinch(_pinch, d)
 			_pinch = d
 		else:
-			var rel: Vector2 = e.position - before
-			ws_yaw -= rel.x * 0.008
-			ws_pitch = clampf(ws_pitch + rel.y * 0.006, -0.3, 1.2)
+			rig.orbit(e.position - before)
 
 func _paint_input(e: InputEvent) -> void:
 	if touch_mode:
@@ -445,13 +434,12 @@ func _paint_input(e: InputEvent) -> void:
 		elif e.button_index == MOUSE_BUTTON_RIGHT:
 			orbiting = e.pressed
 		elif e.pressed and e.button_index == MOUSE_BUTTON_WHEEL_UP:
-			ws_dist = maxf(1.4, ws_dist - 0.25)
+			rig.orbit_wheel(-1)
 		elif e.pressed and e.button_index == MOUSE_BUTTON_WHEEL_DOWN:
-			ws_dist = minf(6.0, ws_dist + 0.25)
+			rig.orbit_wheel(1)
 	elif e is InputEventMouseMotion:
 		if orbiting:
-			ws_yaw -= e.relative.x * 0.008
-			ws_pitch = clampf(ws_pitch + e.relative.y * 0.006, -0.3, 1.2)
+			rig.orbit(e.relative)
 		if PAINT_MODE:
 			_paint_at(e.position, painting)
 
@@ -478,6 +466,7 @@ func start_hide() -> void:
 	gid += 1
 	touch.set_mode("hide" if touch_mode else "")
 	phase = "hide"
+	rig.release()
 	world.set_near_fade(5.0)   # vue à la 3e personne : les arbres entre la caméra et le sniper s'effacent
 	capture_mouse()
 	hud.menu.visible = false
@@ -543,6 +532,7 @@ func start_fire() -> void:
 	gid += 1
 	touch.set_mode("fire" if touch_mode else "")
 	phase = "reveal"
+	rig.release()
 	# Vue de tir : les arbres et buissons proches s'effacent (rayon de 35 m), ils ne bouchent pas la lunette.
 	world.set_near_fade(35.0)
 	reveal_t = 0.0
@@ -817,10 +807,7 @@ func _process(dt: float) -> void:
 	dt = minf(dt, 0.05)
 	var sx := 0.0
 	var sy := 0.0
-	if phase == "menu":
-		menu_t += dt
-		yaw = base_yaw + sin(menu_t / 9.0) * 0.18
-	elif phase == "hide":
+	if phase == "hide":
 		_process_hide(dt)
 	elif phase == "reveal":
 		reveal_t += dt
@@ -875,13 +862,15 @@ func _process(dt: float) -> void:
 	if phase != "reveal":
 		hud.set_fog_amount(0)
 	if phase == "paint":
-		_place_workshop_camera()
+		rig.update(dt)
 		if matches_dirty and not painting:
 			matches_dirty = false
 			var scores := {}
 			for k in WorldScript.ZONE_KEYS:
 				scores[k] = camo_match(k)
 			hud.set_matches(scores)
+	elif phase == "menu":
+		rig.update(dt)
 	elif phase != "hide":
 		if touch_mode and phase in ["fire", "reveal"]:
 			_look(touch.consume_look())

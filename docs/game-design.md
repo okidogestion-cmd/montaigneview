@@ -370,3 +370,12 @@ Le jeu devient une **appli mobile** (même jeu : cachette, peinture, duel), plus
 - Tests : `tools/tests/test_camera.gd` (toutes les phases, 46 vérifications) et `tools/tests/captures_camera.gd`
   (6 vues à hasard fixé : deux versions identiques donnent les mêmes pixels). Les deux demandent un affichage (xvfb),
   pas `--headless` (le jeu attend la première image avant de construire l'archipel).
+
+### CameraRig, pas B (30/10/2026)
+- Le rig pilote maintenant la caméra du **menu** (vue de la vallée, lent va-et-vient) et de l'**atelier** (orbite autour
+  du sniper : glisser à la souris ou au doigt, molette, pincer ; 1,4 à 6 m ; hauteur selon la posture).
+  `camera_rig.gd` : modes `MENU`, `WORKSHOP`, et `EXTERNAL` (cachette et tir, encore placés par `hider.gd` et `main.gd`).
+- `main.gd` garde la lecture des entrées (quel bouton, quel doigt, panneau touché) et appelle `rig.orbit()`,
+  `rig.orbit_wheel()`, `rig.orbit_pinch()` ; `_workshop_center()` donne le point regardé.
+- Vérifié : trace chiffrée de la caméra image par image identique avant/après (`tools/tests/trace_camera.gd`),
+  11 captures identiques au pixel près, 70 vérifications automatiques, version web dans Chromium.

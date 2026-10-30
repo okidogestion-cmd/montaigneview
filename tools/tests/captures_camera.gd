@@ -20,6 +20,13 @@ func _run() -> void:
 	await _wait(120)
 	main.life._particles.visible = false   # pollen en particules GPU : jamais deux fois pareil
 	await _shot("menu")
+	# La vue 3D du menu, sans l'interface qui la recouvre, puis 5 s plus tard (balayage lent de la vallée).
+	main.hud.menu.visible = false
+	await _wait(2)
+	await _shot("menu_vue_3d")
+	await _wait(300)
+	await _shot("menu_vue_3d_5s")
+	main.hud.menu.visible = true
 	main.start_hide()
 	await _wait(40)
 	await _shot("cachette_3e_personne")
@@ -38,6 +45,27 @@ func _run() -> void:
 	main._on_ghillie(true)
 	await _wait(20)
 	await _shot("atelier_camouflage")
+	# Orbite à la souris (clic gauche maintenu), molette, puis au doigt (glisser, pincer), puis posture couchée.
+	_click(MOUSE_BUTTON_LEFT, true)
+	_motion(Vector2(-140, 60))
+	_click(MOUSE_BUTTON_LEFT, false)
+	for i in 3:
+		_click(MOUSE_BUTTON_WHEEL_UP, true)
+	await _wait(5)
+	await _shot("atelier_orbite_souris")
+	var mid := Vector2(root.get_viewport().get_visible_rect().size) * Vector2(0.55, 0.5)
+	_touch(0, mid, true)
+	_drag(0, mid + Vector2(90, -40))
+	_touch(1, mid + Vector2(200, 0), true)
+	_drag(1, mid + Vector2(260, 0))
+	_drag(1, mid + Vector2(320, 0))
+	_touch(1, mid, false)
+	_touch(0, mid, false)
+	await _wait(5)
+	await _shot("atelier_orbite_doigt")
+	main._on_paint_pose("couche")
+	await _wait(10)
+	await _shot("atelier_couche")
 	seed(7)
 	main.start_fire()
 	main.reveal_t = 3.0
@@ -52,6 +80,31 @@ func _run() -> void:
 	await _wait(20)
 	await _shot("lunette_x10")
 	quit()
+
+## Entrées de l'atelier envoyées comme le ferait le moteur (mêmes fonctions avant et après le pas B).
+func _click(button: int, pressed: bool) -> void:
+	var e := InputEventMouseButton.new()
+	e.button_index = button
+	e.pressed = pressed
+	main._paint_input(e)
+
+func _motion(rel: Vector2) -> void:
+	var e := InputEventMouseMotion.new()
+	e.relative = rel
+	main._paint_input(e)
+
+func _touch(i: int, p: Vector2, pressed: bool) -> void:
+	var e := InputEventScreenTouch.new()
+	e.index = i
+	e.position = p
+	e.pressed = pressed
+	main._paint_touch(e)
+
+func _drag(i: int, p: Vector2) -> void:
+	var e := InputEventScreenDrag.new()
+	e.index = i
+	e.position = p
+	main._paint_touch(e)
 
 func _wait(n: int) -> void:
 	for i in n:
