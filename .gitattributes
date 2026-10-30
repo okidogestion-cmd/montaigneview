@@ -43,3 +43,4 @@ game/art/accessoires/* -filter -diff -merge binary
 game/art/*.wav -filter -diff -merge binary
 game/art/*.ogg -filter -diff -merge binary
 sources/*.mp3 -filter -diff -merge binary
+docs/audit/** -filter -diff -merge binary
