@@ -446,3 +446,8 @@ Le jeu devient une **appli mobile** (même jeu : cachette, peinture, duel), plus
 - Coût mesuré : triangles +2 à +9 %, appels de dessin +1 à +8 % (chaque zone de 175 m n'utilise que 2 ou 3 modèles
   d'arbres et 1 ou 2 formes de rocher) ; construction du monde 0,7–0,9 s → 1,2 s (sur ordinateur).
 - Planches avant/après : `docs/audit/foret/`.
+
+### Tours et rondins retirés (30/10/2026)
+- Demande de l'utilisateur : les tours de tireur (une par île) et les rondins couchés en forêt, tirés de la scène
+  Higgsfield, sont retirés du jeu (`_build_towers` et la pose des rondins supprimés de `world.gd`). Les fichiers
+  `game/art/accessoires/` restent dans le dépôt (non utilisés). Comparaison avant/après : `docs/audit/pour_gpt/`.

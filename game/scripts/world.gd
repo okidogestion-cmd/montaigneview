@@ -335,7 +335,6 @@ func build() -> void:
 	_build_water()
 	enemy_spots = _build_spots(-MZ, 1)
 	player_spots = _build_spots(MZ, -1)
-	_build_towers()
 	_scatter()
 	_grass()
 	player = _make_figure()
@@ -611,41 +610,6 @@ func _build_spots(cz: float, facing: int) -> Array:
 			})
 	return list
 
-## Une tour de tireur (plateforme sur pilotis, échelle, filet de camouflage) par île, sur le versant qui fait
-## face à l'autre île, à l'endroit le plus plat : un poste bien visible, donc risqué.
-func _build_towers() -> void:
-	for isl in [[-MZ, 1], [MZ, -1]]:
-		var cz: float = isl[0]
-		var facing: int = isl[1]
-		var best := Vector3.ZERO
-		var best_score := INF
-		for rad in range(70, 160, 10):
-			for a in range(-60, 61, 10):
-				var ang := deg_to_rad(a)
-				var x := sin(ang) * rad * 1.2
-				var z := cz + facing * cos(ang) * rad
-				var h := height_at(x, z)
-				if h < WATER_Y + 6.0 or _near_spot(x, z, 400.0):
-					continue
-				var bump := 0.0
-				for d in [Vector2(2, 0), Vector2(-2, 0), Vector2(0, 2), Vector2(0, -2)]:
-					bump = maxf(bump, absf(height_at(x + d.x, z + d.y) - h))
-				if bump < best_score:
-					best_score = bump
-					best = Vector3(x, h, z)
-		var t := Node3D.new()
-		t.position = best - Vector3(0, 0.15, 0)
-		t.rotation.y = 0.0 if facing > 0 else PI
-		add_child(t)
-		_part(t, prop("tour"), null, Vector3.ZERO, Vector3.ONE)
-		var body := StaticBody3D.new()
-		t.add_child(body)
-		_box(body, Vector3(0, 2.0, 0), Vector3(3.0, 0.25, 2.5))
-		_box(body, Vector3(0, 3.4, 0), Vector3(3.2, 0.1, 2.6))
-		for lx in [-1.35, 1.35]:
-			for lz in [-1.1, 1.1]:
-				_box(body, Vector3(lx, 1.0, lz), Vector3(0.18, 2.0, 0.18))
-
 func _near_spot(x: float, z: float, r2: float) -> bool:
 	for s in enemy_spots + player_spots:
 		if (s.x - x) ** 2 + (s.z - z) ** 2 < r2:
@@ -672,7 +636,6 @@ func _scatter() -> void:
 	var rocks := []     # [x, y, z, échelle, rotation, aplatissement, forme, couleur]
 	var scree := []     # petits cailloux d'éboulis : décor
 	var snow_rocks := []
-	var logs := []
 	var beach := [[], []]
 	var taken := {}     # grille de 4 m : arbres déjà posés (espacement)
 	var step := 4.6
@@ -768,9 +731,6 @@ func _scatter() -> void:
 			if zn == "roche" and slope > 0.75 and r2 < 0.025:
 				scree.append([x, h + 0.05, z, 0.25 + rng.randf() * 0.45, rot, 0.55, _rock_region(x, z), _rock_tint(x, z)])
 				continue
-			# Troncs couchés en forêt.
-			if canopy > 0.55 and r2 < 0.004:
-				logs.append([x, h - 0.1, z, 0.8 + rng.randf() * 0.6, rot, 1.0])
 	var body := StaticBody3D.new()
 	add_child(body)
 	var leafy := StaticBody3D.new()   # arbres et buissons : traversés par les balles quand ils sont effacés
@@ -787,7 +747,6 @@ func _scatter() -> void:
 		_collide(big, body, "rock")
 		_inst(_rock_variants[i], toon(Color.WHITE, true, true, 0.0, 7.0, "roche"), big + small, null, "rock")
 	_inst(_rock_mesh, toon(Color("#e3eaf2"), false, true, 0.0, 7.0, "neige"), snow_rocks, body, "rock")
-	_inst(prop("rondin"), null, logs, body, "rondin")
 	_inst(_rock_mesh, toon(Color("#b8ad98"), false, false, 0.0, 7.0, "roche"), beach[0], body, "pebble")
 	_inst(_log_mesh, toon(Color.WHITE, true, true), beach[1], body, "log")
 	print("décor : %d arbres, %d feuillus, %d buissons hauts, %d buissons bas, %d rochers, %d cailloux d'éboulis, plage %d + %d" % [
