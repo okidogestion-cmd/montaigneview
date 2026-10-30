@@ -406,3 +406,6 @@ Le jeu devient une **appli mobile** (même jeu : cachette, peinture, duel), plus
 - Mesuré (vue de tir vers l'île d'en face) : 1 212 000 → 890 000 triangles (−27 %) ; vue sur la végétation proche :
   1 037 000 → 715 000. Essai à 96 triangles écarté : facettes visibles à 2 m dans l'atelier.
 - Comparaison avant/après : `docs/audit/perf/cailloux_*.png` (à gauche avant, à droite après).
+- Choix définitif (30/10/2026) : 160 triangles. Comparé à 280 et 96 sur 14 vues (atelier à 3 m et 1,4 m,
+  cachette sous 6 angles, marche, tir) : 96 gagnerait encore ≈ 170 000 triangles mais les cailloux deviennent
+  anguleux de près et l'écart avec l'original est 1,5 fois plus grand partout. Planches : `cailloux_280_160_96_*.png`.
