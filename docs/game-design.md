@@ -398,3 +398,11 @@ Le jeu devient une **appli mobile** (même jeu : cachette, peinture, duel), plus
   saccades (images de plus de 20 ms), le temps de process, le temps de rendu CPU/GPU (GPU : « n/d » si le navigateur
   ne le donne pas), les appels de dessin et les triangles. Sans ce mot, `main.gd` ne crée pas le compteur : aucun coût.
 - `scripts/perf_overlay.gd` ; test : `tools/tests/test_perf.gd` (présent avec `--perf`, absent sans).
+
+### Cailloux du champ d'herbe allégés (30/10/2026)
+- Les ≈ 2 700 cailloux gris et mottes de neige du champ d'herbe (dessinés à chaque image) utilisent `_pebble_mesh` :
+  même bruit et même forme que les rochers (`_rock_shape`), sphère de départ 10 × 7 au lieu de 14 × 9,
+  soit 160 triangles au lieu de 280. Mêmes places, mêmes tailles ; les rochers du décor ne changent pas.
+- Mesuré (vue de tir vers l'île d'en face) : 1 212 000 → 890 000 triangles (−27 %) ; vue sur la végétation proche :
+  1 037 000 → 715 000. Essai à 96 triangles écarté : facettes visibles à 2 m dans l'atelier.
+- Comparaison avant/après : `docs/audit/perf/cailloux_*.png` (à gauche avant, à droite après).

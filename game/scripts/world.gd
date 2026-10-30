@@ -39,6 +39,7 @@ var _grass_mask := PackedByteArray()
 var _grass_fields: Array[MultiMeshInstance3D] = []
 var _outline: ShaderMaterial
 var _rock_mesh: Mesh
+var _pebble_mesh: Mesh   # même forme que _rock_mesh, moins de facettes : les milliers de cailloux du champ d'herbe
 var _log_mesh: Mesh
 var _foliage_mats: Array[ShaderMaterial] = []   # feuillage et écorce : effacés près de la caméra
 var near_fade := 0.0                            # rayon actuel de cet effacement (m)
@@ -177,11 +178,9 @@ func _merge(parts: Array, flat := false) -> ArrayMesh:
 func _at(pos: Vector3, scl := Vector3.ONE, rot_y := 0.0) -> Transform3D:
 	return Transform3D(Basis(Vector3.UP, rot_y).scaled(scl), pos)
 
-func _build_meshes() -> void:
-	# Rocher : sphère déformée par un bruit à plusieurs échelles (bloc arrondi, arêtes et méplats),
-	# normales douces : la texture de roche fait le détail.
-	var rock := _sphere(1.0, 14, 9)
-	var ra := rock.get_mesh_arrays()
+## Rocher : la sphère donnée, déformée par le bruit du rocher (dessous aplati), normales douces.
+func _rock_shape(sphere: SphereMesh) -> Mesh:
+	var ra := sphere.get_mesh_arrays()
 	var rv: PackedVector3Array = ra[Mesh.ARRAY_VERTEX]
 	for i in rv.size():
 		var p := rv[i]
@@ -195,7 +194,15 @@ func _build_meshes() -> void:
 	var st := SurfaceTool.new()
 	st.create_from(rmesh, 0)
 	st.generate_normals()
-	_rock_mesh = st.commit()
+	return st.commit()
+
+func _build_meshes() -> void:
+	# Rocher : sphère déformée par un bruit à plusieurs échelles (bloc arrondi, arêtes et méplats),
+	# normales douces : la texture de roche fait le détail.
+	_rock_mesh = _rock_shape(_sphere(1.0, 14, 9))   # 280 triangles
+	# Cailloux et mottes de neige du champ d'herbe (≈ 2 700, vus jusqu'à 2 m à l'atelier) : même bruit, même forme,
+	# sphère de départ plus grossière : 160 triangles au lieu de 280, le contour reste rond.
+	_pebble_mesh = _rock_shape(_sphere(1.0, 10, 7))
 	# Arbres et buissons photo (art/arbres/) : plusieurs modèles par sorte, mélangés dans le décor.
 	for kind in PACK_TREES:
 		var meshes: Array[Mesh] = []
@@ -719,8 +726,8 @@ func _grass() -> void:
 		# [forme, teinte, canal du masque, densité, touffes par m², vent, garder les normales, taille min, taille max, aplatissement]
 		[VEG.tuft(0.9, 0.55), Color("#f2f7e6"), 0, 1.0, 1.6, 0.12, false, 0.8, 1.4, 1.0, "vege_herbe.png"],
 		[VEG.tuft(0.8, 0.5), Color.WHITE, 1, 0.6, 0.07, 0.08, false, 0.9, 1.3, 1.0, "vege_fleurs.png"],
-		[_rock_mesh, Color("#6f6b64"), 2, 1.0, 0.3, 0.0, true, 0.1, 0.45, 0.6],
-		[_rock_mesh, Color("#f4f8fc"), 3, 1.0, 0.12, 0.0, true, 0.3, 1.0, 0.35],
+		[_pebble_mesh, Color("#6f6b64"), 2, 1.0, 0.3, 0.0, true, 0.1, 0.45, 0.6],
+		[_pebble_mesh, Color("#f4f8fc"), 3, 1.0, 0.12, 0.0, true, 0.3, 1.0, 0.35],
 	]
 	for f in fields:
 		var m := ShaderMaterial.new()
