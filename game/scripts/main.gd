@@ -19,7 +19,8 @@ const LEVELS := {
 }
 const AMMO := 5
 const HIDE_TIME := 60.0
-const HIDE_FOV := 62.0
+const HIDE_FOV := 70.0           # angle de vue de la cachette (plus large qu'avant : 62)
+const RUN_FOV_KICK := 9.0        # en courant, l'angle s'élargit encore (sensation de vitesse)
 const FIRE_FOV := CameraRigScript.ZOOM_FOV   # x1, x4, x10 (gérés par le CameraRig)
 const ZOOM_LABELS := ["x1", "x4", "x10"]
 const SKY := Color("#dcb39c")   # brume chaude de l'heure dorée (horizon du ciel Higgsfield), reprise par le brouillard
@@ -43,6 +44,7 @@ var env: Environment
 const SON_TIR := preload("res://art/son_tir.ogg")
 const SON_LOIN := preload("res://art/son_loin.ogg")
 const SON_IMPACT := preload("res://art/son_impact.wav")
+const SON_SOUFFLE := preload("res://art/son_souffle.wav")   # respiration du tireur (synthétisée, boucle de 4,6 s)
 
 var level := "normal"
 var phase := "menu"
@@ -62,6 +64,7 @@ var fight_time := 0.0
 var breath := 100.0
 var breath_held := false
 var gasp := 0.0
+var _breath_player: AudioStreamPlayer
 var scope_time := 0.0
 var glint_warned := false
 var glinted := false
@@ -279,6 +282,30 @@ func bang(stream: AudioStream, vol: float, delay := 0.0) -> void:
 	p.play()
 
 
+# ---------- Respiration du tireur ----------
+## Souffle en boucle quand on vise (lunette ou clic droit) ; s'étouffe quand on retient son souffle,
+## devient plus rapide et plus fort quand on est à bout de souffle.
+func _breath_sound(dt: float, want: bool, gasping: bool) -> void:
+	if _breath_player == null:
+		if not want:
+			return
+		var st: AudioStreamWAV = SON_SOUFFLE
+		st.loop_mode = AudioStreamWAV.LOOP_FORWARD
+		st.loop_begin = 0
+		st.loop_end = st.data.size() / 2
+		_breath_player = AudioStreamPlayer.new()
+		_breath_player.stream = st
+		_breath_player.volume_db = -50.0
+		add_child(_breath_player)
+	var target := (-1.0 if gasping else -8.0) if want else -50.0
+	_breath_player.volume_db = move_toward(_breath_player.volume_db, target, dt * (60.0 if not want else 30.0))
+	_breath_player.pitch_scale = move_toward(_breath_player.pitch_scale, 1.45 if gasping else 1.0, dt * 2.0)
+	if _breath_player.volume_db > -45.0 and not _breath_player.playing:
+		_breath_player.play()
+	elif _breath_player.volume_db <= -49.0 and _breath_player.playing:
+		_breath_player.stop()
+
+
 # ---------- Menu ----------
 func to_menu() -> void:
 	gid += 1
@@ -476,6 +503,37 @@ func _shore_start(z: float, dir: float) -> float:
 		z += 5.0 * dir
 	return z
 
+## Départ en hauteur : premier point à 70 m au-dessus de la mer en montant vers la crête, puis un endroit dégagé
+## alentour (aucun arbre ni rocher à moins de 2 m, vue libre sur 60 m vers l'île d'en face). Le joueur redescend
+## ensuite chercher sa cachette.
+func _high_start() -> Vector2:
+	var z := WorldScript.MZ - 105.0
+	while world.height_at(0.0, z) < WorldScript.WATER_Y + 70.0 and z < WorldScript.MZ + 40.0:
+		z += 5.0
+	var space: PhysicsDirectSpaceState3D = world.get_world_3d().direct_space_state
+	var q := PhysicsShapeQueryParameters3D.new()
+	var ball := SphereShape3D.new()
+	ball.radius = 2.0
+	q.shape = ball
+	q.collision_mask = 1
+	var best := Vector2(0.0, z)
+	var found_free := false
+	for i in 49:
+		var x := float(i % 7 - 3) * 5.0
+		var zz := z - float(i / 7) * 5.0
+		var h: float = world.height_at(x, zz)
+		q.transform = Transform3D(Basis(), Vector3(x, h + 3.2, zz))
+		if not space.intersect_shape(q, 1).is_empty():
+			continue
+		if not found_free:
+			best = Vector2(x, zz)
+			found_free = true
+		var eye := Vector3(x, h + 1.6, zz)
+		var ray := PhysicsRayQueryParameters3D.create(eye, eye + Vector3(0, 0, -60), 1)
+		if space.intersect_ray(ray).is_empty():
+			return Vector2(x, zz)
+	return best
+
 func start_hide() -> void:
 	var ez := _shore_start(-WorldScript.MZ + 105.0, -1.0) - 15.0
 	enemy_view = Vector3(0, world.height_at(0.0, ez) + 3.0, ez)
@@ -498,7 +556,8 @@ func start_hide() -> void:
 	world.player.visible = true
 	world.enemy.visible = false
 	world.end_marker.visible = false
-	hider.reset(0.0, _shore_start(WorldScript.MZ - 105.0, 1.0) + 20.0)   # un peu au-dessus du rivage
+	var st := _high_start()
+	hider.reset(st.x, st.y)
 	hide_left = HIDE_TIME
 	hide_exposure = 1.0
 	expo_t = 0.0
@@ -843,6 +902,7 @@ func _process(dt: float) -> void:
 		if gasp > 0:
 			gasp -= dt
 		hud.breath_bar.value = breath
+		_breath_sound(dt, rig.zoom_level > 0 and not holding, gasp > 0)
 		rig.sway(dt, holding, gasp > 0)
 		scope_time = scope_time + dt if rig.zoom_level == 2 else 0.0
 		var glint := scope_time > 5
@@ -860,6 +920,8 @@ func _process(dt: float) -> void:
 			ai_shoot()
 	if phase != "reveal":
 		hud.set_fog_amount(0)
+	if phase != "fire" and phase != "hide":
+		_breath_sound(dt, false, false)
 	if phase == "paint":
 		rig.update(dt)
 		if matches_dirty and not painting:
@@ -917,11 +979,12 @@ func _process_hide(dt: float) -> void:
 	var preview: bool = Input.is_mouse_button_pressed(MOUSE_BUTTON_RIGHT) or (touch_mode and touch.held("viser"))
 	world.player.visible = not preview
 	hud.dot.visible = preview
+	_breath_sound(dt, preview, false)
 	if preview:
 		set_fov(FIRE_FOV[0])
 		hider.first_person(camera)
 	else:
-		set_fov(HIDE_FOV)
+		set_fov(HIDE_FOV + RUN_FOV_KICK * hider.run_amt)
 		hider.place_camera(camera, dt)
 	# Ce que voit l'ennemi : recalculé quatre fois par seconde.
 	expo_t -= dt

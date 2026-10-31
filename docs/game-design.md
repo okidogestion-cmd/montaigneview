@@ -470,3 +470,16 @@ Le jeu devient une **appli mobile** (même jeu : cachette, peinture, duel), plus
   arnica), gazon ras sur l'herbe, fougères en forêt, bruyère entre les rochers (décor seulement, sans collision).
 - Essais non retenus : îles en 3D Meshy (maquettes rondes, détail trop faible à 870 m) ; faune Meshy en attente (bouquetin
   et aigle réussis, chamois et pin nain ratés).
+
+### Viseur de sniper, souffle, caméra embarquée, départ en hauteur (31/10/2026)
+- **Viseur** (`SCOPE_SHADER` dans `hud.gd`) : verre rond cerné d'un épais tube noir, bords du verre assombris, réticule fin
+  avec gros traits à gauche, à droite et en bas, points de repère (mil-dots) autour du centre, point rouge central.
+  Le x1 garde sa petite croix.
+- **Respiration** : `art/son_souffle.wav` (synthétisée par code, aucun crédit ; boucle de 4,6 s, inspiration puis expiration).
+  Elle joue quand on vise (lunette x4 / x10, ou clic droit pendant la cachette), s'étouffe quand on retient son souffle,
+  devient plus rapide et plus forte à bout de souffle (`main._breath_sound`).
+- **Angle de vue** : cachette 62° → 70° (`HIDE_FOV`), +9° en courant (`RUN_FOV_KICK`, progressif).
+- **Caméra embarquée** (`hider._apply_bob`) : en marchant et en courant, la caméra rebondit à chaque pas, penche et plonge
+  un peu ; plus fort en courant ; nul à l'arrêt.
+- **Départ en hauteur** (`main._high_start`) : 70 m au-dessus de la mer, sur un endroit dégagé avec vue libre vers l'île
+  d'en face ; le joueur redescend chercher sa cachette.

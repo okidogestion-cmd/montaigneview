@@ -30,6 +30,9 @@ var _cam_h := 1.65
 var _first_frame := true
 var _prev_pos := Vector3.ZERO   # position à l'image physique précédente (pour lisser l'affichage)
 var _vis := Vector3.ZERO        # position affichée, lissée
+var run_amt := 0.0              # 0 à l'arrêt ou en marche, 1 en pleine course : élargit l'angle de vue
+var _bob_t := 0.0               # cycle de foulée (une foulée = gauche + droite)
+var _bob_amp := 0.0             # intensité du balancement de la caméra embarquée (0 à l'arrêt)
 
 
 func _init(w) -> void:
@@ -152,6 +155,10 @@ func update_visual(dt: float) -> void:
 	_vis = Vector3(d.x, lerpf(_vis.y, d.y, 1.0 - exp(-dt * 22.0)) if not _first_frame else d.y, d.z)
 	_apply()
 	world.animate_figure(world.player, stance, ground_speed())
+	var spd := ground_speed()
+	run_amt = move_toward(run_amt, 1.0 if spd > 5.5 else 0.0, dt * 3.0)
+	_bob_amp = move_toward(_bob_amp, clampf(spd / RUN_SPEED, 0.0, 1.0), dt * 5.0)
+	_bob_t += dt * lerpf(5.7, 8.8, run_amt)   # marche ≈ 1,8 pas/s, course ≈ 2,8 pas/s
 
 func eye() -> Vector3:
 	return pos + Vector3(0, info().eye, 0) + forward() * 0.3
@@ -184,7 +191,18 @@ func place_camera(cam: Camera3D, dt: float) -> void:
 	_first_frame = false
 	cam.position = _cam_pos
 	cam.basis = rot
+	_apply_bob(cam, 1.0)
+
+## Caméra embarquée : en marchant ou en courant, la caméra rebondit à chaque pas, penche et plonge un peu
+## (nul à l'arrêt). k : part de l'effet (1 en 3e personne, moins à l'œil).
+func _apply_bob(cam: Camera3D, k: float) -> void:
+	if _bob_amp <= 0.0:
+		return
+	var a := _bob_amp * (1.0 + 0.8 * run_amt) * k
+	cam.position += cam.basis.y * cos(_bob_t * 2.0) * 0.045 * a + cam.basis.x * sin(_bob_t) * 0.035 * a
+	cam.basis = cam.basis * Basis.from_euler(Vector3(cos(_bob_t * 2.0) * 0.014 * a, 0.0, sin(_bob_t) * 0.025 * a))
 
 func first_person(cam: Camera3D) -> void:
 	cam.position = eye()
 	cam.rotation = Vector3(cam_pitch, cam_yaw, 0)
+	_apply_bob(cam, 0.6)

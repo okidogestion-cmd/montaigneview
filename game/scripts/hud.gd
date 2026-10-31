@@ -31,21 +31,38 @@ const OK := Color("#86d394")
 
 const SCOPE_SHADER := """
 shader_type canvas_item;
+// Lunette de sniper : verre rond cerné d'un épais tube noir, bords du verre assombris, réticule fin
+// avec gros traits à l'extérieur (gauche, droite, bas) et points de repère (mil-dots) autour du centre.
 uniform float glint = 0.0;
 void fragment() {
 	vec2 size = 1.0 / SCREEN_PIXEL_SIZE;
 	vec2 p = (UV - 0.5) * size;
-	float r = min(size.x * 0.46, size.y * 0.40);
+	float r = min(size.x * 0.46, size.y * 0.43);
 	float d = length(p);
-	float outside = smoothstep(r - 3.0, r, d);
+	float ax = abs(p.x);
+	float ay = abs(p.y);
+	float u = max(1.0, r / 420.0);                         // épaisseur d'un trait fin
+	float vig = smoothstep(r * 0.62, r, d) * 0.78;        // verre assombri vers le bord
+	vec4 col = vec4(0.0, 0.0, 0.0, vig);
 	float hair = 0.0;
-	if (abs(p.y) < 0.9 && abs(p.x) > r * 0.08 && abs(p.x) < r) hair = 0.85;
-	if (abs(p.x) < 0.9 && abs(p.y) > r * 0.08 && abs(p.y) < r) hair = 0.85;
-	vec4 col = vec4(0.04, 0.04, 0.04, hair);
-	if (d < 2.2) col = vec4(0.94, 0.31, 0.31, 1.0);
+	float gap = r * 0.035;
+	if (ay < u * 0.7 && ax > gap && ax < r) hair = 1.0;    // trait horizontal
+	if (ax < u * 0.7 && ay > gap && ay < r) hair = 1.0;    // trait vertical
+	if (ay < u * 3.2 && ax > r * 0.34 && ax < r) hair = 1.0;                    // gros traits gauche et droite
+	if (ax < u * 3.2 && p.y > r * 0.34 && p.y < r) hair = 1.0;                  // gros trait du bas
+	for (int k = 1; k <= 5; k++) {                         // mil-dots
+		float o = r * 0.058 * float(k);
+		float rad = u * 1.9;
+		if (length(vec2(ax - o, p.y)) < rad || length(vec2(p.x, ay - o)) < rad) hair = 1.0;
+	}
+	col = mix(col, vec4(0.015, 0.015, 0.015, 1.0), hair);
+	if (d < u * 1.6) col = vec4(0.94, 0.31, 0.31, 1.0);   // point rouge central
 	float g = glint * smoothstep(r * 0.55, r, d) * 0.35;
 	col = mix(col, vec4(1.0, 0.92, 0.67, max(col.a, g)), g);
-	COLOR = mix(col, vec4(0.02, 0.027, 0.03, 1.0), outside);
+	float outside = smoothstep(r - 2.5, r, d);
+	float rim = smoothstep(r * 1.0, r * 1.012, d) * (1.0 - smoothstep(r * 1.03, r * 1.05, d));   // fin liseré du tube
+	vec4 tube = mix(vec4(0.012, 0.014, 0.016, 1.0), vec4(0.10, 0.105, 0.11, 1.0), rim);
+	COLOR = mix(col, tube, outside);
 }
 """
 
