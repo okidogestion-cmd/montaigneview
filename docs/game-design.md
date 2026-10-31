@@ -591,3 +591,6 @@ Le jeu devient une **appli mobile** (même jeu : cachette, peinture, duel), plus
   du soldat filmé ; elle est filtrée (passe-haut à 1,8 kHz, transitoires écrasés : il ne reste que le froissement),
   original gardé dans `sources/higgsfield/son_equipement_brut.ogg`, et jouée plus bas (−15 dB en courant). Un seul pas
   à la fois (`max_polyphony = 1`).
+
+### Artefact version 28 (31/10/2026)
+- Publié : correction des sons de course superposés. `index.pck` = 8,60 Mo.
