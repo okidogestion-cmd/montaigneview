@@ -680,3 +680,6 @@ Le jeu devient une **appli mobile** (même jeu : cachette, peinture, duel), plus
   (`grass.gdshader` → `patch` : bruit à grande échelle et seuil).
 - Coin enneigé : le haut du versant est de chaque île passe en zone neige (`tools/relief.py`, bord irrégulier ;
   hauteurs inchangées). Neige ≈ 14 % des îles. Jouabilité inchangée : lignes de vue 17,6 %, exposition 0,256.
+
+### Artefact version 37 (31/10/2026)
+- Publié : couché sur les rochers corrigé, champs de lavande, coin enneigé. `index.pck` = 8,96 Mo.
