@@ -726,3 +726,6 @@ Le jeu devient une **appli mobile** (même jeu : cachette, peinture, duel), plus
 - Fin : « IL T'A EU. » / « TOUCHÉ ! » en très grand, couleur du résultat aussi sur la bordure (`set_end_color`) ;
   REJOUER en grande plaque orange, MENU en dessous. TERMINÉ et PRÊT : plaques orange comme JOUER.
 - Artefact version 43 : publié. `index.pck` = 9,07 Mo.
+- **Validé par l'utilisateur (31/10/2026) : « c'est top, on reste dessus ».** Ce style (police Barlow Condensed,
+  titres et boutons en gras 800, textes en 600, plaques biseautées, accents orange) est la référence pour tous
+  les futurs écrans et menus.
