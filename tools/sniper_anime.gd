@@ -307,18 +307,25 @@ func _rifle(rifle: Node3D, body: PackedVector3Array, bone: int) -> Dictionary:
 		up_guess = Vector3.FORWARD - along * along.dot(Vector3.FORWARD)
 	up_guess = up_guess.normalized()
 	var src_basis := Basis(along.cross(up_guess).normalized(), along, up_guess)   # x, y = canon, z = dessus
-	# Dans le dos : canon vers le haut et vers la gauche (+x), dessus du fusil tourné vers l'arrière (-z).
+	# Dans le dos : canon vers le haut et vers la gauche (+x), à plat contre le dos.
 	var back_z := INF
 	for p in body:
 		if p.y > 1.05 and p.y < 1.4 and absf(p.x) < 0.18:
 			back_z = minf(back_z, p.z)
 	var dst_along := Vector3(0.62, 0.78, 0.0).normalized()
-	var dst_up := Vector3(0, 0, -1)
+	# Dessus du fusil (lunette) dans le plan du dos, vers le bas à gauche : le fusil est à plat contre le dos,
+	# de profil, et on le voit sur toute sa longueur de derrière (avant : lunette vers l'arrière, il dépassait).
+	var dst_up := Vector3(0.78, -0.62, 0.0).normalized()
 	var dst_basis := Basis(dst_along.cross(dst_up).normalized(), dst_along, dst_up)
 	var k := RIFLE_LENGTH / (tmax - tmin)
 	var mid := center + along * (tmin + tmax) * 0.5
 	var place := Transform3D(dst_basis.scaled(Vector3.ONE * k) * src_basis.inverse(), Vector3(0.0, 1.27, back_z - 0.06))
 	var xf := place * Transform3D(Basis.IDENTITY, -mid)
+	# Collé au dos : la face du fusil la plus proche du corps à 2 cm derrière le dos.
+	var zmax := -INF
+	for q in pts:
+		zmax = maxf(zmax, (xf * (q as Vector3)).z)
+	xf.origin.z += back_z - 0.02 - zmax
 	var r := {"v": PackedVector3Array(), "n": PackedVector3Array(), "b": PackedInt32Array(), "w": PackedFloat32Array(), "uv": PackedVector2Array(), "idx": ri}
 	for i in pts.size():
 		r.v.append(xf * (pts[i] as Vector3))

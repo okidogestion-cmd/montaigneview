@@ -712,3 +712,6 @@ Le jeu devient une **appli mobile** (même jeu : cachette, peinture, duel), plus
     lissée dans le shader (la texture générée est brouillée de près). `tools/sniper_anime.gd` garde les UV du fusil
     et marque ses sommets (CUSTOM0.w = 1) ; le fusil reste froid au viseur thermique.
 - Artefact version 40 : publié. `index.pck` = 9,07 Mo.
+- Fusil à plat contre le dos, de profil (31/10/2026, « faudrait le voir sur la longueur ») : la lunette ne pointe plus
+  vers l'arrière, elle est dans le plan du dos (vers le bas à gauche) ; le fusil est collé à 2 cm du dos et se voit
+  sur toute sa longueur de derrière. Artefact version 41 : publié.
