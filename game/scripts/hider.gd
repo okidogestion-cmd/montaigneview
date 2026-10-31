@@ -4,9 +4,9 @@ extends RefCounted
 ## accélère et freine en douceur, et peut se tenir debout, accroupi ou couché.
 
 const STANCES := {
-	"debout":   {"label": "Debout",   "speed": 4.2, "eye": 1.6,  "height": 1.75, "body": 1.75, "cam_h": 1.6, "cam_d": 2.2, "detect": 1.8},
-	"accroupi": {"label": "Accroupi", "speed": 1.8, "eye": 1.1,  "height": 1.2,  "body": 1.2,  "cam_h": 1.2, "cam_d": 2.0, "detect": 1.0},
-	"couche":   {"label": "Couché",   "speed": 1.1, "eye": 0.35, "height": 0.45, "body": 0.6,  "cam_h": 0.8,  "cam_d": 1.9, "detect": 0.55},
+	"debout":   {"label": "Debout",   "speed": 4.2, "eye": 1.6,  "height": 1.75, "body": 1.75, "cam_h": 1.6, "cam_d": 1.7, "detect": 1.8},
+	"accroupi": {"label": "Accroupi", "speed": 1.8, "eye": 1.1,  "height": 1.2,  "body": 1.2,  "cam_h": 1.2, "cam_d": 1.5, "detect": 1.0},
+	"couche":   {"label": "Couché",   "speed": 1.1, "eye": 0.35, "height": 0.45, "body": 0.6,  "cam_h": 0.8,  "cam_d": 1.45, "detect": 0.55},
 }
 const RUN_SPEED := 7.5      # course (Maj), seulement debout
 const ACCEL := 20.0
@@ -29,7 +29,7 @@ var stance := "debout"
 var cam_yaw := 0.0
 var cam_pitch := -0.25
 var _cam_pos := Vector3.ZERO
-var _cam_dist := 2.2
+var _cam_dist := 1.7
 var _cam_h := 1.65
 var _first_frame := true
 var _prev_pos := Vector3.ZERO   # position à l'image physique précédente (pour lisser l'affichage)

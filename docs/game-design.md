@@ -715,3 +715,5 @@ Le jeu devient une **appli mobile** (même jeu : cachette, peinture, duel), plus
 - Fusil à plat contre le dos, de profil (31/10/2026, « faudrait le voir sur la longueur ») : la lunette ne pointe plus
   vers l'arrière, elle est dans le plan du dos (vers le bas à gauche) ; le fusil est collé à 2 cm du dos et se voit
   sur toute sa longueur de derrière. Artefact version 41 : publié.
+- Caméra plus proche du personnage (31/10/2026) : distance derrière l'épaule 1,7 m debout (avant 2,2),
+  1,5 m accroupi (2,0), 1,45 m couché (1,9) — `hider.gd` → `cam_d`. Artefact version 42 : publié.
