@@ -171,8 +171,8 @@ func update_visual(dt: float) -> void:
 	if air == "":
 		world.animate_figure(world.player, stance, ground_speed())
 	var spd := ground_speed()
-	run_amt = move_toward(run_amt, 1.0 if spd > 5.5 else 0.0, dt * 3.0)
-	_bob_amp = move_toward(_bob_amp, clampf(spd / RUN_SPEED, 0.0, 1.0), dt * 5.0)
+	run_amt = move_toward(run_amt, 1.0 if spd > 5.5 else 0.0, dt * 1.5)
+	_bob_amp = move_toward(_bob_amp, clampf(spd / RUN_SPEED, 0.0, 1.0), dt * 2.0)
 	_bob_t += dt * lerpf(5.7, 8.8, run_amt)   # marche ≈ 1,8 pas/s, course ≈ 2,8 pas/s
 
 ## Saut : impulsion, en l'air, réception (animations Jump_* de la bibliothèque Quaternius). Une petite descente
@@ -238,9 +238,9 @@ func place_camera(cam: Camera3D, dt: float) -> void:
 func _apply_bob(cam: Camera3D, k: float) -> void:
 	if _bob_amp <= 0.0:
 		return
-	var a := _bob_amp * (1.0 + 0.8 * run_amt) * k
-	cam.position += cam.basis.y * cos(_bob_t * 2.0) * 0.045 * a + cam.basis.x * sin(_bob_t) * 0.035 * a
-	cam.basis = cam.basis * Basis.from_euler(Vector3(cos(_bob_t * 2.0) * 0.014 * a, 0.0, sin(_bob_t) * 0.025 * a))
+	var a := _bob_amp * (1.0 + 0.5 * run_amt) * k   # doux : quelques centimètres et moins d'un demi-degré
+	cam.position += cam.basis.y * cos(_bob_t * 2.0) * 0.016 * a + cam.basis.x * sin(_bob_t) * 0.012 * a
+	cam.basis = cam.basis * Basis.from_euler(Vector3(cos(_bob_t * 2.0) * 0.004 * a, 0.0, sin(_bob_t) * 0.007 * a))
 
 func first_person(cam: Camera3D) -> void:
 	cam.position = eye()

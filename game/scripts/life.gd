@@ -1,17 +1,17 @@
 extends Node3D
 ## La vie de l'archipel : mouettes, voiliers au large, feuilles et pollen dans le vent,
-## sons des vagues, du vent et des mouettes. Purement décoratif : rien ici n'arrête les balles
+## ambiance de forêt et cris de mouettes. Purement décoratif : rien ici n'arrête les balles
 ## ni n'aide à repérer l'adversaire.
 
 const TOON := preload("res://shaders/toon.gdshader")
 const WIND := Vector3(1.0, 0.0, 0.35)
+const SON_FORET := preload("res://art/son_foret.ogg")
 
 var world
 var _birds: Array = []
 var _boats: Array = []
 var _particles: GPUParticles3D
 var _waves: AudioStreamPlayer
-var _wind: AudioStreamPlayer
 var _cry: AudioStreamWAV
 var _cry_t := 4.0
 var _rng := RandomNumberGenerator.new()
@@ -219,16 +219,15 @@ func _gull_cry() -> AudioStreamWAV:
 	return s
 
 func _make_sounds() -> void:
+	# Bande son : ambiance de forêt enregistrée (art/son_foret.ogg, La Sonothèque, « AMBForst Forêt ID 0100 »),
+	# en boucle (fin fondue dans le début sur 3 s). Remplace les vagues et le vent synthétisés.
+	var amb: AudioStreamOggVorbis = SON_FORET
+	amb.loop = true
 	_waves = AudioStreamPlayer.new()
-	_waves.stream = _noise_loop(6.0, 500.0, 3.0, 0.75, 1)
-	_waves.volume_db = -14
+	_waves.stream = amb
+	_waves.volume_db = -6
 	add_child(_waves)
 	_waves.play()
-	_wind = AudioStreamPlayer.new()
-	_wind.stream = _noise_loop(8.0, 260.0, 4.0, 0.6, 2)
-	_wind.volume_db = -22
-	add_child(_wind)
-	_wind.play()
 	_cry = _gull_cry()
 
 
@@ -238,10 +237,6 @@ func update(dt: float, cam: Vector3) -> void:
 	_update_birds(dt)
 	_update_boats(dt)
 	_particles.global_position = cam
-	# Plus on est près de la mer, plus on entend les vagues ; plus on est haut, plus le vent souffle.
-	var alt: float = cam.y - world.WATER_Y
-	_waves.volume_db = lerpf(-10.0, -26.0, clampf(alt / 120.0, 0.0, 1.0))
-	_wind.volume_db = lerpf(-24.0, -13.0, clampf(alt / 140.0, 0.0, 1.0))
 	_cry_t -= dt
 	if _cry_t <= 0.0:
 		_cry_t = _rng.randf_range(7.0, 16.0)

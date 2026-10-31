@@ -506,3 +506,10 @@ Le jeu devient une **appli mobile** (même jeu : cachette, peinture, duel), plus
   ≈ 0,9 m de haut. Animations Jump_Start / Jump_Loop / Jump_Land de la bibliothèque Quaternius (déjà utilisée pour la
   marche, CC0), ajoutées à `sniper_anime.scn` par `tools/sniper_anime.gd` (aucun crédit Higgsfield). États dans
   `hider._update_air` : impulsion, en l'air, réception (une petite descente de moins de 0,3 s ne déclenche rien).
+
+### Bande son forêt, caméra de course adoucie (31/10/2026)
+- Bande son : ambiance de forêt fournie par l'utilisateur (La Sonothèque, « AMBForst Forêt ID 0100 », sons libres de droits,
+  lasonotheque.fr), mise en boucle sans coupure (fin fondue dans le début sur 3 s) → `game/art/son_foret.ogg` (700 Ko).
+  Remplace les vagues et le vent synthétisés (`life.gd`) ; les cris de mouettes restent.
+- Caméra embarquée adoucie (demande : « trop brutal ») : balancement ÷ 3 environ (rebond 1,6 cm, roulis 0,4°),
+  montée en douceur ; élargissement de l'angle en courant 9° → 5°, plus progressif.
