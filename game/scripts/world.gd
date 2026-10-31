@@ -962,6 +962,8 @@ func _grass() -> void:
 		[VEG.tuft(0.9, 0.3), Color("#e8eedc"), 0, 1.0, 0.35, 0.06, false, 0.8, 1.3, 1.0, "vege_gazon.png", Vector2(0.75, 2.0)],
 		[VEG.tuft(1.1, 0.75), Color.WHITE, 0, 1.0, 0.18, 0.05, false, 0.8, 1.4, 1.0, "vege_fougere.png", Vector2(0.3, 0.65)],
 		[VEG.tuft(1.0, 0.55), Color.WHITE, 2, 0.5, 0.15, 0.04, false, 0.8, 1.3, 1.0, "vege_bruyere.png", Vector2(0.6, 2.0)],
+		# Champs de lavande : la planche de bruyère teintée lavande, dense, en grandes taches dans les prairies.
+		[VEG.tuft(1.0, 0.6), Color(0.86, 0.74, 1.0), 0, 1.0, 1.1, 0.07, false, 0.8, 1.25, 1.0, "vege_bruyere.png", Vector2(0.75, 2.0), Vector2(0.025, 0.62)],
 		[_pebble_mesh, Color("#4a4742"), 2, 1.0, 0.3, 0.0, true, 0.08, 0.36, 0.42],   # graviers sombres et plats, comme la roche
 		[_pebble_mesh, Color("#f4f8fc"), 3, 1.0, 0.12, 0.0, true, 0.3, 1.0, 0.35],
 	]
@@ -985,6 +987,8 @@ func _grass() -> void:
 			m.set_shader_parameter("use_tex", true)
 		if f.size() > 11:
 			m.set_shader_parameter("mask_range", f[11])
+		if f.size() > 12:
+			m.set_shader_parameter("patch", f[12])
 		# Touffes réparties au hasard dans un carré autour de la caméra.
 		var count := int(4 * GRASS_RADIUS * GRASS_RADIUS * f[4])
 		var xforms := []

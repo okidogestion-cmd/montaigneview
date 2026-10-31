@@ -15,6 +15,8 @@ const GRAVITY := 18.0
 const AREA_RADIUS := 200.0  # on reste sur son île
 const MOUSE_SENS := 0.0028
 const RADIUS := 0.3
+const MAX_PRONE_SLOPE := 0.75   # au-delà (≈ 37°), on ne peut pas se coucher
+const MAX_PRONE_TILT := 0.4     # inclinaison maximale du corps couché (≈ 23°)
 const JUMP_SPEED := 5.6     # vitesse de départ d'un saut (m/s) : ≈ 0,85 m de haut
 const LAND_TIME := 0.42     # durée de la réception avant de reprendre la marche (s)
 
@@ -92,7 +94,17 @@ func set_stance(s: String) -> void:
 	_apply()
 
 func toggle(s: String) -> void:
+	if s == "couche" and stance != "couche" and slope_here() > MAX_PRONE_SLOPE:
+		world.get_parent().hud.toast("Trop raide pour se coucher ici : accroupis-toi.", 2.0)
+		return
 	set_stance("debout" if stance == s else s)
+
+## Pente du sol sous le personnage (rapport hauteur / distance).
+func slope_here() -> float:
+	var d := 1.0
+	var gx: float = world.height_at(pos.x + d, pos.z) - world.height_at(pos.x - d, pos.z)
+	var gz: float = world.height_at(pos.x, pos.z + d) - world.height_at(pos.x, pos.z - d)
+	return Vector2(gx, gz).length() / (2.0 * d)
 
 func info() -> Dictionary:
 	return STANCES[stance]
@@ -174,7 +186,10 @@ func _apply() -> void:
 		var hb: float = world.height_at(p.x - f.x * 0.95, p.z - f.z * 0.95)
 		var hr: float = world.height_at(p.x + r.x * 0.3, p.z + r.z * 0.3)
 		var hl: float = world.height_at(p.x - r.x * 0.3, p.z - r.z * 0.3)
-		basis = basis * Basis(Vector3.RIGHT, -atan2(hf - hb, 1.7)) * Basis(Vector3.FORWARD, atan2(hr - hl, 0.6) * -1.0)
+		# Inclinaison bornée (sinon, sur un rocher très raide, le corps couché se tord et s'étire).
+		var pitch := clampf(-atan2(hf - hb, 1.7), -MAX_PRONE_TILT, MAX_PRONE_TILT)
+		var roll := clampf(-atan2(hr - hl, 0.6), -MAX_PRONE_TILT, MAX_PRONE_TILT)
+		basis = basis * Basis(Vector3.RIGHT, pitch) * Basis(Vector3.FORWARD, roll)
 		p.y = maxf(p.y, (hf * 0.95 + hb * 0.75) / 1.7) - 0.03
 	world.player.transform = Transform3D(basis, p)
 

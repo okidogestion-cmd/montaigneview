@@ -280,6 +280,9 @@ zones[forest] = ZN["foret"]
 rock = (slope > 0.9 + SLO + n1 * 0.15) | (H > 118 + ALT + n1 * 18)
 zones[rock] = ZN["roche"]
 snow = (H > 128 + ALT + n1 * 16) & (slope < 1.25 + n1 * 0.2)
+if HF_DIR:
+    # Coin enneigé (31/10/2026) : le haut du versant est de chaque île, bord irrégulier.
+    snow |= (X + n1 * 40.0 > 115.0) & (H > WATER_Y + 52.0 + n1 * 12.0) & (np.abs(Z) > 90.0) & (np.abs(Z) < 420.0)
 zones[snow] = ZN["neige"]
 for k, v in ZN.items():
     print("zone %s : %.1f %%" % (k, 100.0 * np.mean(zones[H > WATER_Y] == v)))

@@ -672,3 +672,11 @@ Le jeu devient une **appli mobile** (même jeu : cachette, peinture, duel), plus
 
 ### Artefact version 36 (31/10/2026)
 - Publié : étalonnage des couleurs seulement, plantes à leur luminosité. `index.pck` = 8,96 Mo.
+
+### Couché sur les rochers, champs de lavande, coin enneigé (31/10/2026)
+- Bug : couché sur un rocher très raide, le corps se tordait. Inclinaison du corps couché bornée à ≈ 23°
+  (`hider.MAX_PRONE_TILT`) ; impossible de se coucher sur une pente de plus de ≈ 37° (`MAX_PRONE_SLOPE`, message).
+- Champs de lavande : la planche de bruyère teintée lavande, dense, en grandes taches dans les prairies
+  (`grass.gdshader` → `patch` : bruit à grande échelle et seuil).
+- Coin enneigé : le haut du versant est de chaque île passe en zone neige (`tools/relief.py`, bord irrégulier ;
+  hauteurs inchangées). Neige ≈ 14 % des îles. Jouabilité inchangée : lignes de vue 17,6 %, exposition 0,256.

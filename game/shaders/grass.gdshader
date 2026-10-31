@@ -14,6 +14,7 @@ uniform vec3 cam_pos;
 uniform float wind = 0.12;
 uniform float density = 1.0;
 uniform int channel = 0;          // 0 : herbe, 1 : fleurs, 2 : cailloux, 3 : neige
+uniform vec2 patch = vec2(0.0, 0.5);   // champs en taches : (échelle du bruit, seuil) ; échelle 0 = partout
 uniform vec2 mask_range = vec2(0.0, 2.0);   // ne pousse que là où le masque est dans cet intervalle (ex. forêt seule)
 uniform bool keep_normals = false;
 uniform vec4 tint : source_color = vec4(1.0);
@@ -53,6 +54,18 @@ void vertex() {
 	vec4 mk = texture(mask, uv);
 	float m = mk[channel];
 	m *= step(mask_range.x, m) * step(m, mask_range.y);
+	if (patch.x > 0.0) {
+		// Grandes taches (champs de lavande) : bruit doux à grande échelle, bords effilochés.
+		vec2 q = origin.xz * patch.x;
+		vec2 i = floor(q), f = fract(q);
+		vec2 u = f * f * (3.0 - 2.0 * f);
+		float h00 = fract(sin(dot(i, vec2(127.1, 311.7))) * 43758.5453);
+		float h10 = fract(sin(dot(i + vec2(1, 0), vec2(127.1, 311.7))) * 43758.5453);
+		float h01 = fract(sin(dot(i + vec2(0, 1), vec2(127.1, 311.7))) * 43758.5453);
+		float h11 = fract(sin(dot(i + vec2(1, 1), vec2(127.1, 311.7))) * 43758.5453);
+		float nz = mix(mix(h00, h10, u.x), mix(h01, h11, u.x), u.y);
+		m *= smoothstep(patch.y, patch.y + 0.08, nz);
+	}
 	vec2 seed = fract(inst.xz * 0.0137 + k * vec2(0.3183, 0.6180));
 	float rnd = fract(sin(dot(seed, vec2(12.9898, 78.233))) * 43758.5453);
 	float d = length(origin.xz - cam_pos.xz);
