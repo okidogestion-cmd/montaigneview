@@ -32,6 +32,8 @@ const OK := Color("#86d394")
 
 const FONT := preload("res://art/police_600.woff")       # Barlow Condensed (OFL), interface
 const FONT_BOLD := preload("res://art/police_800.woff")  # titres et boutons
+const SON_CLIC := preload("res://art/son_ui_clic.ogg")         # culasse du Kar98k (tools/sons_k98.sh)
+const SON_CULASSE := preload("res://art/son_ui_culasse.ogg")   # la balle entre dans la chambre (bouton JOUER)
 const SENS_MIN := 0.25
 const SENS_MAX := 5.0
 const SENS_STEP := 0.25
@@ -260,7 +262,17 @@ func _button(text: String, bg: Color, fg: Color, size := 18) -> Button:
 	b.add_theme_stylebox_override("normal", _style(bg, LINE, 4, 10))
 	b.add_theme_stylebox_override("hover", _style(bg.lightened(0.12), LINE, 4, 10))
 	b.add_theme_stylebox_override("pressed", _style(bg.darkened(0.15), LINE, 4, 10))
+	b.pressed.connect(func(): ui_sound(b.has_meta("son_fort")))
 	return b
+
+## Son d'un bouton : clic de culasse, ou cycle complet (balle chambrée) pour JOUER.
+func ui_sound(strong := false) -> void:
+	var p := AudioStreamPlayer.new()
+	p.stream = SON_CULASSE if strong else SON_CLIC
+	p.volume_db = -4.0 if strong else -8.0
+	add_child(p)
+	p.finished.connect(p.queue_free)
+	p.play()
 
 ## Titre en capitales étroites et grasses (police Barlow Condensed 800), avec espacement des lettres.
 func _title(text: String, size: int, color: Color, spacing := 0) -> Label:
@@ -396,6 +408,7 @@ func _build_menu() -> void:
 		seg.add_child(b)
 	v.add_child(seg)
 	var play := _tac_button("JOUER", BLAZE, Color("#1a0d04"), 44, true)
+	play.set_meta("son_fort", true)
 	play.custom_minimum_size.y = 78
 	play.pressed.connect(func(): play_pressed.emit())
 	v.add_child(play)

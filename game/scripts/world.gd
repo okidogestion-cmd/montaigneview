@@ -324,6 +324,16 @@ func set_near_fade(r: float) -> void:
 func is_foliage(collider: Object) -> bool:
 	return collider != null and collider.has_meta("foliage")
 
+## Une balle qui touche un arbre en ce point frappe-t-elle le tronc (à moins de 0,35 m de son axe) ?
+func hits_trunk(collider: Object, p: Vector3) -> bool:
+	for cs in (collider as Node).get_children():
+		if cs is CollisionShape3D and cs.shape is CylinderShape3D:
+			var c: Vector3 = cs.global_position
+			var h: float = (cs.shape as CylinderShape3D).height
+			if Vector2(p.x - c.x, p.z - c.z).length() < 0.35 and p.y < c.y + h * 0.5:
+				return true
+	return false
+
 
 # ---------- Construction ----------
 func build() -> void:

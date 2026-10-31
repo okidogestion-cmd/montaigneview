@@ -710,9 +710,10 @@ func shoot() -> void:
 	var origin: Vector3 = rig.aim_origin()
 	var dir: Vector3 = rig.aim_direction()
 	var hit := ray(origin, origin + dir * 3000)
-	# Les arbres effacés près du tireur ne retiennent pas la balle : elle repart juste derrière.
-	for i in 8:
-		if hit.is_empty() or not world.is_foliage(hit.collider) or origin.distance_to(hit.position) > world.near_fade:
+	# La balle traverse les feuillages (buissons, houppiers) : seuls les troncs, les rochers et le relief l'arrêtent.
+	# (31/10/2026 : l'ennemi visible derrière son buisson n'était jamais touché, la boîte du buisson arrêtait tout.)
+	for i in 12:
+		if hit.is_empty() or not world.is_foliage(hit.collider) or world.hits_trunk(hit.collider, hit.position):
 			break
 		hit = ray(hit.position + dir * 0.05, origin + dir * 3000)
 	rig.recoil_kick()

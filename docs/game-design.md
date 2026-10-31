@@ -567,3 +567,10 @@ Le jeu devient une **appli mobile** (même jeu : cachette, peinture, duel), plus
 
 ### Artefact version 26 (31/10/2026)
 - Publié : interface DUSKLINE (accueil, police, boutons à icônes, cases de gadgets), lunette ennemie retirée. `index.pck` = 8,44 Mo.
+
+### Sons de menu, balles qui traversent les feuillages (31/10/2026)
+- Sons de l'interface tirés du même enregistrement du Kar98k (`tools/sons_k98.sh`) : clic de culasse sur chaque bouton
+  (`son_ui_clic.ogg`), cycle complet de la culasse (balle chambrée) sur JOUER (`son_ui_culasse.ogg`).
+- Tir : la balle traverse les feuillages (buissons, houppiers) à toute distance ; seuls les troncs (à moins de 0,35 m
+  de l'axe, `world.hits_trunk`), les rochers et le relief l'arrêtent. Avant, la boîte du buisson d'une cachette en forêt
+  arrêtait la balle : 3 cachettes en forêt sur 11 étaient impossibles à toucher alors que l'ennemi était visible.
