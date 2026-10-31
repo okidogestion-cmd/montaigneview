@@ -574,3 +574,13 @@ Le jeu devient une **appli mobile** (même jeu : cachette, peinture, duel), plus
 - Tir : la balle traverse les feuillages (buissons, houppiers) à toute distance ; seuls les troncs (à moins de 0,35 m
   de l'axe, `world.hits_trunk`), les rochers et le relief l'arrêtent. Avant, la boîte du buisson d'une cachette en forêt
   arrêtait la balle : 3 cachettes en forêt sur 11 étaient impossibles à toucher alors que l'ennemi était visible.
+
+### Bruits de pas et d'équipement (31/10/2026)
+- Sons créés avec Higgsfield (≈ 15 crédits) : trois vidéos Seedance 2.0 Mini de 10 s avec son (bottes dans l'herbe,
+  bottes sur feuilles et brindilles, frottement de la tenue et du sac en courant), dont on ne garde que le son.
+  Pas détectés et découpés automatiquement : `son_pas_herbe_1..4.ogg`, `son_pas_feuilles_1..4.ogg` (0,35 s chacun) ;
+  `son_equipement.ogg` : boucle de 6,5 s (fondu enchaîné, pics écrêtés).
+- `hider.gd` : un pas à chaque appui (deux par foulée, au rythme du balancement de la caméra), feuilles en forêt et herbe
+  ailleurs, 4 variantes avec hauteur et volume tirés au hasard (`AudioStreamRandomizer`) ; plus fort en courant, plus
+  doux accroupi, rien couché ; un pas appuyé à la réception d'un saut. Équipement : muet à l'arrêt, léger en marchant,
+  net en courant. Tout se tait à la fin de la cachette (`hider.silence`).

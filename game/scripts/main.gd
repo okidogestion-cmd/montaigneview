@@ -318,6 +318,7 @@ func bang(stream: AudioStream, vol: float, delay := 0.0) -> void:
 # ---------- Menu ----------
 func to_menu() -> void:
 	gid += 1
+	hider.silence()
 	gadgets.clear()
 	touch.set_mode("")
 	phase = "menu"
@@ -342,6 +343,7 @@ func to_menu() -> void:
 # ---------- Atelier de peinture ----------
 func start_paint() -> void:
 	gid += 1
+	hider.silence()
 	touch.set_mode("")
 	phase = "paint"
 	world.set_near_fade(4.0)   # rien ne cache le sniper à l'atelier

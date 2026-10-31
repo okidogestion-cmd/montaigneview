@@ -39,6 +39,12 @@ var _land_t := 0.0
 var run_amt := 0.0              # 0 à l'arrêt ou en marche, 1 en pleine course : élargit l'angle de vue
 var _bob_t := 0.0               # cycle de foulée (une foulée = gauche + droite)
 var _bob_amp := 0.0             # intensité du balancement de la caméra embarquée (0 à l'arrêt)
+# Sons (tools/sons_pas.py) : un pas à chaque appui de la foulée, herbe ou feuilles selon le terrain,
+# et le frottement de l'équipement pendant la course.
+var _steps := {}                # "herbe" / "feuilles" → lecteur (AudioStreamRandomizer : 4 variantes, hauteur au hasard)
+var _gear: AudioStreamPlayer
+var _step_idx := 0
+var steps_played := 0           # nombre de pas joués (pour les tests)
 
 
 func _init(w) -> void:
@@ -56,6 +62,23 @@ func _init(w) -> void:
 	body.add_child(cs)
 	world.add_child(body)
 	_fit_shape()
+	for kind in ["herbe", "feuilles"]:
+		var r := AudioStreamRandomizer.new()
+		r.random_pitch = 1.12
+		r.random_volume_offset_db = 2.5
+		for i in 4:
+			r.add_stream(i, load("res://art/son_pas_%s_%d.ogg" % [kind, i + 1]))
+		var p := AudioStreamPlayer.new()
+		p.stream = r
+		p.max_polyphony = 2
+		world.add_child(p)
+		_steps[kind] = p
+	var g: AudioStreamOggVorbis = load("res://art/son_equipement.ogg")
+	g.loop = true
+	_gear = AudioStreamPlayer.new()
+	_gear.stream = g
+	_gear.volume_db = -60.0
+	world.add_child(_gear)
 
 func reset(x: float, z: float) -> void:
 	body.global_position = Vector3(x, world.height_at(x, z) + 0.05, z)
@@ -174,6 +197,7 @@ func update_visual(dt: float) -> void:
 	run_amt = move_toward(run_amt, 1.0 if spd > 5.5 else 0.0, dt * 1.5)
 	_bob_amp = move_toward(_bob_amp, clampf(spd / RUN_SPEED, 0.0, 1.0), dt * 2.0)
 	_bob_t += dt * lerpf(5.7, 8.8, run_amt)   # marche ≈ 1,8 pas/s, course ≈ 2,8 pas/s
+	_update_sounds(dt, spd)
 
 ## Saut : impulsion, en l'air, réception (animations Jump_* de la bibliothèque Quaternius). Une petite descente
 ## en marchant (moins de 0,3 s en l'air) ne déclenche rien : pas de clignotement d'animation dans les pentes.
@@ -191,6 +215,7 @@ func _update_air(dt: float) -> void:
 			world.play_jump(world.player, "Jump_Loop", 0.25, 1.0)
 		return
 	if air == "start" or air == "loop":
+		_play_step(4.0)   # réception : un pas plus appuyé
 		air = "land"
 		_land_t = 0.0
 		world.play_jump(world.player, "Jump_Land", 0.08, 1.7)
@@ -199,6 +224,37 @@ func _update_air(dt: float) -> void:
 		if _land_t > LAND_TIME or (ground_speed() > 1.0 and _land_t > LAND_TIME * 0.5):
 			air = ""
 	_air_t = 0.0
+
+func _update_sounds(dt: float, spd: float) -> void:
+	# Un pas à chaque appui (deux par foulée, au rythme du balancement de la caméra).
+	var idx := floori(_bob_t / PI)
+	if idx != _step_idx:
+		_step_idx = idx
+		if spd > 0.6 and air == "" and stance != "couche":
+			_play_step(0.0)
+	# Équipement : silencieux à l'arrêt, léger en marchant, net en courant ; la boucle suit le rythme.
+	var target := -60.0
+	if spd > 0.5 and air == "":
+		target = lerpf(-27.0, -9.0, run_amt) - (6.0 if stance != "debout" else 0.0)
+	_gear.volume_db = move_toward(_gear.volume_db, target, dt * 40.0)
+	_gear.pitch_scale = lerpf(0.8, 1.0, run_amt)
+	if _gear.volume_db > -55.0 and not _gear.playing:
+		_gear.play()
+	elif _gear.volume_db <= -59.0 and _gear.playing:
+		_gear.stop()
+
+func _play_step(extra_db: float) -> void:
+	var kind := "feuilles" if world.zone_of(pos.x, pos.z) == "foret" else "herbe"
+	var p: AudioStreamPlayer = _steps[kind]
+	var spd := ground_speed()
+	p.volume_db = (-5.0 if spd > 5.5 else -12.0) - (8.0 if stance == "accroupi" else 0.0) + extra_db
+	p.play()
+	steps_played += 1
+
+## Fin de la cachette : plus de pas ni d'équipement.
+func silence() -> void:
+	_gear.stop()
+	_gear.volume_db = -60.0
 
 func eye() -> Vector3:
 	return pos + Vector3(0, info().eye, 0) + forward() * 0.3
