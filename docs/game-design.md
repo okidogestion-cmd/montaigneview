@@ -491,3 +491,9 @@ Le jeu devient une **appli mobile** (même jeu : cachette, peinture, duel), plus
   s'applique au regard à la lunette et au regard pendant la cachette. Enregistré dans `user://reglages.cfg`
   (conservé d'une séance à l'autre quand le navigateur le permet).
 - Test : `tools/tests/test_reglages.gd`.
+
+### Artefact version 22 (31/10/2026)
+- Publié : îles Higgsfield, textures, ciel d'heure dorée, feuillages, nouveau viseur, respiration, caméra embarquée,
+  départ en hauteur, réglages de sensibilité. `index.pck` = 12,47 Mo (limite 15 Mo par fichier).
+- Décision de l'utilisateur : on n'exécute plus le long test de caméra (`tools/tests/test_camera.gd`, ~10 min) à chaque
+  changement. Les vérifications rapides (`test_reglages.gd`, mesures de jouabilité, captures) restent à la demande.
