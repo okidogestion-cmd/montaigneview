@@ -775,6 +775,9 @@ func _scatter() -> void:
 				continue
 	# Arrière des îles (côté opposé à l'adversaire, où l'on ne va pas pour l'instant) : décor allégé.
 	var before := trees.size() + rounds.size() + bushes.size() + shrubs.size() + rocks.size() + scree.size()
+	# Les arbres retirés restent en image (imposteurs) : la forêt paraît toujours pleine.
+	var far_trees: Array = trees.filter(func(p): return _thin_back(p[0], p[2]))
+	var far_rounds: Array = rounds.filter(func(p): return _thin_back(p[0], p[2]))
 	for list: Array in [trees, rounds, bushes, shrubs, rocks, scree]:
 		var kept: Array = list.filter(func(p): return not _thin_back(p[0], p[2]))
 		list.clear()
@@ -787,6 +790,9 @@ func _scatter() -> void:
 	add_child(leafy)
 	_inst_models("tree", trees, leafy)
 	_inst_models("round", rounds, leafy)
+	_inst_impostors("tree", far_trees)
+	_inst_impostors("round", far_rounds)
+	print("arrière des îles : %d arbres en image" % (far_trees.size() + far_rounds.size()))
 	# Buissons hauts (collision) et bas (décor) d'un même modèle dessinés ensemble.
 	_inst_models("bush", bushes, leafy, shrubs)
 	# Rochers et cailloux d'éboulis d'une même forme dessinés ensemble ; collision pour les rochers seulement.
@@ -806,6 +812,70 @@ const SHRUB_MODELS := [0, 1]   # buissons bas : les modèles des buissons hauts 
 const PLAY_RADIUS := 210.0     # zone de jeu autour du centre de chaque île
 const PLAY_FILL := 0.42        # forêt de la zone de jeu (réglée pour garder le couvert d'avant)
 const PLAY_MAX_SCALE := 1.3   # part des emplacements libres de la forêt dense qui portent un grand arbre
+
+const IMPOSTOR := preload("res://shaders/imposteur.gdshader")
+var _impostor_meshes := {}
+
+## Imposteur d'un arbre : une seule de ses cartes (et le tronc), aplatie dans le plan x-y ; le shader la tourne
+## vers la caméra. Même photo, même taille, même nuance que l'arbre complet.
+func _impostor(mesh: ArrayMesh) -> ArrayMesh:
+	var a := mesh.surface_get_arrays(0)
+	var v: PackedVector3Array = a[Mesh.ARRAY_VERTEX]
+	var uv: PackedVector2Array = a[Mesh.ARRAY_TEX_UV]
+	var col: PackedColorArray = a[Mesh.ARRAY_COLOR]
+	var idx: PackedInt32Array = a[Mesh.ARRAY_INDEX]
+	var card_n := Vector3.ZERO
+	var st := SurfaceTool.new()
+	st.begin(Mesh.PRIMITIVE_TRIANGLES)
+	var axis := Vector3.RIGHT
+	for pass_i in 2:
+		for t in range(0, idx.size(), 3):
+			var i0 := idx[t]
+			var i1 := idx[t + 1]
+			var i2 := idx[t + 2]
+			var leaf := uv[i0].x > 0.25 and uv[i1].x > 0.25 and uv[i2].x > 0.25
+			var n := (v[i1] - v[i0]).cross(v[i2] - v[i0])
+			if n.length() < 1e-6:
+				continue
+			n = n.normalized()
+			if pass_i == 0:
+				# Première carte de feuillage presque verticale : son plan donne l'axe horizontal de l'image.
+				if leaf and absf(n.y) < 0.3 and card_n == Vector3.ZERO:
+					card_n = n
+					axis = Vector3(n.z, 0.0, -n.x).normalized()
+				continue
+			if leaf and absf(n.dot(card_n)) < 0.95:
+				continue
+			for i in [i0, i1, i2]:
+				st.set_color(col[i])
+				st.set_uv(uv[i])
+				st.set_normal(Vector3(0, 0.5, 1).normalized())
+				var p: Vector3 = v[i]
+				st.add_vertex(Vector3(p.x * axis.x + p.z * axis.z, p.y, 0.0))
+	return st.commit()
+
+func _inst_impostors(kind: String, list: Array) -> void:
+	if not _impostor_meshes.has(kind):
+		var arr := []
+		for i in _tree_meshes[kind].size():
+			var src: ArrayMesh = _tree_meshes[kind][i]
+			var m := ShaderMaterial.new()
+			m.shader = IMPOSTOR
+			var fm: ShaderMaterial = src.surface_get_material(0)
+			m.set_shader_parameter("albedo_tex", fm.get_shader_parameter("albedo_tex"))
+			m.set_shader_parameter("translucency", fm.get_shader_parameter("translucency"))
+			arr.append([_impostor(src), m])
+		_impostor_meshes[kind] = arr
+	for i in _impostor_meshes[kind].size():
+		var mine := list.filter(func(p): return p[6] == i)
+		if mine.is_empty():
+			continue
+		var xforms := []
+		var colors := []
+		for p in mine:
+			xforms.append(Transform3D(Basis.from_scale(Vector3(p[3], p[3] * p[5], p[3])), Vector3(p[0], p[1], p[2])))
+			colors.append(p[7] if p.size() > 7 else Color.WHITE)
+		_multimesh_chunked(_impostor_meshes[kind][i][0], _impostor_meshes[kind][i][1], xforms, false, colors)
 
 const BACK_MARGIN := 30.0      # m au-delà du centre de l'île, côté opposé à l'adversaire
 const BACK_KEEP := 0.35        # part du décor gardée à l'arrière des îles

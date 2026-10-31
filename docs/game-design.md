@@ -747,3 +747,8 @@ Le jeu devient une **appli mobile** (même jeu : cachette, peinture, duel), plus
   le décor passe progressivement à 35 % (`world.gd` → `_thin_back`, tirage fixe par position). 2 500 éléments
   en moins (arbres 7 013 → 4 889). Le décor de l'avant, où l'on joue, ne change pas.
 - Artefact version 45 : publié. `index.pck` = 9,31 Mo.
+- **Arbres en image à l'arrière** (« laisse des PNG pour que ça fasse rempli ») : les 2 135 arbres retirés de l'arrière
+  des îles reviennent en **imposteurs** — une seule carte de l'arbre (la même photo, taille et nuance), tournée vers
+  la caméra (`shaders/imposteur.gdshader`, `world.gd` → `_impostor` / `_inst_impostors`). Pas d'ombre, pas de vent,
+  pas de collision : la forêt paraît pleine pour bien moins de calcul. Buissons et cailloux restent allégés.
+- Artefact version 46 : publié. `index.pck` = 9,32 Mo.
