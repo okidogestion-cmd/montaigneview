@@ -30,6 +30,8 @@ const BLAZE := Color("#ff7a2f")
 const DANGER := Color("#ef4f4f")
 const OK := Color("#86d394")
 
+const FONT := preload("res://art/police_600.woff")       # Barlow Condensed (OFL), interface
+const FONT_BOLD := preload("res://art/police_800.woff")  # titres et boutons
 const SENS_MIN := 0.25
 const SENS_MAX := 5.0
 const SENS_STEP := 0.25
@@ -84,6 +86,7 @@ var center_label: Label
 
 var menu: Control
 var gadget_label: Label
+var gadget_slots: Array = []   # deux cases [panneau, icône, touche]
 var settings: Control
 var _sens_labels := {}
 var _sens := {"souris": 1.0, "tactile": 2.0}
@@ -136,6 +139,10 @@ var _toast_tween: Tween
 
 func _ready() -> void:
 	root = _full(Control.new())
+	var theme := Theme.new()
+	theme.default_font = FONT
+	theme.default_font_size = 18
+	root.theme = theme
 	add_child(root)
 	fog_overlay = _full(_rect(Color("#dfe6ea", 0)))
 	root.add_child(fog_overlay)
@@ -255,6 +262,35 @@ func _button(text: String, bg: Color, fg: Color, size := 18) -> Button:
 	b.add_theme_stylebox_override("pressed", _style(bg.darkened(0.15), LINE, 4, 10))
 	return b
 
+## Titre en capitales étroites et grasses (police Barlow Condensed 800), avec espacement des lettres.
+func _title(text: String, size: int, color: Color, spacing := 0) -> Label:
+	var l := _label(text, size, color)
+	var fv := FontVariation.new()
+	fv.base_font = FONT_BOLD
+	fv.spacing_glyph = spacing
+	l.add_theme_font_override("font", fv)
+	return l
+
+func _spacer_v(h: float) -> Control:
+	var c := Control.new()
+	c.custom_minimum_size.y = h
+	c.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	return c
+
+## Bouton biseauté façon jeu de tir moderne (fond incliné, liseré fin, texte en capitales grasses).
+func _tac_button(text: String, bg: Color, fg: Color, size := 20, strong := false) -> Button:
+	var b := _button(text, bg, fg, size)
+	var fv := FontVariation.new()
+	fv.base_font = FONT_BOLD
+	fv.spacing_glyph = 2
+	b.add_theme_font_override("font", fv)
+	for st in [["normal", bg], ["hover", bg.lightened(0.12)], ["pressed", bg.darkened(0.15)]]:
+		var sb := _style(st[1], LINE if not strong else Color(1, 1, 1, 0.0), 0, 12)
+		sb.skew = Vector2(0.22, 0)
+		b.add_theme_stylebox_override(st[0], sb)
+	b.custom_minimum_size.y = maxf(48.0, size * 1.9)
+	return b
+
 func _vbox(sep := 12) -> VBoxContainer:
 	var v := VBoxContainer.new()
 	v.add_theme_constant_override("separation", sep)
@@ -307,59 +343,63 @@ func _center_card(width: float) -> Array:
 
 
 # ---------- Menu ----------
+## Page d'accueil DUSKLINE (style jeu de tir moderne) : la photo en plein écran, un dégradé sombre à droite,
+## le titre en grandes capitales étroites, des boutons biseautés.
 func _build_menu() -> void:
-	var parts := _center_card(440)
-	# Illustration du menu (art/menu.jpg, créée avec Higgsfield) derrière la carte, poussée à droite.
 	menu = _full(Control.new())
 	var bg := TextureRect.new()
 	bg.texture = preload("res://art/menu.jpg")
 	bg.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
 	bg.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_COVERED
 	menu.add_child(_full(bg))
-	menu.add_child(_full(_rect(Color(INK, 0.3))))
-	menu_card = parts[0]
-	menu_card.anchor_left = 0.42
-	menu.add_child(menu_card)
-	var v: VBoxContainer = parts[1]
-	var title := RichTextLabel.new()
-	title.bbcode_enabled = true
-	title.fit_content = true
-	title.scroll_active = false
-	title.add_theme_font_size_override("normal_font_size", 58)
-	title.text = "Duel des [color=#ff7a2f]Cimes[/color]"
-	title.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	v.add_child(title)
-	var pitch := _label("Deux montagnes, deux snipers. Le premier qui trouve l'autre a gagné.", 18, MUTED)
+	var shade := TextureRect.new()
+	var gt := GradientTexture2D.new()
+	var gr := Gradient.new()
+	gr.set_color(0, Color(INK, 0.0))
+	gr.set_color(1, Color(INK, 0.94))
+	gr.add_point(0.45, Color(INK, 0.35))
+	gt.gradient = gr
+	gt.fill_from = Vector2(0, 0)
+	gt.fill_to = Vector2(1, 0)
+	shade.texture = gt
+	shade.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
+	shade.stretch_mode = TextureRect.STRETCH_SCALE
+	menu.add_child(_full(shade))
+	var holder := MarginContainer.new()
+	holder.set_anchors_preset(Control.PRESET_FULL_RECT)
+	holder.anchor_left = 0.5
+	for side in ["left", "right", "top", "bottom"]:
+		holder.add_theme_constant_override("margin_" + side, 44)
+	holder.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	menu_card = holder
+	menu.add_child(holder)
+	var v := _vbox(14)
+	v.alignment = BoxContainer.ALIGNMENT_CENTER
+	holder.add_child(v)
+	v.add_child(_title("DUEL DE SNIPERS  ·  1 CONTRE 1", 18, BLAZE, 3))
+	v.add_child(_title("DUSKLINE", 104, PAPER, 6))
+	var bar := _rect(BLAZE)
+	bar.custom_minimum_size = Vector2(140, 5)
+	bar.size_flags_horizontal = Control.SIZE_SHRINK_BEGIN
+	v.add_child(bar)
+	var pitch := _label("Deux montagnes. Deux snipers. Cache-toi, laisse le brouillard se lever, trouve-le à la lunette et tire le premier.", 19, PAPER)
 	pitch.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 	v.add_child(pitch)
-	var steps := [
-		"Cache-toi sur ta montagne et choisis une tenue de la couleur du terrain.",
-		"Le brouillard se lève sur la vallée.",
-		"Fouille la montagne d'en face à la lunette et tire avant d'être repéré. Chaque tir raté trahit ta position.",
-	]
-	for i in steps.size():
-		var row := _hbox(10)
-		var n := _label(str(i + 1), 24, BLAZE)
-		n.custom_minimum_size.x = 22
-		row.add_child(n)
-		var t := _label(steps[i], 16, PAPER)
-		t.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
-		t.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-		row.add_child(t)
-		v.add_child(row)
-	v.add_child(_small("Adversaire (ordinateur)"))
-	var seg := _hbox(0)
+	v.add_child(_spacer_v(6))
+	v.add_child(_title("ADVERSAIRE", 15, MUTED, 3))
+	var seg := _hbox(6)
 	for lv in ["facile", "normal", "difficile"]:
-		var b := _button(lv.capitalize(), Color(1, 1, 1, 0.04), PAPER, 17)
+		var b := _tac_button(lv.to_upper(), Color(1, 1, 1, 0.06), PAPER, 20)
 		b.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 		b.pressed.connect(func(): level_chosen.emit(lv))
 		level_buttons[lv] = b
 		seg.add_child(b)
 	v.add_child(seg)
-	var play := _button("JOUER", BLAZE, Color("#1a0d04"), 28)
+	var play := _tac_button("JOUER", BLAZE, Color("#1a0d04"), 44, true)
+	play.custom_minimum_size.y = 78
 	play.pressed.connect(func(): play_pressed.emit())
 	v.add_child(play)
-	var cfg := _button("Réglages : sensibilité souris / tactile", Color(1, 1, 1, 0.06), PAPER, 16)
+	var cfg := _tac_button("RÉGLAGES", Color(1, 1, 1, 0.04), PAPER, 20)
 	cfg.pressed.connect(func(): settings.visible = true)
 	v.add_child(cfg)
 	menu_hint = _label("Souris pour viser, clic gauche ou Espace pour tirer, clic droit ou Maj pour retenir ta respiration, molette ou Z pour zoomer, Échap pour libérer la souris.", 14, MUTED)
@@ -368,8 +408,33 @@ func _build_menu() -> void:
 	v.add_child(hint)
 	root.add_child(menu)
 	_build_settings()
+	# Cases des gadgets portés : icône + touche (1 / 2), en haut à gauche sous la barre.
+	for i in 2:
+		var p := Panel.new()
+		var sb := _style(Color(0.02, 0.03, 0.04, 0.55), Color("#ffcf8a", 0.7), 0, 0)
+		sb.skew = Vector2(0.18, 0)
+		p.add_theme_stylebox_override("panel", sb)
+		p.position = Vector2(18 + i * 78, 96)
+		p.size = Vector2(66, 66)
+		p.mouse_filter = Control.MOUSE_FILTER_IGNORE
+		var ic := TextureRect.new()
+		var at := AtlasTexture.new()
+		at.atlas = preload("res://art/gadgets_icones.png")
+		ic.texture = at
+		ic.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
+		ic.position = Vector2(9, 7)
+		ic.size = Vector2(48, 48)
+		ic.modulate = Color("#ffcf8a")
+		ic.mouse_filter = Control.MOUSE_FILTER_IGNORE
+		p.add_child(ic)
+		var k := _title(str(i + 1), 15, PAPER)
+		k.position = Vector2(50, 44)
+		p.add_child(k)
+		p.visible = false
+		root.add_child(p)
+		gadget_slots.append([p, at, k])
 	gadget_label = _label("", 17, Color("#ffcf8a"))
-	gadget_label.position = Vector2(16, 96)
+	gadget_label.position = Vector2(18, 170)
 	gadget_label.add_theme_color_override("font_outline_color", Color(0, 0, 0, 0.8))
 	gadget_label.add_theme_constant_override("outline_size", 5)
 	root.add_child(gadget_label)
@@ -424,9 +489,19 @@ func set_sens(kind: String, v: float) -> void:
 		(_sens_labels[kind] as Label).text = "× %.2f" % v
 
 ## Gadgets portés et effets en cours (en haut à gauche, pendant la cachette et le tir).
-func set_gadgets(text: String) -> void:
-	if gadget_label != null:
-		gadget_label.text = text
+## icons : case de gadgets_icones.png de chaque gadget porté ; show_keys : touches 1 / 2 (pas au doigt,
+## où les boutons des gadgets portent déjà l'icône).
+func set_gadgets(text: String, icons: Array = [], show_keys := true) -> void:
+	if gadget_label == null:
+		return
+	gadget_label.text = text
+	for i in gadget_slots.size():
+		var slot: Array = gadget_slots[i]
+		var on := show_keys and i < icons.size()
+		slot[0].visible = on
+		if on:
+			var n: int = icons[i]
+			(slot[1] as AtlasTexture).region = Rect2((n % 2) * 128, (n / 2) * 128, 128, 128)
 
 func set_level(level: String) -> void:
 	for lv in level_buttons:
@@ -434,8 +509,10 @@ func set_level(level: String) -> void:
 		var on: bool = lv == level
 		var bg := PAPER if on else Color(1, 1, 1, 0.04)
 		var fg := INK if on else PAPER
-		b.add_theme_stylebox_override("normal", _style(bg, LINE, 0, 10))
-		b.add_theme_stylebox_override("hover", _style(bg.lightened(0.1), LINE, 0, 10))
+		for st in [["normal", bg], ["hover", bg.lightened(0.1)]]:
+			var sb := _style(st[1], BLAZE if on else LINE, 0, 12)
+			sb.skew = Vector2(0.22, 0)
+			b.add_theme_stylebox_override(st[0], sb)
 		for st in ["font_color", "font_hover_color", "font_pressed_color"]:
 			b.add_theme_color_override(st, fg)
 
@@ -447,7 +524,7 @@ func _build_hide() -> void:
 	var th := _hbox()
 	var tv := _vbox(2)
 	tv.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-	tv.add_child(_label("Cache-toi", 30, PAPER))
+	tv.add_child(_title("CACHE-TOI", 32, PAPER, 2))
 	var hide_sub := _small("Trouve une cachette sur ton île, puis tu choisiras ta tenue de camouflage sur place. L'ennemi regarde depuis l'île d'en face.")
 	hide_sub.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 	tv.add_child(hide_sub)
@@ -554,7 +631,9 @@ func set_swatch(zone: String) -> void:
 		b.add_theme_stylebox_override("hover", s)
 		b.add_theme_stylebox_override("pressed", s)
 
-func show_inset(on: bool) -> void:
+## Petite lunette ennemie retirée (31/10/2026, demande de l'utilisateur) : toujours cachée, plus dessinée.
+func show_inset(_on: bool) -> void:
+	var on := false
 	inset.visible = on
 	inset_label.visible = on
 	# Mise à jour à la demande (main.gd la rafraîchit une image sur 4) : le monde est dessiné deux fois sinon.
@@ -861,7 +940,7 @@ func set_touch_mode(on: bool) -> void:
 	# remplacent le bouton « Prêt » et les touches du clavier.
 	if not on:
 		return
-	menu_hint.text = "Glisse le doigt pour regarder et viser. Les gros boutons ronds servent à s'accroupir, se coucher, tirer, zoomer et retenir son souffle."
+	menu_hint.text = "Glisse le doigt pour regarder et viser. Double tape pour zoomer. Les boutons ronds : sauter, s'accroupir, se coucher, tirer, retenir son souffle, gadgets."
 	keys_hint.text = "Pouce gauche : marcher (à fond : courir)   ·   Glisser à droite : regarder   ·   Viser (maintenu) : vue de tir"
 	ready_btn.visible = false
 	fire_keys.visible = false
@@ -907,7 +986,7 @@ func _apply_orientation() -> void:
 	# Base 720 × 1280 debout (au lieu de 1280 × 720) : le texte garde sa taille sur un écran étroit.
 	get_window().content_scale_size = Vector2i(720, 1280) if portrait else Vector2i(1280, 720)
 	# Menu : la carte au centre debout ; à droite couché, pour laisser voir l'illustration.
-	menu_card.anchor_left = 0.0 if portrait else 0.42
+	menu_card.anchor_left = 0.0 if portrait else 0.5
 	# Lunette ennemie : un peu plus bas debout, le bandeau du haut y prend trois lignes.
 	inset.position.y = 132 if portrait else 92
 	inset_label.position.y = inset.position.y + 206

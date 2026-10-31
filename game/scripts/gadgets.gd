@@ -342,14 +342,12 @@ func clear() -> void:
 
 func _refresh() -> void:
 	var parts := []
-	for i in carry.size():
-		parts.append(("%d : " % (i + 1) if not main.touch_mode else "") + INFO[carry[i]].label)
 	for k in timers:
 		if timers[k] > 0.0:
 			parts.append("%s %d s" % [INFO[k].label, ceili(timers[k])])
-	main.hud.set_gadgets("   ·   ".join(parts))
+	main.hud.set_gadgets("   ·   ".join(parts), carry.map(func(k): return INFO[k].icon), not main.touch_mode)
 	if main.touch_mode:
-		main.touch.set_gadgets(carry.map(func(k): return INFO[k].label))
+		main.touch.set_gadgets(carry.map(func(k): return [INFO[k].label, INFO[k].icon]))
 
 func _make_blob() -> ImageTexture:
 	var n := 64

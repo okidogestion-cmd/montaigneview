@@ -554,3 +554,13 @@ Le jeu devient une **appli mobile** (même jeu : cachette, peinture, duel), plus
 - Poids : `index.pck` était monté à 14,9 Mo (limite 15 Mo). Les images JPG du jeu sont maintenant importées en
   compression « avec perte » (WebP, qualité 0,82 ; `compress/mode=1` dans les `.import`) au lieu de « sans perte » :
   `index.pck` = 8,4 Mo, rendu vérifié sur captures. Garder ce réglage pour toute nouvelle image JPG.
+
+### Interface DUSKLINE (31/10/2026)
+- Le jeu s'appelle **DUSKLINE** (titre de l'accueil, page de chargement de l'artefact).
+- Accueil refait façon jeu de tir moderne : photo `menu.jpg` en plein écran, dégradé sombre à droite, titre en grandes
+  capitales, boutons biseautés (`hud._tac_button`, `StyleBoxFlat.skew`). Police **Barlow Condensed** (licence OFL,
+  `art/police_600.woff`, `police_800.woff`, `police_LICENCE_OFL.txt`) pour toute l'interface.
+- Boutons tactiles : cercles sombres translucides, liseré fin, icône (Higgsfield, `art/commandes_icones.png`, ≈ 0,25 crédit)
+  et libellé court. Boutons de gadgets avec l'icône du gadget.
+- Gadgets portés : deux cases avec icône et touche (1 / 2) en haut à gauche (au doigt, les boutons portent l'icône).
+- Petite lunette ennemie retirée de la cachette (plus de deuxième rendu de la scène).

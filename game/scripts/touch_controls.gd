@@ -28,16 +28,22 @@ func _ready() -> void:
 	set_anchors_preset(Control.PRESET_FULL_RECT)
 	mouse_filter = Control.MOUSE_FILTER_IGNORE
 	# Positions comptées depuis le bas droit (x négatif) ou le bas gauche (x positif).
-	_add("pret", Vector2(-110, -560), 62, "PRÊT", BLAZE, ["hide"], false)
-	_add("viser", Vector2(-110, -390), 62, "Viser", PAPER, ["hide"], true)
-	_add("couche", Vector2(-110, -235), 58, "Couché", PAPER, ["hide"], false)
-	_add("accroupi", Vector2(-245, -150), 58, "Accroupi", PAPER, ["hide"], false)
-	_add("sauter", Vector2(-380, -110), 58, "Sauter", PAPER, ["hide"], false)
-	_add("tirer", Vector2(-140, -190), 92, "TIRER", DANGER, ["fire"], false)
-	_add("souffle", Vector2(120, -190), 72, "Souffle", Color("#86d394"), ["fire"], true)
+	# Icônes (art/commandes_icones.png, Higgsfield) : 0 sauter, 1 accroupi, 2 couché, 3 viser, 4 prêt, 5 tirer, 6 souffle.
+	_add("pret", Vector2(-110, -560), 58, "PRÊT", BLAZE, ["hide"], false, 4)
+	_add("viser", Vector2(-110, -400), 62, "VISER", PAPER, ["hide"], true, 3)
+	_add("couche", Vector2(-110, -245), 54, "COUCHÉ", PAPER, ["hide"], false, 2)
+	_add("accroupi", Vector2(-240, -150), 54, "ACCROUPI", PAPER, ["hide"], false, 1)
+	_add("sauter", Vector2(-370, -105), 54, "SAUTER", PAPER, ["hide"], false, 0)
+	_add("tirer", Vector2(-140, -190), 90, "TIRER", BLAZE, ["fire"], false, 5)
+	_add("souffle", Vector2(120, -190), 66, "SOUFFLE", Color("#86d394"), ["fire"], true, 6)
 
-func _add(name: String, pos: Vector2, r: float, label: String, color: Color, modes: Array, hold: bool) -> void:
-	_buttons[name] = {"pos": pos, "radius": r, "label": label, "color": color, "modes": modes, "hold": hold}
+const ICONS := preload("res://art/commandes_icones.png")          # 3 × 3 icônes de 128 px
+const GADGET_ICONS := preload("res://art/gadgets_icones.png")    # 2 × 2 icônes de 128 px
+const FONT_BOLD := preload("res://art/police_800.woff")
+
+## icon : case de commandes_icones.png ; gadget_icon : case de gadgets_icones.png (boutons de gadgets).
+func _add(name: String, pos: Vector2, r: float, label: String, color: Color, modes: Array, hold: bool, icon := -1, gadget_icon := -1) -> void:
+	_buttons[name] = {"pos": pos, "radius": r, "label": label, "color": color, "modes": modes, "hold": hold, "icon": icon, "gicon": gadget_icon}
 
 func set_mode(m: String) -> void:
 	mode = m
@@ -49,12 +55,12 @@ func set_mode(m: String) -> void:
 	visible = m != ""
 	queue_redraw()
 
-## Un bouton par gadget porté (à gauche, au-dessus du joystick), seulement quand on en a un.
-func set_gadgets(labels: Array) -> void:
+## Un bouton par gadget porté (à gauche, au-dessus du joystick), seulement quand on en a un : [libellé, icône].
+func set_gadgets(items: Array) -> void:
 	for i in 2:
 		var key := "g%d" % (i + 1)
-		if i < labels.size():
-			_add(key, Vector2(110, -430 - i * 140), 56, String(labels[i]).split(" ")[0], Color("#ffcf8a"), ["hide", "fire"], false)
+		if i < items.size():
+			_add(key, Vector2(100, -430 - i * 130), 50, String(items[i][0]).split(" ")[0].to_upper(), Color("#ffcf8a"), ["hide", "fire"], false, -1, items[i][1])
 		else:
 			_buttons.erase(key)
 	queue_redraw()
@@ -136,21 +142,32 @@ func _draw() -> void:
 			continue
 		var c := _center(b)
 		var col: Color = b.color
+		var r: float = b.radius
 		var pressed := _down.has(name)
-		draw_circle(c, b.radius, Color(col, 0.55 if pressed else 0.28))
-		draw_arc(c, b.radius, 0, TAU, 48, Color(col, 0.9), 3.0, true)
-		var size := 26 if b.radius > 80 else 20
-		var w := font.get_string_size(b.label, HORIZONTAL_ALIGNMENT_CENTER, -1, size).x
-		draw_string(font, c + Vector2(-w / 2, size * 0.35), b.label, HORIZONTAL_ALIGNMENT_CENTER, -1, size, PAPER)
+		# Cercle sombre translucide, liseré fin de la couleur du bouton, icône blanche et petit libellé dessous.
+		draw_circle(c, r, Color(col, 0.45) if pressed else Color(0.02, 0.03, 0.04, 0.42))
+		draw_arc(c, r, 0, TAU, 64, Color(col, 1.0 if pressed else 0.8), 2.5, true)
+		draw_arc(c, r - 5.0, 0, TAU, 64, Color(1, 1, 1, 0.1), 1.0, true)
+		var s := r * 0.95
+		var at := c - Vector2(s / 2, s * 0.62)
+		if b.icon >= 0:
+			draw_texture_rect_region(ICONS, Rect2(at, Vector2(s, s)), Rect2((b.icon % 3) * 128, (b.icon / 3) * 128, 128, 128), Color(1, 1, 1, 0.95))
+		elif b.gicon >= 0:
+			draw_texture_rect_region(GADGET_ICONS, Rect2(at, Vector2(s, s)), Rect2((b.gicon % 2) * 128, (b.gicon / 2) * 128, 128, 128), Color(1, 0.85, 0.6, 1.0))
+		var size := 15 if r < 80 else 18
+		var w := FONT_BOLD.get_string_size(b.label, HORIZONTAL_ALIGNMENT_CENTER, -1, size).x
+		draw_string(FONT_BOLD, c + Vector2(-w / 2, r * 0.62), b.label, HORIZONTAL_ALIGNMENT_CENTER, -1, size, Color(1, 1, 1, 0.92))
 	if mode == "hide" and _joy_finger != -1:
-		draw_circle(_joy_center, JOY_RADIUS, Color(1, 1, 1, 0.12))
-		draw_arc(_joy_center, JOY_RADIUS, 0, TAU, 48, Color(1, 1, 1, 0.5), 2.0, true)
-		draw_circle(_joy_pos, 38, Color(1, 1, 1, 0.45))
+		draw_circle(_joy_center, JOY_RADIUS, Color(0.02, 0.03, 0.04, 0.3))
+		draw_arc(_joy_center, JOY_RADIUS, 0, TAU, 64, Color(1, 1, 1, 0.55), 2.0, true)
+		draw_circle(_joy_pos, 36, Color(1, 1, 1, 0.5))
+		draw_arc(_joy_pos, 36, 0, TAU, 48, Color(1, 1, 1, 0.9), 2.0, true)
 	elif mode == "hide":
 		# Indique où poser le pouce pour marcher.
 		var s := get_viewport_rect().size
 		var hint := Vector2(170, s.y - 170)
-		draw_arc(hint, JOY_RADIUS * 0.8, 0, TAU, 48, Color(1, 1, 1, 0.25), 2.0, true)
-		var t := "Marcher"
-		var w := font.get_string_size(t, HORIZONTAL_ALIGNMENT_CENTER, -1, 18).x
-		draw_string(font, hint + Vector2(-w / 2, 6), t, HORIZONTAL_ALIGNMENT_CENTER, -1, 18, Color(1, 1, 1, 0.6))
+		draw_circle(hint, JOY_RADIUS * 0.8, Color(0.02, 0.03, 0.04, 0.25))
+		draw_arc(hint, JOY_RADIUS * 0.8, 0, TAU, 64, Color(1, 1, 1, 0.3), 2.0, true)
+		var t := "MARCHER"
+		var w := FONT_BOLD.get_string_size(t, HORIZONTAL_ALIGNMENT_CENTER, -1, 16).x
+		draw_string(FONT_BOLD, hint + Vector2(-w / 2, 6), t, HORIZONTAL_ALIGNMENT_CENTER, -1, 16, Color(1, 1, 1, 0.6))

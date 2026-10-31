@@ -1014,9 +1014,3 @@ func _process_hide(dt: float) -> void:
 		expo_t = 0.25
 		hide_exposure = exposure_from(hide_viewers())
 		update_zone_info()
-	var target: Vector3 = hider.pos + Vector3(0, hider.info().height * 0.5, 0)
-	inset_cam.position = enemy_view
-	inset_cam.look_at(target)
-	inset_cam.fov = rad_to_deg(2 * atan(4.5 / enemy_view.distance_to(target)))
-	if Engine.get_process_frames() % 4 == 0:
-		hud.inset_viewport.render_target_update_mode = SubViewport.UPDATE_ONCE
