@@ -533,3 +533,10 @@ Le jeu devient une **appli mobile** (même jeu : cachette, peinture, duel), plus
 
 ### Artefact version 24 (31/10/2026)
 - Publié : gadgets et caisses, zoom en double tape, mouette retirée. `index.pck` = 13,60 Mo (limite 15 Mo : ≈ 1,4 Mo de marge).
+
+### Thermique visible, ordinateur ralenti, caisses face à l'ennemi (31/10/2026)
+- Thermique : en plus du filtre, une tache de chaleur (au moins 26 × 44 px à l'écran) marque l'ennemi à travers les
+  feuillages, jamais à travers le relief (`gadgets._update_heat`, tracé contre la carte des hauteurs) ; plus faible
+  s'il porte la tenue de feuillage. Monde un peu moins sombre (luminosité 0,45).
+- Ordinateur ralenti (`LEVELS`) : premier tir 16 → 26 s (normal), tirs espacés de 10 à 14 s, repérage ≈ 45 % plus lent.
+- Caisses seulement sur le versant face à l'ennemi (pas plus de 12 m derrière le point de départ).

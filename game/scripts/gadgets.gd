@@ -1,6 +1,7 @@
 extends Node3D
 ## Gadgets à ramasser dans des caisses pendant la cachette, puis à utiliser (touches 1 et 2, ou boutons au doigt) :
-##   - thermique  : 6 s, la lunette montre les corps chauds (la tenue de feuillage les atténue) ; ta lunette brille 2× plus vite.
+##   - thermique  : 6 s, monde sombre, le corps chaud brille et se voit à travers les feuillages (pas à travers le relief) ;
+##                  la tenue de feuillage l'atténue ; ta lunette brille 2× plus vite.
 ##   - echo       : 30 s, chaque tir ennemi laisse un repère approximatif (± 12 m) visible à travers le décor.
 ##   - leurre     : un mannequin en tenue posé là où tu es ; les 2 prochains tirs ennemis le visent.
 ##   - couverture : 20 s, l'ennemi te repère 2,5× moins vite (couverture de survie).
@@ -42,6 +43,7 @@ var _overlay: ColorRect
 var _markers: Array = []             # repères de l'écho [{sprite, t}]
 var _ring_tex: ImageTexture
 var _crate_mat: StandardMaterial3D
+var _heat: TextureRect               # tache de chaleur de l'ennemi au thermique, dessinée à l'écran (visible à travers les feuillages)
 var _beam_mat: StandardMaterial3D
 
 
@@ -68,6 +70,13 @@ func setup(m) -> void:
 	main.hud.root.add_child(_overlay)
 	main.hud.root.move_child(_overlay, main.hud.scope.get_index())   # sous le cache de la lunette
 	_ring_tex = _make_ring()
+	_heat = TextureRect.new()
+	_heat.texture = _make_blob()
+	_heat.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
+	_heat.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	_heat.visible = false
+	main.hud.root.add_child(_heat)
+	main.hud.root.move_child(_heat, _overlay.get_index() + 1)   # au-dessus du filtre, sous le cache de la lunette
 
 
 # ---------- Caisses ----------
@@ -83,7 +92,7 @@ func start_hide(start: Vector3) -> void:
 	rng.randomize()
 	var placed: Array[Vector3] = []
 	var tries := 0
-	while placed.size() < CRATES and tries < 400:
+	while placed.size() < CRATES and tries < 1500:
 		tries += 1
 		var a := rng.randf() * TAU
 		var d := rng.randf_range(25.0, 110.0)
@@ -92,8 +101,10 @@ func start_hide(start: Vector3) -> void:
 		var h: float = world.height_at(x, z)
 		if h < world.WATER_Y + 3.0 or Vector2(x, z - world.MZ).length() > 185.0:
 			continue
+		if z > start.z + 12.0:
+			continue   # seulement sur le versant face à l'ennemi, pas derrière la crête
 		var slope := absf(world.height_at(x + 1.5, z) - world.height_at(x - 1.5, z)) / 3.0 + absf(world.height_at(x, z + 1.5) - world.height_at(x, z - 1.5)) / 3.0
-		if slope > 0.8:
+		if slope > 1.15:
 			continue
 		var p := Vector3(x, h, z)
 		if placed.any(func(q): return q.distance_to(p) < 30.0):
@@ -225,12 +236,42 @@ func update(dt: float) -> void:
 		if m.t <= 0.0:
 			m.sprite.queue_free()
 			_markers.remove_at(i)
+	_update_heat()
 	if not carry.is_empty() or not timers.values().filter(func(t): return t > 0.0).is_empty():
 		_refresh()
 
+## Au thermique, le corps chaud se voit à travers les feuillages (pas à travers le relief) : une tache de taille fixe
+## à l'écran, même à 400 m. Plus faible si l'ennemi porte la tenue de feuillage.
+func _update_heat() -> void:
+	if not active("thermique") or not world.enemy.visible:
+		_heat.visible = false
+		return
+	var target: Vector3 = world.enemy.global_position + Vector3(0, 0.8, 0)
+	var from: Vector3 = main.camera.global_position
+	var hidden := false
+	for i in range(1, 40):
+		var p := from.lerp(target, i / 40.0)
+		if world.height_at(p.x, p.z) > p.y + 0.3:
+			hidden = true
+			break
+	var cam: Camera3D = main.camera
+	if hidden or cam.is_position_behind(target):
+		_heat.visible = false
+		return
+	# Taille : un peu plus grande que le corps à l'écran, au moins 26 × 44 px (repérable même à 400 m).
+	var sp := cam.unproject_position(target)
+	var px_per_m: float = main.get_viewport().get_visible_rect().size.y / (2.0 * tan(deg_to_rad(cam.fov) / 2.0) * from.distance_to(target))
+	var sz := Vector2(maxf(26.0, 1.2 * px_per_m), maxf(44.0, 2.0 * px_per_m))
+	_heat.size = sz
+	_heat.position = sp - sz / 2.0
+	_heat.visible = true
+	var ghillie_on: bool = world.enemy.has_meta("ghillie") and (world.enemy.get_meta("ghillie") as Node3D).visible
+	var pulse := 0.85 + 0.15 * sin(Time.get_ticks_msec() * 0.008)
+	_heat.modulate = Color(1.0, 0.95, 0.8, (0.55 if ghillie_on else 0.95) * pulse)
+
 func _set_thermal(on: bool) -> void:
 	_overlay.visible = on
-	main.env.adjustment_brightness = 0.28 if on else 1.0
+	main.env.adjustment_brightness = 0.45 if on else 1.0
 	var mat: ShaderMaterial = world.enemy.get_meta("camo")
 	var ghillie_on: bool = world.enemy.has_meta("ghillie") and (world.enemy.get_meta("ghillie") as Node3D).visible
 	mat.set_shader_parameter("heat", (0.45 if ghillie_on else 1.0) if on else 0.0)
@@ -309,6 +350,16 @@ func _refresh() -> void:
 	main.hud.set_gadgets("   ·   ".join(parts))
 	if main.touch_mode:
 		main.touch.set_gadgets(carry.map(func(k): return INFO[k].label))
+
+func _make_blob() -> ImageTexture:
+	var n := 64
+	var img := Image.create(n, n, false, Image.FORMAT_RGBA8)
+	for y in n:
+		for x in n:
+			var d := Vector2((x - n / 2.0 + 0.5) / 0.55, y - n / 2.0 + 0.5).length() / (n / 2.0)   # tache plus haute que large
+			var a := clampf(1.0 - d, 0.0, 1.0)
+			img.set_pixel(x, y, Color(1, 1, 1, a * a * (3.0 - 2.0 * a)))
+	return ImageTexture.create_from_image(img)
 
 func _make_ring() -> ImageTexture:
 	var n := 64

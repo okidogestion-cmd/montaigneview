@@ -14,9 +14,11 @@ const CameraRigScript := preload("res://scripts/camera_rig.gd")
 const PerfOverlayScript := preload("res://scripts/perf_overlay.gd")
 
 const LEVELS := {
-	"facile":    {"first": 22.0, "interval": [9.0, 13.0], "rate_good": 0.006, "rate_bad": 0.02,  "acc": 0.6,  "camo": 0.35, "glint": 0.02,  "shot_reveal": 0.18},
-	"normal":    {"first": 16.0, "interval": [7.0, 10.0], "rate_good": 0.010, "rate_bad": 0.03,  "acc": 0.75, "camo": 0.75, "glint": 0.03,  "shot_reveal": 0.25},
-	"difficile": {"first": 11.0, "interval": [5.0, 8.0],  "rate_good": 0.015, "rate_bad": 0.045, "acc": 0.9,  "camo": 1.0,  "glint": 0.045, "shot_reveal": 0.32},
+	# Ordinateur ralenti le 31/10 (« il me trouve trop vite », montagnes plus grandes) : premier tir plus tard,
+	# tirs plus espacés, repérage environ 45 % plus lent.
+	"facile":    {"first": 32.0, "interval": [12.0, 17.0], "rate_good": 0.0035, "rate_bad": 0.011, "acc": 0.6,  "camo": 0.35, "glint": 0.02,  "shot_reveal": 0.18},
+	"normal":    {"first": 26.0, "interval": [10.0, 14.0], "rate_good": 0.0055, "rate_bad": 0.017, "acc": 0.75, "camo": 0.75, "glint": 0.03,  "shot_reveal": 0.25},
+	"difficile": {"first": 18.0, "interval": [7.0, 11.0],  "rate_good": 0.009,  "rate_bad": 0.027, "acc": 0.9,  "camo": 1.0,  "glint": 0.045, "shot_reveal": 0.32},
 }
 const AMMO := 5
 const HIDE_TIME := 60.0
