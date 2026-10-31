@@ -584,3 +584,6 @@ Le jeu devient une **appli mobile** (même jeu : cachette, peinture, duel), plus
   ailleurs, 4 variantes avec hauteur et volume tirés au hasard (`AudioStreamRandomizer`) ; plus fort en courant, plus
   doux accroupi, rien couché ; un pas appuyé à la réception d'un saut. Équipement : muet à l'arrêt, léger en marchant,
   net en courant. Tout se tait à la fin de la cachette (`hider.silence`).
+
+### Artefact version 27 (31/10/2026)
+- Publié : bruits de pas et d'équipement, sons de culasse dans le menu, balles qui traversent les feuillages. `index.pck` = 8,60 Mo.
