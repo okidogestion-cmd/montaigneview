@@ -717,3 +717,12 @@ Le jeu devient une **appli mobile** (même jeu : cachette, peinture, duel), plus
   sur toute sa longueur de derrière. Artefact version 41 : publié.
 - Caméra plus proche du personnage (31/10/2026) : distance derrière l'épaule 1,7 m debout (avant 2,2),
   1,5 m accroupi (2,0), 1,45 m couché (1,9) — `hider.gd` → `cam_d`. Artefact version 42 : publié.
+
+### Menus dans le style de l'écran d'ouverture (31/10/2026)
+- Atelier de camouflage, écran de fin et barre « Cache-toi » reprennent la direction artistique du titre (façon CoD) :
+  grands titres en capitales grasses avec un trait orange (`_tac_top`), panneaux sombres à coins droits avec une
+  bordure orange à gauche (`_tac_panel`), titres de section précédés d'un tiret orange (`_tac_header`), choix en
+  plaques biseautées, le choix actif en orange (`_tac_choice` / `_tac_mark`). Le meilleur terrain est en orange.
+- Fin : « IL T'A EU. » / « TOUCHÉ ! » en très grand, couleur du résultat aussi sur la bordure (`set_end_color`) ;
+  REJOUER en grande plaque orange, MENU en dessous. TERMINÉ et PRÊT : plaques orange comme JOUER.
+- Artefact version 43 : publié. `index.pck` = 9,07 Mo.

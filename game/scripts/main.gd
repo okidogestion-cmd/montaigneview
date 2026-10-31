@@ -965,8 +965,8 @@ func finish(won: bool) -> void:
 	var zones: Dictionary = WorldScript.ZONES
 	var ez: String = zones[enemy_spot.zone]["label"]
 	var ec: String = zones[enemy_camo]["label"]
-	hud.end_title.text = "Touché !" if won else "Il t'a eu."
-	hud.end_title.add_theme_color_override("font_color", HudScript.OK if won else HudScript.DANGER)
+	hud.end_title.text = "TOUCHÉ !" if won else "IL T'A EU."
+	hud.set_end_color(HudScript.OK if won else HudScript.DANGER)
 	var start := ("Tu l'as trouvé en %d s avec %d balle%s. " % [roundi(fight_time), shots_fired, "s" if shots_fired > 1 else ""]) if won else "Le voici, dans la lunette. "
 	hud.end_text.text = start + "Il était caché sur la %s, en tenue %s." % [ez.to_lower(), ec.to_lower()]
 	var tips: Array[String] = []

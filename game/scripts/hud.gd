@@ -128,6 +128,7 @@ var end_panel: Control
 var end_title: Label
 var end_text: Label
 var end_tips: Label
+var end_accent: StyleBoxFlat
 
 var paint_hud: Control
 var paint_colors := []
@@ -522,6 +523,57 @@ func _menu_item(text: String, primary: bool) -> Button:
 			b.add_theme_stylebox_override(st, sb)
 	return b
 
+## Panneau façon menu de jeu de tir : fond sombre translucide, coins droits, liseré fin, trait orange à gauche.
+func _tac_panel(pad := 16) -> PanelContainer:
+	var p := PanelContainer.new()
+	var sb := _style(Color(0.02, 0.03, 0.04, 0.72), BLAZE, 0, pad)
+	sb.set_border_width_all(0)
+	sb.border_width_left = 4
+	sb.content_margin_left = pad + 4
+	p.add_theme_stylebox_override("panel", sb)
+	return p
+
+## Titre de section : petit trait orange puis capitales grasses espacées.
+func _tac_header(text: String, size := 15) -> HBoxContainer:
+	var h := _hbox(8)
+	var tick := _rect(BLAZE)
+	tick.custom_minimum_size = Vector2(14, 4)
+	tick.size_flags_vertical = Control.SIZE_SHRINK_CENTER
+	h.add_child(tick)
+	h.add_child(_title(text.to_upper(), size, Color(PAPER, 0.8), 3))
+	return h
+
+## Choix (tenue, feuillage, posture) : plaque biseautée comme les choix du menu ; choisi = liseré et fond orangés.
+func _tac_choice(text: String, size := 17) -> Button:
+	var b := _tac_button(text.to_upper(), Color(0.02, 0.03, 0.04, 0.55), PAPER, size)
+	b.custom_minimum_size.y = 46
+	_tac_mark(b, false)
+	return b
+
+func _tac_mark(b: Button, on: bool) -> void:
+	for st in [["normal", 0.0], ["hover", 0.08], ["pressed", -0.05]]:
+		var bg := Color(BLAZE, 0.28) if on else Color(0.02, 0.03, 0.04, 0.55)
+		var sb := _style(Color(bg.lightened(st[1]), bg.a), BLAZE if on else Color(PAPER, 0.22), 0, 10)
+		sb.set_border_width_all(2 if on else 1)
+		sb.skew = Vector2(0.22, 0)
+		b.add_theme_stylebox_override(st[0], sb)
+	for c in ["font_color", "font_hover_color", "font_pressed_color", "font_focus_color"]:
+		b.add_theme_color_override(c, Color("#ffd2b3") if on else PAPER)
+
+## Barre du haut d'un écran : grand titre gras, trait orange, sous-titre.
+func _tac_top(title: String, sub: String) -> Array:
+	var tv := _vbox(4)
+	tv.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	tv.add_child(_title(title.to_upper(), 36, PAPER, 3, true))
+	var line := _rect(BLAZE)
+	line.custom_minimum_size = Vector2(64, 4)
+	line.size_flags_horizontal = Control.SIZE_SHRINK_BEGIN
+	tv.add_child(line)
+	var l := _title(sub.to_upper(), 14, Color(PAPER, 0.7), 1)
+	l.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	tv.add_child(l)
+	return [tv, l]
+
 func _build_settings() -> void:
 	var parts := _center_card(440)
 	settings = _full(Control.new())
@@ -596,18 +648,12 @@ func _build_hide() -> void:
 	hide_hud = _full(Control.new())
 	var top := _bar(true)
 	var th := _hbox()
-	var tv := _vbox(2)
-	tv.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-	tv.add_child(_title("CACHE-TOI", 32, PAPER, 2))
-	var hide_sub := _small("Trouve une cachette sur ton île, puis tu choisiras ta tenue de camouflage sur place. L'ennemi regarde depuis l'île d'en face.")
-	hide_sub.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
-	tv.add_child(hide_sub)
-	th.add_child(tv)
+	th.add_child(_tac_top("Cache-toi", "Trouve une cachette sur ton île, puis tu choisiras ta tenue de camouflage sur place. L'ennemi regarde depuis l'île d'en face.")[0])
 	var tr := _vbox(2)
 	var tl := _small("Temps")
 	tl.horizontal_alignment = HORIZONTAL_ALIGNMENT_RIGHT
 	tr.add_child(tl)
-	hide_timer = _label("60", 30, PAPER)
+	hide_timer = _title("60", 40, PAPER, 1, true)
 	hide_timer.horizontal_alignment = HORIZONTAL_ALIGNMENT_RIGHT
 	tr.add_child(hide_timer)
 	th.add_child(tr)
@@ -671,8 +717,9 @@ func _build_hide() -> void:
 	sv.add_child(sw)
 	r2.add_child(sv)
 	r2.add_child(_spacer())
-	ready_btn = _button("PRÊT", BLAZE, Color("#1a0d04"), 24)
-	ready_btn.text = "PRÊT (Entrée)"
+	ready_btn = _menu_item("PRÊT  (ENTRÉE)", true)
+	ready_btn.add_theme_font_size_override("font_size", 26)
+	ready_btn.custom_minimum_size = Vector2(230, 58)
 	ready_btn.size_flags_vertical = Control.SIZE_SHRINK_END
 	ready_btn.pressed.connect(func(): ready_pressed.emit())
 	r2.add_child(ready_btn)
@@ -791,41 +838,46 @@ func set_scope(on: bool, glint := false) -> void:
 func _build_end() -> void:
 	end_panel = _full(Control.new())
 	var holder := _full(MarginContainer.new())
-	holder.add_theme_constant_override("margin_bottom", 16)
+	holder.add_theme_constant_override("margin_bottom", 22)
 	var box := _vbox(0)
 	box.alignment = BoxContainer.ALIGNMENT_END
-	var card := _panel()
-	card.add_theme_stylebox_override("panel", _style(PANEL, LINE, 6, 20))
-	card.custom_minimum_size.x = 460
+	var card := _tac_panel(24)
+	card.custom_minimum_size.x = 500
 	card.size_flags_horizontal = Control.SIZE_SHRINK_CENTER
 	card.mouse_filter = Control.MOUSE_FILTER_STOP
+	end_accent = card.get_theme_stylebox("panel")
 	var v := _vbox(12)
-	end_title = _label("", 46, OK)
+	v.add_child(_tac_header("Fin de la partie", 14))
+	end_title = _title("", 64, OK, 2, true)
 	v.add_child(end_title)
-	end_text = _label("", 17, PAPER)
+	end_text = _title("", 19, PAPER, 1)
 	end_text.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
-	end_text.custom_minimum_size.x = 420
+	end_text.custom_minimum_size.x = 450
 	v.add_child(end_text)
-	end_tips = _label("", 15, MUTED)
+	end_tips = _label("", 16, MUTED)
 	end_tips.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
-	end_tips.custom_minimum_size.x = 420
+	end_tips.custom_minimum_size.x = 450
 	v.add_child(end_tips)
-	var row := _hbox(10)
-	var to_menu := _button("Menu", Color(1, 1, 1, 0.08), PAPER, 18)
-	to_menu.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-	to_menu.pressed.connect(func(): menu_pressed.emit())
-	row.add_child(to_menu)
-	var again := _button("REJOUER", BLAZE, Color("#1a0d04"), 22)
-	again.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	v.add_child(_spacer_v(4))
+	var again := _menu_item("REJOUER", true)
+	again.set_meta("son_fort", true)
+	again.custom_minimum_size.y = 66
 	again.pressed.connect(func(): again_pressed.emit())
-	row.add_child(again)
-	v.add_child(row)
+	v.add_child(again)
+	var to_menu := _menu_item("MENU", false)
+	to_menu.pressed.connect(func(): menu_pressed.emit())
+	v.add_child(to_menu)
 	card.add_child(v)
 	box.add_child(card)
 	holder.add_child(box)
 	end_panel.add_child(holder)
 	end_panel.visible = false
 	root.add_child(end_panel)
+
+## Couleur du résultat (vert gagné, rouge perdu) : titre et trait du panneau de fin.
+func set_end_color(c: Color) -> void:
+	end_title.add_theme_color_override("font_color", c)
+	end_accent.border_color = c
 
 
 # ---------- Effets ----------
@@ -852,23 +904,18 @@ func pulse(rect: ColorRect, from: float, secs: float) -> void:
 const PaintScript := preload("res://scripts/paint.gd")
 
 func _section(title: String) -> VBoxContainer:
-	var v := _vbox(6)
-	v.add_child(_small(title))
+	var v := _vbox(8)
+	v.add_child(_tac_header(title, 14))
 	return v
 
 func _build_paint() -> void:
 	paint_hud = _full(Control.new())
 	var top := _bar(true)
-	var tv := _vbox(2)
-	tv.add_child(_label("Camouflage", 30, PAPER))
-	var paint_sub := _small("Choisis la tenue qui ressemble au terrain de ta cachette")
-	paint_sub.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
-	tv.add_child(paint_sub)
-	top.add_child(tv)
+	top.add_child(_tac_top("Camouflage", "Choisis la tenue qui ressemble au terrain de ta cachette")[0])
 	paint_hud.add_child(top)
 
 	# Panneau de gauche : couleurs, pinceau, outils, posture.
-	var left := _panel()
+	var left := _tac_panel(14)
 	left.set_anchors_preset(Control.PRESET_CENTER_LEFT)
 	left.grow_vertical = Control.GROW_DIRECTION_BOTH
 	left.position.x = 14
@@ -882,7 +929,7 @@ func _build_paint() -> void:
 	og.add_theme_constant_override("v_separation", 6)
 	for k in PaintScript.OUTFITS:
 		var o: Array = PaintScript.OUTFITS[k]
-		var b := _button(o[0], Color(1, 1, 1, 0.06), PAPER, 15)
+		var b := _tac_choice(o[0], 15)
 		var img: Image = (load(o[1]) as Texture2D).get_image()
 		img.decompress()
 		img.resize(34, 24)
@@ -903,7 +950,7 @@ func _build_paint() -> void:
 	for k in PaintScript.GHILLIES:
 		kinds[k] = PaintScript.GHILLIES[k][0]
 	for k in kinds:
-		var b := _button(kinds[k], Color(1, 1, 1, 0.06), PAPER, 14)
+		var b := _tac_choice(kinds[k], 14)
 		b.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 		b.pressed.connect(func(): paint_ghillie.emit(k))
 		ghillie_buttons[k] = b
@@ -913,7 +960,7 @@ func _build_paint() -> void:
 	var ps := _section("Voir la posture")
 	var ph := _hbox(6)
 	for p in [["debout", "Debout"], ["accroupi", "Accroupi"], ["couche", "Couché"]]:
-		var b := _button(p[1], Color(1, 1, 1, 0.06), PAPER, 15)
+		var b := _tac_choice(p[1], 15)
 		b.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 		b.pressed.connect(func(): paint_pose.emit(p[0]))
 		paint_poses[p[0]] = b
@@ -926,7 +973,7 @@ func _build_paint() -> void:
 	paint_left = left
 
 	# Panneau de droite : ressemblance avec chaque terrain.
-	var right := _panel()
+	var right := _tac_panel(14)
 	right.set_anchors_preset(Control.PRESET_CENTER_RIGHT)
 	right.grow_vertical = Control.GROW_DIRECTION_BOTH
 	right.grow_horizontal = Control.GROW_DIRECTION_BEGIN
@@ -934,14 +981,14 @@ func _build_paint() -> void:
 	right.custom_minimum_size.x = 230
 	right.mouse_filter = Control.MOUSE_FILTER_STOP
 	var rv := _vbox(10)
-	rv.add_child(_small("Camouflage sur chaque terrain"))
+	rv.add_child(_tac_header("Camouflage par terrain", 14))
 	for k in ["neige", "roche", "herbe", "foret"]:
 		var row := _vbox(3)
 		var lh := _hbox(6)
-		var name_l := _label(ZONES[k]["label"], 16, PAPER)
+		var name_l := _title(String(ZONES[k]["label"]).to_upper(), 17, PAPER, 2)
 		name_l.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 		lh.add_child(name_l)
-		var pct := _label("0 %", 16, PAPER)
+		var pct := _title("0 %", 17, PAPER, 1)
 		lh.add_child(pct)
 		match_labels[k] = pct
 		row.add_child(lh)
@@ -969,7 +1016,9 @@ func _build_paint() -> void:
 	hint.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	hint.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 	bh.add_child(hint)
-	var done := _button("TERMINÉ", BLAZE, Color("#1a0d04"), 24)
+	var done := _menu_item("TERMINÉ", true)
+	done.custom_minimum_size = Vector2(230, 64)
+	done.set_meta("son_fort", true)
 	done.pressed.connect(func(): paint_done.emit())
 	bh.add_child(done)
 	bottom.add_child(bh)
@@ -980,8 +1029,7 @@ func _build_paint() -> void:
 func _mark(buttons: Dictionary, key) -> void:
 	for k in buttons:
 		var b: Button = buttons[k]
-		var on: bool = k == key
-		b.add_theme_stylebox_override("normal", _style(Color(1, 1, 1, 0.22) if on else Color(1, 1, 1, 0.06), BLAZE if on else LINE, 4, 10))
+		_tac_mark(b, k == key)
 
 func set_paint_state(color: Color, size_idx: int, tool: String, pose: String) -> void:
 	for b in paint_colors:
@@ -1009,6 +1057,8 @@ func set_matches(scores: Dictionary) -> void:
 		(match_bars[k] as ColorRect).size = Vector2(200 * v, 8)
 		if best == "" or v > scores[best]:
 			best = k
+	for k in match_labels:
+		(match_labels[k] as Label).add_theme_color_override("font_color", BLAZE if k == best else PAPER)
 	paint_info.text = "Cette tenue va le mieux sur la %s. La tenue de feuillage casse encore plus ta silhouette." % ZONES[best]["label"].to_lower()
 
 
