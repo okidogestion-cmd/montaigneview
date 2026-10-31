@@ -741,3 +741,9 @@ Le jeu devient une **appli mobile** (même jeu : cachette, peinture, duel), plus
   le corps suit la pente.
 - Décor seulement : pas de collision, ni pour les balles ni pour la vue de l'ennemi (équilibre inchangé).
 - Artefact version 44 : publié. `index.pck` = 9,31 Mo.
+- Bouquetins déplacés **devant** chaque île (côté adversaire, 30 à 150 m du centre, à plus de 25 m des cachettes) :
+  avant, ils étaient derrière et on ne les voyait pas.
+- **Arrière des îles allégé** (on n'y va pas pour l'instant) : au-delà de 30 m derrière le centre de chaque île,
+  le décor passe progressivement à 35 % (`world.gd` → `_thin_back`, tirage fixe par position). 2 500 éléments
+  en moins (arbres 7 013 → 4 889). Le décor de l'avant, où l'on joue, ne change pas.
+- Artefact version 45 : publié. `index.pck` = 9,31 Mo.

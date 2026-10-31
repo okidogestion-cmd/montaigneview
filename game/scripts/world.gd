@@ -773,6 +773,13 @@ func _scatter() -> void:
 			if zn == "roche" and slope > 0.75 and r2 < 0.025:
 				scree.append([x, h + 0.05, z, 0.25 + rng.randf() * 0.45, rot, 0.55, _rock_region(x, z), _rock_tint(x, z)])
 				continue
+	# Arrière des îles (côté opposé à l'adversaire, où l'on ne va pas pour l'instant) : décor allégé.
+	var before := trees.size() + rounds.size() + bushes.size() + shrubs.size() + rocks.size() + scree.size()
+	for list: Array in [trees, rounds, bushes, shrubs, rocks, scree]:
+		var kept: Array = list.filter(func(p): return not _thin_back(p[0], p[2]))
+		list.clear()
+		list.append_array(kept)
+	print("arrière des îles : %d éléments de décor en moins" % (before - (trees.size() + rounds.size() + bushes.size() + shrubs.size() + rocks.size() + scree.size())))
 	var body := StaticBody3D.new()
 	add_child(body)
 	var leafy := StaticBody3D.new()   # arbres et buissons : traversés par les balles quand ils sont effacés
@@ -799,6 +806,18 @@ const SHRUB_MODELS := [0, 1]   # buissons bas : les modèles des buissons hauts 
 const PLAY_RADIUS := 210.0     # zone de jeu autour du centre de chaque île
 const PLAY_FILL := 0.42        # forêt de la zone de jeu (réglée pour garder le couvert d'avant)
 const PLAY_MAX_SCALE := 1.3   # part des emplacements libres de la forêt dense qui portent un grand arbre
+
+const BACK_MARGIN := 30.0      # m au-delà du centre de l'île, côté opposé à l'adversaire
+const BACK_KEEP := 0.35        # part du décor gardée à l'arrière des îles
+
+## Vrai pour un élément de décor à retirer à l'arrière d'une île (tirage fixe par position : même décor à chaque partie).
+func _thin_back(x: float, z: float) -> bool:
+	var cz := MZ if z > 0.0 else -MZ
+	var back := (z - cz) * signf(cz)
+	if back < BACK_MARGIN or Vector2(x, z - cz).length() > 420.0:
+		return false
+	var hsh := fposmod(sin(x * 12.9898 + z * 78.233) * 43758.5453, 1.0)
+	return hsh > lerpf(1.0, BACK_KEEP, smoothstep(BACK_MARGIN, BACK_MARGIN + 40.0, back))
 
 ## Un amas de rochers autour de (cx, cz) : beaucoup de petits, quelques gros, formes et nuances mêlées.
 func _rock_cluster(rocks: Array, scree: Array, cx: float, cz: float, count: int, spread: float) -> void:
@@ -1359,14 +1378,15 @@ func _build_fauna() -> void:
 	var r := RandomNumberGenerator.new()
 	r.seed = 77
 	for cz in [MZ, -MZ]:
-		# Une petite harde par île, sur les rochers et l'herbe de mi-pente, loin des cachettes.
+		# Une petite harde par île, sur les rochers et l'herbe, devant l'île, loin des cachettes.
 		var center := Vector2.ZERO
-		for tries in 400:
-			var a := r.randf() * TAU
-			var d := 50.0 + r.randf() * 90.0
+		for tries in 2000:
+			# Devant l'île (côté adversaire), visibles depuis les cachettes et à la lunette.
+			var a: float = -signf(cz) * PI / 2.0 + r.randf_range(-1.0, 1.0)
+			var d := 30.0 + r.randf() * 120.0
 			var x := cos(a) * d
 			var z: float = cz + sin(a) * d
-			if height_at(x, z) > WATER_Y + 8.0 and zone_of(x, z) in ["roche", "herbe"] and not _near_spot(x, z, 900):
+			if height_at(x, z) > WATER_Y + 6.0 and zone_of(x, z) != "neige" and not _near_spot(x, z, 625):
 				center = Vector2(x, z)
 				break
 		if center == Vector2.ZERO:
