@@ -4,51 +4,52 @@
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@600;800&display=swap" rel="stylesheet">
 <style>
-/* Écran de chargement : même direction artistique que l'écran titre du jeu (photo, plaque sombre à filet orange,
-   capitales étroites et grasses Barlow Condensed, barre biseautée). */
+/* Écran de chargement : même direction artistique que l'écran titre du jeu (inspiré des menus de Call of Duty) :
+   photo assombrie comme au cinéma, logo DUSKLINE (logo.png, Higgsfield) au centre avec des bandes glitch orange,
+   barre de chargement fine et biseautée, textes en capitales Barlow Condensed. */
 :root {
-  --ink: #0e1418; --paper: #ecf0e8; --muted: #a3ada7; --blaze: #ff7a2f;
+  --ink: #0e1418; --paper: #ecf0e8; --blaze: #ff7a2f;
   --font: 'Barlow Condensed', 'Arial Narrow', system-ui, sans-serif;
   color-scheme: dark;
 }
 html, body { height: 100%; margin: 0; overflow: hidden; background: var(--ink); color: var(--paper); font-family: var(--font); font-weight: 600;
   touch-action: none; user-select: none; -webkit-user-select: none; -webkit-touch-callout: none; }
 #canvas { position: fixed; inset: 0; width: 100%; height: 100%; display: block; outline: none; background: var(--ink); }
-/* Illustration créée avec Higgsfield (menu.jpg), comme sur l'écran titre. */
-#loader { position: fixed; inset: 0; display: grid; place-items: center end;
-  background: linear-gradient(90deg, rgba(14,20,24,0), rgba(14,20,24,.35) 45%, rgba(14,20,24,.94)), url("menu.jpg") 25% center / cover no-repeat, var(--ink);
-  padding-left: max(16px, env(safe-area-inset-left, 0px)); padding-right: max(44px, env(safe-area-inset-right, 0px)); padding-block: 24px; }
-.card { width: min(560px, 100%); display: grid; gap: 18px; }
-.plate { background: rgba(9,13,15,.78); border-left: 7px solid var(--blaze); padding: 26px; display: grid; gap: 10px; }
-.kicker { margin: 0; color: var(--blaze); font-weight: 800; font-size: 22px; letter-spacing: .14em; text-transform: uppercase; text-shadow: 0 2px 0 rgba(0,0,0,.85); }
-h1 { margin: 0; font-weight: 800; font-size: clamp(64px, 14vw, 112px); line-height: .9; letter-spacing: .06em; text-shadow: 0 3px 0 rgba(0,0,0,.85); }
-.pitch { margin: 0; font-weight: 800; font-size: 24px; line-height: 1.2; text-shadow: 0 2px 0 rgba(0,0,0,.85); }
-.bar { height: 14px; background: rgba(255,255,255,.08); transform: skewX(-12deg); overflow: hidden; border: 1px solid rgba(236,240,232,.16); }
+#loader { position: fixed; inset: 0; display: grid; place-items: center;
+  background:
+    linear-gradient(180deg, rgba(14,20,24,.55), rgba(14,20,24,.05) 40%, rgba(14,20,24,.3) 62%, rgba(14,20,24,.9)),
+    linear-gradient(90deg, rgba(14,20,24,.6), rgba(14,20,24,0) 50%, rgba(14,20,24,.6)),
+    url("menu.jpg") 30% center / cover no-repeat, var(--ink);
+  padding: 24px max(16px, env(safe-area-inset-right, 0px)) 24px max(16px, env(safe-area-inset-left, 0px)); }
+.card { width: min(720px, 92vw); display: grid; gap: 30px; justify-items: center; }
+.logo { position: relative; width: 100%; aspect-ratio: 1100 / 346; }
+.logo img { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: contain; }
+.logo i { position: absolute; display: block; }
+.logo i:nth-child(1) { left: -16%; right: 70%; top: 36%; bottom: 50%; background: rgba(255,122,47,.85); animation: glitch 2.3s infinite; }
+.logo i:nth-child(2) { left: 58%; right: -14%; top: 58%; bottom: 30%; background: rgba(255,122,47,.7); animation: glitch 3.0s .4s infinite; }
+.logo i:nth-child(3) { left: -6%; right: 78%; top: 74%; bottom: 20%; background: rgba(0,0,0,.7); animation: glitch 3.7s .9s infinite; }
+.logo i:nth-child(4) { left: 70%; right: -4%; top: 16%; bottom: 76%; background: rgba(0,0,0,.6); animation: glitch 4.4s 1.3s infinite; }
+.logo i:nth-child(5) { left: 40%; right: 38%; top: 86%; bottom: 10%; background: rgba(255,122,47,.55); animation: glitch 5.1s 1.8s infinite; }
+@keyframes glitch { 0%, 92%, 100% { opacity: 1; transform: none; } 94% { opacity: .35; transform: translateX(14px); } 97% { opacity: 1; transform: none; } }
+.bar { width: min(420px, 80vw); height: 10px; background: rgba(255,255,255,.08); transform: skewX(-18deg); overflow: hidden; border: 1px solid rgba(236,240,232,.2); }
 .bar b { display: block; height: 100%; width: 0; background: var(--blaze); transition: width .2s; }
-.status { margin: 0; font-weight: 800; font-size: 19px; color: var(--paper); letter-spacing: .12em; text-transform: uppercase; font-variant-numeric: tabular-nums; text-shadow: 0 2px 0 rgba(0,0,0,.85); }
-.hint { margin: 0; font-size: 17px; color: rgba(236,240,232,.88); line-height: 1.3; text-shadow: 0 2px 0 rgba(0,0,0,.85); }
+.status { margin: -14px 0 0; font-weight: 800; font-size: 20px; letter-spacing: .14em; text-transform: uppercase; font-variant-numeric: tabular-nums; text-shadow: 0 2px 0 rgba(0,0,0,.85); }
+.hint { position: fixed; left: 0; right: 0; bottom: max(18px, env(safe-area-inset-bottom, 0px)); margin: 0; padding: 0 20px; text-align: center;
+  font-size: 16px; letter-spacing: .04em; color: rgba(236,240,232,.75); text-shadow: 0 2px 0 rgba(0,0,0,.85); }
 .error { color: #ef8f7f; text-transform: none; letter-spacing: 0; }
-/* Téléphone debout : la carte au centre, en pleine largeur. */
-@media (orientation: portrait) {
-  #loader { place-items: center; padding-right: max(16px, env(safe-area-inset-right, 0px));
-    background: linear-gradient(180deg, rgba(14,20,24,.2), rgba(14,20,24,.55)), url("menu.jpg") 22% center / cover no-repeat, var(--ink); }
-}
-@media (prefers-reduced-motion: reduce) { .bar b { transition: none; } }
+@media (orientation: portrait) { .card { width: 92vw; } }
+@media (prefers-reduced-motion: reduce) { .bar b { transition: none; } .logo i { animation: none; } }
 </style>
 
 <canvas id="canvas" tabindex="0">Ton navigateur ne peut pas afficher le jeu.</canvas>
 
 <div id="loader">
   <div class="card">
-    <div class="plate">
-      <p class="kicker">Duel de snipers · 1 contre 1</p>
-      <h1>DUSKLINE</h1>
-      <p class="pitch">Deux montagnes. Deux snipers. Cache-toi, laisse le brouillard se lever, trouve-le à la lunette et tire le premier.</p>
-    </div>
+    <div class="logo"><i></i><i></i><i></i><i></i><i></i><img src="logo.png" alt="DUSKLINE — duel de snipers"></div>
     <div class="bar"><b id="progress"></b></div>
     <p class="status" id="status">Chargement du moteur…</p>
-    <p class="hint">Sur téléphone, joue debout ou couché. Sur ordinateur : ZQSD, souris, Maj pour courir.</p>
   </div>
+  <p class="hint">Sur téléphone, joue debout ou couché · Sur ordinateur : ZQSD, souris, Maj pour courir</p>
 </div>
 
 <script>

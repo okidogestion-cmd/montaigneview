@@ -145,6 +145,9 @@ var ready_btn: Button
 var fire_keys: Label
 var paint_hint: Label
 var menu_card: Control
+var menu_logo: Control
+var menu_list: Control
+var _level := "normal"
 var paint_left: Control
 var paint_right: Control
 ## Téléphone tenu debout : l'interface passe en 720 × 1280 et se réorganise (voir _apply_orientation).
@@ -373,8 +376,9 @@ func _center_card(width: float) -> Array:
 
 
 # ---------- Menu ----------
-## Page d'accueil DUSKLINE (style jeu de tir moderne) : la photo en plein écran, un dégradé sombre à droite,
-## le titre en grandes capitales étroites, des boutons biseautés.
+## Écran titre DUSKLINE, inspiré des menus de Call of Duty : la photo en plein écran assombrie comme au cinéma,
+## le logo (art/logo.png, créé avec Higgsfield) au centre avec des bandes « glitch » orange derrière,
+## trois choix sobres dessous, les aides en petit en bas.
 func _build_menu() -> void:
 	menu = _full(Control.new())
 	var bg := TextureRect.new()
@@ -382,69 +386,98 @@ func _build_menu() -> void:
 	bg.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
 	bg.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_COVERED
 	menu.add_child(_full(bg))
-	var shade := TextureRect.new()
-	var gt := GradientTexture2D.new()
-	var gr := Gradient.new()
-	gr.set_color(0, Color(INK, 0.0))
-	gr.set_color(1, Color(INK, 0.94))
-	gr.add_point(0.45, Color(INK, 0.35))
-	gt.gradient = gr
-	gt.fill_from = Vector2(0, 0)
-	gt.fill_to = Vector2(1, 0)
-	shade.texture = gt
-	shade.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
-	shade.stretch_mode = TextureRect.STRETCH_SCALE
-	menu.add_child(_full(shade))
-	var holder := MarginContainer.new()
-	holder.set_anchors_preset(Control.PRESET_FULL_RECT)
-	holder.anchor_left = 0.5
-	for side in ["left", "right", "top", "bottom"]:
-		holder.add_theme_constant_override("margin_" + side, 44)
-	holder.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	menu_card = holder
-	menu.add_child(holder)
-	var col := _vbox(0)
-	col.alignment = BoxContainer.ALIGNMENT_CENTER
-	holder.add_child(col)
-	# Plaque sombre derrière le titre et le texte (lisible sur le ciel, au téléphone debout aussi), filet orange à gauche.
-	var plate := PanelContainer.new()
-	var ps := _style(Color(0.035, 0.05, 0.06, 0.78), Color(0, 0, 0, 0), 0, 26)
-	ps.border_width_left = 7
-	ps.border_color = BLAZE
-	plate.add_theme_stylebox_override("panel", ps)
-	plate.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	col.add_child(plate)
-	var head := _vbox(10)
-	plate.add_child(head)
-	head.add_child(_title("DUEL DE SNIPERS  ·  1 CONTRE 1", 22, BLAZE, 3, true))
-	head.add_child(_title("DUSKLINE", 112, PAPER, 6, true))
-	var pitch := _title("Deux montagnes. Deux snipers. Cache-toi, laisse le brouillard se lever, trouve-le à la lunette et tire le premier.", 24, PAPER, 0, true)
-	pitch.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
-	head.add_child(pitch)
-	var v := _vbox(14)
-	col.add_child(_spacer_v(18))
-	col.add_child(v)
-	v.add_child(_title("ADVERSAIRE", 19, PAPER, 3, true))
-	var seg := _hbox(6)
-	for lv in ["facile", "normal", "difficile"]:
-		var b := _tac_button(lv.to_upper(), Color(1, 1, 1, 0.06), PAPER, 20)
-		b.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-		b.pressed.connect(func(): level_chosen.emit(lv))
-		level_buttons[lv] = b
-		seg.add_child(b)
-	v.add_child(seg)
-	var play := _tac_button("JOUER", BLAZE, Color("#1a0d04"), 44, true)
+	# Assombrissement : haut et bas sombres, bords sombres (vignette), le centre reste lisible.
+	for dir in [Vector2(0, 1), Vector2(1, 0)]:
+		var shade := TextureRect.new()
+		var gt := GradientTexture2D.new()
+		var gr := Gradient.new()
+		gr.offsets = PackedFloat32Array([0.0, 0.4, 0.62, 1.0]) if dir.y > 0 else PackedFloat32Array([0.0, 0.5, 1.0])
+		gr.colors = PackedColorArray([Color(INK, 0.55), Color(INK, 0.05), Color(INK, 0.3), Color(INK, 0.9)]) if dir.y > 0 \
+			else PackedColorArray([Color(INK, 0.6), Color(INK, 0.0), Color(INK, 0.6)])
+		gt.gradient = gr
+		gt.fill_to = dir
+		shade.texture = gt
+		shade.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
+		shade.stretch_mode = TextureRect.STRETCH_SCALE
+		shade.mouse_filter = Control.MOUSE_FILTER_IGNORE
+		menu.add_child(_full(shade))
+	var center := VBoxContainer.new()
+	center.set_anchors_preset(Control.PRESET_FULL_RECT)
+	center.alignment = BoxContainer.ALIGNMENT_CENTER
+	center.add_theme_constant_override("separation", 34)
+	center.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	menu_card = center
+	menu.add_child(center)
+	# Logo et bandes glitch (positions en fraction de la taille du logo).
+	menu_logo = Control.new()
+	menu_logo.size_flags_horizontal = Control.SIZE_SHRINK_CENTER
+	menu_logo.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	center.add_child(menu_logo)
+	var bars := [
+		[-0.16, 0.30, 0.36, 0.50, Color(BLAZE, 0.85)], [0.58, 1.14, 0.58, 0.70, Color(BLAZE, 0.7)],
+		[-0.06, 0.22, 0.74, 0.80, Color(0, 0, 0, 0.7)], [0.70, 1.04, 0.16, 0.24, Color(0, 0, 0, 0.6)],
+		[0.40, 0.62, 0.86, 0.90, Color(BLAZE, 0.55)], [-0.10, 0.08, 0.20, 0.25, Color(PAPER, 0.18)],
+	]
+	for i in bars.size():
+		var bdef: Array = bars[i]
+		var r := ColorRect.new()
+		r.color = bdef[4]
+		r.anchor_left = bdef[0]
+		r.anchor_right = bdef[1]
+		r.anchor_top = bdef[2]
+		r.anchor_bottom = bdef[3]
+		r.mouse_filter = Control.MOUSE_FILTER_IGNORE
+		menu_logo.add_child(r)
+		# Léger scintillement des bandes, chacune à son rythme.
+		var tw := r.create_tween().set_loops()
+		tw.tween_interval(1.6 + i * 0.7)
+		var dx := 14.0 if i % 2 == 0 else -18.0
+		tw.tween_property(r, "modulate:a", 0.35, 0.06)
+		tw.parallel().tween_property(r, "offset_left", dx, 0.0)
+		tw.parallel().tween_property(r, "offset_right", dx, 0.0)
+		tw.tween_interval(0.08)
+		tw.tween_property(r, "modulate:a", 1.0, 0.05)
+		tw.parallel().tween_property(r, "offset_left", 0.0, 0.0)
+		tw.parallel().tween_property(r, "offset_right", 0.0, 0.0)
+	var logo := TextureRect.new()
+	logo.texture = preload("res://art/logo.png")
+	logo.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
+	logo.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_CENTERED
+	logo.set_anchors_preset(Control.PRESET_FULL_RECT)
+	logo.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	menu_logo.add_child(logo)
+	_size_logo(false)
+	# Choix.
+	var list := _vbox(10)
+	list.size_flags_horizontal = Control.SIZE_SHRINK_CENTER
+	list.custom_minimum_size.x = 400
+	menu_list = list
+	center.add_child(list)
+	var play := _menu_item("JOUER", true)
 	play.set_meta("son_fort", true)
-	play.custom_minimum_size.y = 78
 	play.pressed.connect(func(): play_pressed.emit())
-	v.add_child(play)
-	var cfg := _tac_button("RÉGLAGES", Color(1, 1, 1, 0.04), PAPER, 20)
+	list.add_child(play)
+	var lvl := _menu_item("ADVERSAIRE : NORMAL", false)
+	lvl.pressed.connect(func():
+		var order := ["facile", "normal", "difficile"]
+		level_chosen.emit(order[(order.find(_level) + 1) % order.size()]))
+	level_buttons["cycle"] = lvl
+	list.add_child(lvl)
+	var cfg := _menu_item("RÉGLAGES", false)
 	cfg.pressed.connect(func(): settings.visible = true)
-	v.add_child(cfg)
-	menu_hint = _title("Souris pour viser, clic gauche ou Espace pour tirer, clic droit ou Maj pour retenir ta respiration, molette ou Z pour zoomer, Échap pour libérer la souris.", 17, Color(PAPER, 0.88), 0, true)
-	var hint := menu_hint
-	hint.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
-	v.add_child(hint)
+	list.add_child(cfg)
+	# Aides en petit, en bas.
+	var foot := MarginContainer.new()
+	foot.set_anchors_preset(Control.PRESET_BOTTOM_WIDE)
+	foot.grow_vertical = Control.GROW_DIRECTION_BEGIN
+	for side in ["left", "right", "bottom"]:
+		foot.add_theme_constant_override("margin_" + side, 28)
+	foot.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	menu.add_child(foot)
+	menu_hint = _title("Souris pour viser, clic gauche ou Espace pour tirer, clic droit ou Maj pour retenir ta respiration, molette ou Z pour zoomer, Échap pour libérer la souris.", 16, Color(PAPER, 0.75), 1, true)
+	menu_hint.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	menu_hint.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	foot.add_child(menu_hint)
 	root.add_child(menu)
 	_build_settings()
 	# Cases des gadgets portés : icône + touche (1 / 2), en haut à gauche sous la barre.
@@ -479,6 +512,27 @@ func _build_menu() -> void:
 	root.add_child(gadget_label)
 
 ## Réglages : sensibilité du regard à la souris et au doigt (multiplicateur, par pas de 0,25).
+
+## Taille du logo : grand en paysage, presque toute la largeur debout.
+func _size_logo(portrait: bool) -> void:
+	var w := 640.0 if portrait else 720.0
+	menu_logo.custom_minimum_size = Vector2(w, w * 346.0 / 1100.0)
+	if menu_list != null:
+		menu_list.custom_minimum_size.x = 560.0 if portrait else 400.0
+
+## Choix du menu, façon Call of Duty : plaque biseautée, capitales grasses. Le choix principal est orange.
+func _menu_item(text: String, primary: bool) -> Button:
+	var bg := BLAZE if primary else Color(0.02, 0.03, 0.04, 0.55)
+	var fg := Color("#160b03") if primary else PAPER
+	var b := _tac_button(text, bg, fg, 40 if primary else 24, primary)
+	b.custom_minimum_size.y = 76 if primary else 54
+	if not primary:
+		for st in ["normal", "hover", "pressed"]:
+			var sb := (b.get_theme_stylebox(st) as StyleBoxFlat).duplicate() as StyleBoxFlat
+			sb.border_color = Color(PAPER, 0.22 if st == "normal" else 0.6)
+			b.add_theme_stylebox_override(st, sb)
+	return b
+
 func _build_settings() -> void:
 	var parts := _center_card(440)
 	settings = _full(Control.new())
@@ -543,17 +597,9 @@ func set_gadgets(text: String, icons: Array = [], show_keys := true) -> void:
 			(slot[1] as AtlasTexture).region = Rect2((n % 2) * 128, (n / 2) * 128, 128, 128)
 
 func set_level(level: String) -> void:
-	for lv in level_buttons:
-		var b: Button = level_buttons[lv]
-		var on: bool = lv == level
-		var bg := PAPER if on else Color(1, 1, 1, 0.04)
-		var fg := INK if on else PAPER
-		for st in [["normal", bg], ["hover", bg.lightened(0.1)]]:
-			var sb := _style(st[1], BLAZE if on else LINE, 0, 12)
-			sb.skew = Vector2(0.22, 0)
-			b.add_theme_stylebox_override(st[0], sb)
-		for st in ["font_color", "font_hover_color", "font_pressed_color"]:
-			b.add_theme_color_override(st, fg)
+	_level = level
+	if level_buttons.has("cycle"):
+		(level_buttons["cycle"] as Button).text = "ADVERSAIRE : " + level.to_upper()
 
 
 # ---------- Phase cachette ----------
@@ -1029,7 +1075,7 @@ func _apply_orientation() -> void:
 	# Base 720 × 1280 debout (au lieu de 1280 × 720) : le texte garde sa taille sur un écran étroit.
 	get_window().content_scale_size = Vector2i(720, 1280) if portrait else Vector2i(1280, 720)
 	# Menu : la carte au centre debout ; à droite couché, pour laisser voir l'illustration.
-	menu_card.anchor_left = 0.0 if portrait else 0.5
+	_size_logo(portrait)
 	# Lunette ennemie : un peu plus bas debout, le bandeau du haut y prend trois lignes.
 	inset.position.y = 132 if portrait else 92
 	inset_label.position.y = inset.position.y + 206

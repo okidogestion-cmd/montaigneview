@@ -46,3 +46,4 @@ sources/*.mp3 -filter -diff -merge binary
 docs/audit/** -filter -diff -merge binary
 sources/higgsfield/** -filter -diff -merge binary
 game/art/*.woff -filter -diff -merge binary
+tools/artefact/*.png -filter -diff -merge binary

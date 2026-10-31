@@ -608,3 +608,11 @@ Le jeu devient une **appli mobile** (même jeu : cachette, peinture, duel), plus
 
 ### Artefact version 29 (31/10/2026)
 - Publié : vraie lunette, écran titre lisible, chargement assorti, frottement retiré. `index.pck` = 8,54 Mo.
+
+### Écran titre façon Call of Duty (31/10/2026)
+- Demande : « c'est moche, avant c'était plus beau, inspire-toi de Call of Duty ». Plus de plaque de texte : la photo
+  `menu.jpg` en plein écran assombrie comme au cinéma (haut, bas, bords), le **logo DUSKLINE** créé avec Higgsfield
+  (`art/logo.png` et `tools/artefact/logo.png` : capitales usées, viseur orange dans le K, « DUEL DE SNIPERS », filet
+  orange ; ≈ 0,5 crédit) au centre, avec des bandes « glitch » orange et noires derrière qui scintillent, puis trois
+  choix : JOUER (orange), ADVERSAIRE : NORMAL (appuyer change de niveau), RÉGLAGES ; les aides en petit en bas.
+- Page de chargement de l'artefact refaite à l'identique (même logo, mêmes bandes animées en CSS, barre fine biseautée).
