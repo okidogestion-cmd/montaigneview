@@ -699,3 +699,6 @@ Le jeu devient une **appli mobile** (même jeu : cachette, peinture, duel), plus
 - Correction des rayons (31/10/2026, « le soleil est super fort et le côté lumineux bouge ») : seul le ciel tout près
   du soleil (≈ 30 % de l'écran autour) envoie des rayons, plus les nuages lointains ; force plafonnée à un léger voile,
   coupée dès que le soleil sort de l'écran, et qui varie en douceur quand on tourne.
+
+### Artefact version 39 (31/10/2026)
+- Publié : rayons de lumière plus doux et stables. `index.pck` = 8,97 Mo.
