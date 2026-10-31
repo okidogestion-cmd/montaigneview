@@ -1017,6 +1017,8 @@ const CAMO_SHADER := preload("res://shaders/camo.gdshader")
 # la peinture suit le corps dans toutes les poses.
 const FIG_SCENE := preload("res://art/sniper_anime.scn")
 const MODEL_TEX := preload("res://art/sniper_couleur.jpg")
+const SKIN_MASK := preload("res://art/sniper_peau.png")       # peau (visage, mains) : jamais peinte (tools/masque_peau.py)
+const RIFLE_TEX := preload("res://art/fusil_couleur.jpg")     # texture d'origine du fusil (sources/fusil_higgsfield.glb)
 const MODEL_LUM := 0.051          # luminance moyenne de la texture (linéaire), pour garder ses plis sous la peinture
 # Animations de chaque posture : [nom, vitesse au sol (m/s) à vitesse normale de l'animation] ; la première est à l'arrêt.
 const FIG_ANIMS := {
@@ -1033,6 +1035,8 @@ func _make_figure() -> Node3D:
 	camo.set_shader_parameter("base_color", ZONES["roche"]["color"])
 	camo.set_shader_parameter("albedo_tex", MODEL_TEX)
 	camo.set_shader_parameter("avg_lum", MODEL_LUM)
+	camo.set_shader_parameter("skin_mask", SKIN_MASK)
+	camo.set_shader_parameter("rifle_tex", RIFLE_TEX)
 	var inst: Node3D = FIG_SCENE.instantiate()
 	g.add_child(inst)
 	var mi: MeshInstance3D = inst.find_children("*", "MeshInstance3D", true, false)[0]

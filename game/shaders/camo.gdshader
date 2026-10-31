@@ -9,11 +9,16 @@ render_mode cull_disabled;   // le capuchon et quelques vêtements sont en une s
 // ligne 0 = position + rayon, ligne 1 = couleur. Une image passe partout, y compris dans
 // Safari sur iPhone, où la taille des listes envoyées aux shaders est très limitée.
 
+// Seuls les vêtements prennent la tenue et la peinture : la peau (masque art/sniper_peau.png) et le fusil
+// (CUSTOM0.w = 1, sa propre texture art/fusil_couleur.jpg) gardent les couleurs d'origine du modèle 3D.
+
 // Couleur de fond convertie ici (pow 2,2), comme les coups de pinceau : même rendu sur ordinateur et dans le navigateur.
 uniform vec4 base_color = vec4(0.57, 0.56, 0.53, 1.0);
 // Texture du modèle 3D : tex_mix = 1 montre la tenue d'origine ; sinon la peinture garde ses plis (luminance).
 uniform sampler2D albedo_tex : source_color, filter_linear_mipmap;
 uniform float tex_mix = 0.0;
+uniform sampler2D skin_mask : filter_linear_mipmap;
+uniform sampler2D rifle_tex : source_color, filter_linear_mipmap;
 uniform float avg_lum = 0.043;
 // Tenue à motif (mode normal) : image de camouflage plaquée sur le corps, dans le repère debout.
 uniform sampler2D camo_tex : source_color, filter_linear_mipmap, repeat_enable;
@@ -27,12 +32,14 @@ uniform float heat = 0.0;          // viseur thermique : le corps chaud brille (
 
 varying vec3 ref_pos;
 varying vec3 world_pos;
+varying float rifle;
 
 #include "res://shaders/clouds.gdshaderinc"
 #include "res://shaders/grade.gdshaderinc"
 
 void vertex() {
 	ref_pos = CUSTOM0.xyz;
+	rifle = CUSTOM0.w;
 	world_pos = (MODEL_MATRIX * vec4(VERTEX, 1.0)).xyz;
 }
 
@@ -53,12 +60,19 @@ void fragment() {
 			c = grade(pow(texelFetch(stroke_tex, ivec2(i, 1), 0).rgb, vec3(2.2))) * fold;
 		}
 	}
+	c = mix(c, t, texture(skin_mask, UV).r);
+	float h = heat;
+	if (rifle > 0.5) {
+		// Texture d'origine lissée (niveau de détail réduit) : ses couleurs sans le brouillage de la texture générée.
+		c = textureLod(rifle_tex, UV, 3.5).rgb * 0.9;
+		h *= 0.2;   // l'arme reste froide dans le viseur thermique
+	}
 	if (cursor.w > 0.0) {
 		float d = abs(distance(ref_pos, cursor.xyz) - cursor.w);
 		c = mix(c, vec3(1.0), 1.0 - smoothstep(0.004, 0.009, d));
 	}
-	ALBEDO = mix(c, vec3(1.0), heat * 0.7);
-	EMISSION = vec3(1.0, 0.95, 0.85) * heat * 4.0;
+	ALBEDO = mix(c, vec3(1.0), h * 0.7);
+	EMISSION = vec3(1.0, 0.95, 0.85) * h * 4.0;
 	ROUGHNESS = 1.0;
 	SPECULAR = 0.0;
 }

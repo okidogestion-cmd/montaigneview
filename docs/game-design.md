@@ -702,3 +702,13 @@ Le jeu devient une **appli mobile** (même jeu : cachette, peinture, duel), plus
 
 ### Artefact version 39 (31/10/2026)
 - Publié : rayons de lumière plus doux et stables. `index.pck` = 8,97 Mo.
+
+### Sniper : couleurs d'origine du modèle 3D (31/10/2026)
+- Demande : « sa tenue, son visage et son sniper sont de la même couleur, on reprend le fichier 3D de base ».
+- La tenue de camouflage et la peinture ne vont plus que sur les **vêtements** :
+  - peau (visage, cou, mains) : masque `game/art/sniper_peau.png` (parties rosées de la texture d'origine,
+    `tools/masque_peau.py`), qui garde la texture d'origine `sniper_couleur.jpg` ;
+  - fusil : il reprend **sa propre texture** (`game/art/fusil_couleur.jpg`, tirée de `sources/fusil_higgsfield.glb`),
+    lissée dans le shader (la texture générée est brouillée de près). `tools/sniper_anime.gd` garde les UV du fusil
+    et marque ses sommets (CUSTOM0.w = 1) ; le fusil reste froid au viseur thermique.
+- Artefact version 40 : publié. `index.pck` = 9,07 Mo.

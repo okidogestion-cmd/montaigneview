@@ -5,13 +5,14 @@ extends SceneTree
 ##
 ## Entrées (dossier sources/) :
 ## - sniper_higgsfield.glb : le sniper sans arme, en A-pose, avec son squelette (Higgsfield, 1,8 m, regard vers +z) ;
-## - fusil_higgsfield.glb : le fusil seul (Higgsfield), qu'on accroche dans le dos ;
+## - fusil_higgsfield.glb : le fusil seul (Higgsfield), qu'on accroche dans le dos, avec sa texture (art/fusil_couleur.jpg) ;
 ## - UAL1_Standard.glb : squelette et animations de la « Universal Animation Library » de Quaternius (CC0).
 ##
 ## Le squelette des animations est ajusté au sniper : chaque os prend la longueur et la direction de l'os
 ## correspondant du sniper (hanches, genoux, chevilles, épaules, coudes, poignets), puis le sniper garde ses
 ## propres poids de peau, rattachés aux os des animations. Les animations jouent donc avec les vraies
-## articulations du modèle. Chaque sommet garde sa position au repos (CUSTOM0) : la peinture suit le corps.
+## articulations du modèle. Chaque sommet garde sa position au repos (CUSTOM0.xyz) : la peinture suit le corps.
+## CUSTOM0.w vaut 1 sur le fusil : le shader camo lui donne sa propre texture et ne le peint pas.
 ## La bibliothèque n'a pas de position couchée : on la fabrique (Prone_Idle_Loop, Prone_Crawl_Loop).
 
 const KEEP := [
@@ -169,7 +170,7 @@ func _run() -> void:
 	var idx: PackedInt32Array = a[Mesh.ARRAY_INDEX]
 
 	# --- Le fusil, dans le dos (rigide, suit le haut du buste).
-	var r := _rifle(rifle, out_v, sk.find_bone("spine_03"), _dark_uv(h_mi))
+	var r := _rifle(rifle, out_v, sk.find_bone("spine_03"))
 	var first := out_v.size()
 	out_v.append_array(r.v)
 	out_n.append_array(r.n)
@@ -185,6 +186,7 @@ func _run() -> void:
 		custom[i * 4] = out_v[i].x
 		custom[i * 4 + 1] = out_v[i].y
 		custom[i * 4 + 2] = out_v[i].z
+		custom[i * 4 + 3] = 1.0 if i >= first else 0.0   # 1 : fusil (sa propre texture, art/fusil_couleur.jpg)
 	var arrays := []
 	arrays.resize(Mesh.ARRAY_MAX)
 	arrays[Mesh.ARRAY_VERTEX] = out_v
@@ -247,31 +249,13 @@ func _place(sk: Skeleton3D, name: String, target: Vector3) -> void:
 	rest.origin = pg.affine_inverse() * (sk.global_transform.affine_inverse() * target)
 	sk.set_bone_rest(b, rest)
 
-## Un coin sombre de la texture du sniper (pour le fusil, qui n'a pas de place dans cette texture).
-func _dark_uv(mi: MeshInstance3D) -> Vector2:
-	var mat := mi.mesh.surface_get_material(0)
-	var img: Image = (mat as BaseMaterial3D).albedo_texture.get_image()
-	img.decompress()
-	var best := Vector2(0.5, 0.5)
-	var best_l := INF
-	for y in range(8, img.get_height() - 8, 16):
-		for x in range(8, img.get_width() - 8, 16):
-			var s := 0.0
-			for dy in [-6, 0, 6]:
-				for dx in [-6, 0, 6]:
-					s += img.get_pixel(x + dx, y + dy).get_luminance()
-			# assez sombre, mais pas le noir pur des bords de la texture
-			if s / 9.0 > 0.05 and s < best_l:
-				best_l = s
-				best = Vector2((x + 0.5) / img.get_width(), (y + 0.5) / img.get_height())
-	return best
-
 ## Le fusil, à ajouter au maillage : en travers du dos, canon vers le haut derrière l'épaule gauche.
-func _rifle(rifle: Node3D, body: PackedVector3Array, bone: int, dark: Vector2) -> Dictionary:
+func _rifle(rifle: Node3D, body: PackedVector3Array, bone: int) -> Dictionary:
 	var rmi: MeshInstance3D = rifle.find_children("*", "MeshInstance3D", true, false)[0]
 	var ra := rmi.mesh.surface_get_arrays(0)
 	var rv: PackedVector3Array = ra[Mesh.ARRAY_VERTEX]
 	var rn: PackedVector3Array = ra[Mesh.ARRAY_NORMAL]
+	var ruv: PackedVector2Array = ra[Mesh.ARRAY_TEX_UV]
 	var ri: PackedInt32Array = ra[Mesh.ARRAY_INDEX]
 	var g := rmi.global_transform
 	var pts := []
@@ -341,7 +325,7 @@ func _rifle(rifle: Node3D, body: PackedVector3Array, bone: int, dark: Vector2) -
 		r.n.append((xf.basis * (g.basis * rn[i])).normalized())
 		r.b.append_array([bone, 0, 0, 0])
 		r.w.append_array([1.0, 0.0, 0.0, 0.0])
-		r.uv.append(dark)
+		r.uv.append(ruv[i])
 	print("fusil : ", pts.size(), " sommets, longueur d'origine ", tmax - tmin, " m → ", RIFLE_LENGTH, " m, dos à z = ", back_z)
 	return r
 
