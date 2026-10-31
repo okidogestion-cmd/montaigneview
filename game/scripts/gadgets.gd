@@ -43,6 +43,9 @@ var _overlay: ColorRect
 var _markers: Array = []             # repères de l'écho [{sprite, t}]
 var _ring_tex: ImageTexture
 var _crate_mat: StandardMaterial3D
+const HEAT_ZONE := 16.0               # largeur de la zone de chaleur (m)
+const HEAT_OFFSET := 7.0              # décalage au hasard de la zone par rapport au corps (m)
+var _heat_off := Vector3.ZERO
 var _heat: TextureRect               # tache de chaleur de l'ennemi au thermique, dessinée à l'écran (visible à travers les feuillages)
 var _beam_mat: StandardMaterial3D
 
@@ -174,6 +177,7 @@ func update_hide(pos: Vector3) -> void:
 			main.hud.toast("Tu portes déjà 2 gadgets.", 1.5)
 			return
 		carry.append(c.kind)
+		_sfx("ramassage", -6.0)
 		c.node.queue_free()
 		_crates.remove_at(i)
 		main.hud.toast("Trouvé : %s ! (%s)" % [INFO[c.kind].label, _how(carry.size())], 3.0)
@@ -193,26 +197,44 @@ func use(slot: int) -> void:
 	if when == "fire" and phase != "fire":
 		main.hud.toast("%s : à utiliser pendant le tir." % INFO[kind].label, 2.0)
 		return
-	if when == "hide" and phase != "hide":
-		main.hud.toast("%s : à poser pendant la cachette." % INFO[kind].label, 2.0)
+	if when == "hide" and phase != "hide" and phase != "move":
+		main.hud.toast("%s : à poser pendant la cachette ou un déplacement." % INFO[kind].label, 2.0)
 		return
-	if phase != "fire" and phase != "hide":
+	if not phase in ["fire", "hide", "move"]:
 		return
 	carry.remove_at(slot)
 	match kind:
 		"leurre":
+			_sfx("leurre", -2.0)
 			_place_decoy()
 			main.hud.toast("Leurre posé. Va te cacher ailleurs : l'ennemi tirera dessus.", 3.0)
 		"thermique":
 			timers[kind] = INFO[kind].time
+			var a := randf() * TAU
+			_heat_off = Vector3(cos(a), 0.0, sin(a)) * randf_range(2.0, HEAT_OFFSET)
+			_sfx("thermique_on", -4.0)
 			_set_thermal(true)
 		"echo":
 			timers[kind] = INFO[kind].time
+			_sfx("echo", -6.0)
 			main.hud.toast("Écho de tir : chaque tir ennemi laisse un repère pendant 30 s.", 3.0)
 		"couverture":
 			timers[kind] = INFO[kind].time
+			_sfx("couverture", -3.0)
 			main.hud.toast("Couverture de survie : l'ennemi te repère moins vite pendant 20 s.", 3.0)
 	_refresh()
+
+## Bruitage d'un gadget (art/son_<nom>.ogg) ; rien si le fichier n'existe pas.
+func _sfx(name: String, db: float) -> void:
+	var path := "res://art/son_%s.ogg" % name
+	if not ResourceLoader.exists(path):
+		return
+	var p := AudioStreamPlayer.new()
+	p.stream = load(path)
+	p.volume_db = db
+	add_child(p)
+	p.finished.connect(p.queue_free)
+	p.play()
 
 func active(kind: String) -> bool:
 	return timers.get(kind, 0.0) > 0.0
@@ -227,6 +249,7 @@ func update(dt: float) -> void:
 		timers[k] = maxf(0.0, timers[k] - dt)
 		if was and timers[k] == 0.0:
 			if k == "thermique":
+				_sfx("thermique_off", -6.0)
 				_set_thermal(false)
 			main.hud.toast("%s : terminé." % INFO[k].label, 1.5)
 	for i in range(_markers.size() - 1, -1, -1):
@@ -246,11 +269,12 @@ func _update_heat() -> void:
 	if not active("thermique") or not world.enemy.visible:
 		_heat.visible = false
 		return
-	var target: Vector3 = world.enemy.global_position + Vector3(0, 0.8, 0)
+	var body: Vector3 = world.enemy.global_position + Vector3(0, 0.8, 0)
+	var target: Vector3 = body + _heat_off
 	var from: Vector3 = main.camera.global_position
 	var hidden := false
 	for i in range(1, 40):
-		var p := from.lerp(target, i / 40.0)
+		var p := from.lerp(body, i / 40.0)
 		if world.height_at(p.x, p.z) > p.y + 0.3:
 			hidden = true
 			break
@@ -258,16 +282,17 @@ func _update_heat() -> void:
 	if hidden or cam.is_position_behind(target):
 		_heat.visible = false
 		return
-	# Taille : un peu plus grande que le corps à l'écran, au moins 26 × 44 px (repérable même à 400 m).
+	# Zone de chaleur (31/10 : le point précis était « cheaté ») : une grande tache floue de ≈ 16 m, décalée au hasard
+	# jusqu'à 7 m du corps à chaque allumage. On sait où chercher, pas où tirer.
 	var sp := cam.unproject_position(target)
 	var px_per_m: float = main.get_viewport().get_visible_rect().size.y / (2.0 * tan(deg_to_rad(cam.fov) / 2.0) * from.distance_to(target))
-	var sz := Vector2(maxf(26.0, 1.2 * px_per_m), maxf(44.0, 2.0 * px_per_m))
+	var sz := Vector2(maxf(90.0, HEAT_ZONE * px_per_m), maxf(70.0, HEAT_ZONE * 0.75 * px_per_m))
 	_heat.size = sz
 	_heat.position = sp - sz / 2.0
 	_heat.visible = true
 	var ghillie_on: bool = world.enemy.has_meta("ghillie") and (world.enemy.get_meta("ghillie") as Node3D).visible
 	var pulse := 0.85 + 0.15 * sin(Time.get_ticks_msec() * 0.008)
-	_heat.modulate = Color(1.0, 0.95, 0.8, (0.55 if ghillie_on else 0.95) * pulse)
+	_heat.modulate = Color(1.0, 0.75, 0.45, (0.25 if ghillie_on else 0.45) * pulse)
 
 func _set_thermal(on: bool) -> void:
 	_overlay.visible = on
@@ -354,9 +379,9 @@ func _make_blob() -> ImageTexture:
 	var img := Image.create(n, n, false, Image.FORMAT_RGBA8)
 	for y in n:
 		for x in n:
-			var d := Vector2((x - n / 2.0 + 0.5) / 0.55, y - n / 2.0 + 0.5).length() / (n / 2.0)   # tache plus haute que large
+			var d := Vector2(x - n / 2.0 + 0.5, y - n / 2.0 + 0.5).length() / (n / 2.0)
 			var a := clampf(1.0 - d, 0.0, 1.0)
-			img.set_pixel(x, y, Color(1, 1, 1, a * a * (3.0 - 2.0 * a)))
+			img.set_pixel(x, y, Color(1, 1, 1, a * a))   # très floue : pas de contour
 	return ImageTexture.create_from_image(img)
 
 func _make_ring() -> ImageTexture:

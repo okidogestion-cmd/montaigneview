@@ -757,7 +757,7 @@ func _build_fire() -> void:
 	zv.add_child(zoom_label)
 	bh.add_child(zv)
 	bh.add_child(_spacer())
-	fire_keys = _label("Clic gauche ou Espace : tirer   1 / 2 : gadgets\nÉchap : libérer la souris", 14, MUTED)
+	fire_keys = _label("Clic gauche ou Espace : tirer   1 / 2 : gadgets   R : changer de cachette\nÉchap : libérer la souris", 14, MUTED)
 	var keys := fire_keys
 	keys.horizontal_alignment = HORIZONTAL_ALIGNMENT_RIGHT
 	bh.add_child(keys)

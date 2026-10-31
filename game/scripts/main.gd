@@ -70,6 +70,9 @@ var gasp := 0.0
 var sens := {"souris": 1.0, "tactile": 2.0}   # sensibilité du regard (multiplicateurs, réglables dans le menu)
 const SETTINGS_FILE := "user://reglages.cfg"
 var scope_time := 0.0
+const MOVE_TIME := 15.0       # durée d'un changement de cachette pendant le tir (s)
+const MOVE_DETECT := 3.0      # en bougeant, l'ennemi te repère 3 fois plus vite
+var move_left := 0.0
 var _scope_par := Vector2.ZERO   # décalage de l'objectif dans la lunette (pixels), lissé
 var _last_look := Vector2.ZERO
 var glint_warned := false
@@ -199,8 +202,12 @@ func _on_touch_tap(name: String) -> void:
 			hider.toggle("couche")
 			update_zone_info()
 		"sauter":
-			if phase == "hide":
+			if phase == "hide" or phase == "move":
 				hider.jump_req = true
+		"bouger":
+			start_move()
+		"lunette":
+			end_move()
 		"g1":
 			gadgets.use(0)
 		"g2":
@@ -573,6 +580,7 @@ func start_hide() -> void:
 	var st := _high_start()
 	hider.reset(st.x, st.y)
 	gadgets.start_hide(hider.pos)
+	world.restore_covers()
 	hide_left = HIDE_TIME
 	hide_exposure = 1.0
 	expo_t = 0.0
@@ -685,23 +693,87 @@ func cycle_zoom() -> void:
 	hud.set_scope(z > 0)
 	hud.dot.visible = z == 0
 
-func puff(p: Vector3, color := Color("#cdbf9f"), size := 2.6) -> void:
+func puff(p: Vector3, color := Color("#cdbf9f"), size := 2.6, life := 1.1, rise := 0.8) -> void:
+	# Nuage doux (texture floue tournée vers la caméra), pas une boule.
 	var m := MeshInstance3D.new()
-	var sm := SphereMesh.new()
-	sm.radius = 1.0
-	sm.height = 2.0
-	sm.radial_segments = 8
-	sm.rings = 4
-	m.mesh = sm
+	var q := QuadMesh.new()
+	q.size = Vector2(2, 2)
+	m.mesh = q
 	var mat := StandardMaterial3D.new()
 	mat.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
 	mat.transparency = BaseMaterial3D.TRANSPARENCY_ALPHA
+	mat.billboard_mode = BaseMaterial3D.BILLBOARD_ENABLED
+	mat.albedo_texture = _smoke_tex()
 	mat.albedo_color = Color(color, 0.9)
+	mat.cull_mode = BaseMaterial3D.CULL_DISABLED
 	m.material_override = mat
+	m.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
 	m.position = p
 	m.scale = Vector3.ONE * 0.3
+	m.rotation.z = randf() * TAU
 	add_child(m)
-	fx.append({"m": m, "mat": mat, "t": 0.0, "life": 1.1, "size": size})
+	fx.append({"m": m, "mat": mat, "t": 0.0, "life": life, "size": size, "rise": rise})
+
+var _smoke: ImageTexture
+## Texture de fumée : tache ronde aux bords irréguliers, très floue.
+func _smoke_tex() -> ImageTexture:
+	if _smoke != null:
+		return _smoke
+	var n := 64
+	var img := Image.create(n, n, false, Image.FORMAT_RGBA8)
+	var noise := FastNoiseLite.new()
+	noise.frequency = 0.08
+	for y in n:
+		for x in n:
+			var d := Vector2(x - n / 2.0 + 0.5, y - n / 2.0 + 0.5).length() / (n / 2.0)
+			var a := clampf(1.0 - d, 0.0, 1.0)
+			a = a * a * (0.6 + 0.4 * (noise.get_noise_2d(x, y) * 0.5 + 0.5))
+			img.set_pixel(x, y, Color(1, 1, 1, a))
+	_smoke = ImageTexture.create_from_image(img)
+	return _smoke
+
+# ---------- Impacts violents ----------
+var debris: Array = []   # éclats de roche projetés : {m, v, spin, t, life}
+var _debris_mat := {}
+
+## Impact d'une balle : gros nuage de poussière de la couleur du sol, éclats de roche projetés, éclair bref, son
+## (Higgsfield) qui arrive avec le retard du son. Sur une cachette en rocher : dégâts, puis le rocher vole en éclats.
+func impact(p: Vector3, normal: Vector3, collider: Object, shooter: Vector3) -> void:
+	var zone: String = world.zone_of(p.x, p.z)
+	var leafy: bool = world.is_foliage(collider)
+	var dust := Color("#cfc6b6") if zone == "roche" else (Color("#f4f7fa") if zone == "neige" else (Color("#a08a64") if not leafy else Color("#7d8a52")))
+	var chip := Color("#7d7a73") if zone != "neige" else Color("#d9dee4")
+	if normal == Vector3.ZERO:
+		normal = Vector3.UP
+	var destroyed: bool = world.damage_cover(collider)
+	var n := 22 if destroyed else 9
+	puff(p, Color(1.0, 0.85, 0.55), 0.9, 0.12, 0.0)                       # éclair
+	for i in (8 if destroyed else 5):
+		var o := Vector3(randf_range(-1, 1), randf_range(0, 1), randf_range(-1, 1)) * (1.6 if destroyed else 0.6)
+		puff(p + o + normal * 0.5, dust, randf_range(4.5, 8.0) * (1.6 if destroyed else 1.0), randf_range(2.0, 3.2), 1.6)
+	if not leafy:
+		for i in n:
+			var m := MeshInstance3D.new()
+			m.mesh = world._pebble_mesh
+			if not _debris_mat.has(chip):
+				var mat := StandardMaterial3D.new()
+				mat.albedo_color = chip
+				mat.roughness = 1.0
+				_debris_mat[chip] = mat
+			m.material_override = _debris_mat[chip]
+			m.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
+			var s := randf_range(0.08, 0.28) * (2.2 if destroyed else 1.0)
+			m.scale = Vector3(s, s * randf_range(0.5, 1.0), s)
+			m.position = p + normal * 0.2
+			add_child(m)
+			var v := (normal * randf_range(3.0, 9.0) + Vector3(randf_range(-4, 4), randf_range(2, 7), randf_range(-4, 4))) * (1.5 if destroyed else 1.0)
+			debris.append({"m": m, "v": v, "spin": Vector3(randf_range(-9, 9), randf_range(-9, 9), randf_range(-9, 9)), "t": 0.0, "life": randf_range(1.4, 2.4)})
+	var d := shooter.distance_to(p)
+	var path := "res://art/son_impact_roche_%d.ogg" % (randi() % 3 + 1)
+	if not leafy and ResourceLoader.exists(path):
+		bang(load(path), clampf(1.4 - d / 600.0, 0.35, 1.0) * (1.4 if destroyed else 1.0), d / 343.0)
+	if destroyed:
+		hud.toast("Le rocher a volé en éclats !", 2.5)
 
 func shoot() -> void:
 	if phase != "fire" or ammo <= 0 or cool > 0:
@@ -735,7 +807,7 @@ func shoot() -> void:
 		win()
 		return
 	if not hit.is_empty():
-		puff(hit.position)
+		impact(hit.position, hit.get("normal", Vector3.UP), hit.collider, origin)
 	hud.toast("Plus de balles ! L'ennemi sait où tu es…" if ammo == 0 else "Raté. Ton tir a trahi ta position.")
 
 func ai_shoot() -> void:
@@ -753,13 +825,15 @@ func ai_shoot() -> void:
 	var at_decoy: bool = gadgets.on_enemy_shot(tip)
 	var g := gid
 	await get_tree().create_timer(dist / 850.0).timeout
-	if g != gid or phase != "fire":
+	if g != gid or (phase != "fire" and phase != "move"):
 		return
 	if at_decoy:
 		puff(gadgets.decoy_pos() + Vector3(0, 0.8, 0))
 		hud.toast("L'ennemi a tiré sur ton leurre ! Regarde d'où vient le tir.")
 		return
 	if randf() < p:
+		if phase == "move":
+			end_move()
 		lose()
 		return
 	var r := 2.5 + (1 - ai_reveal) * 22
@@ -848,7 +922,7 @@ func _unhandled_input(e: InputEvent) -> void:
 	var captured := Input.mouse_mode == Input.MOUSE_MODE_CAPTURED
 	var playing := phase in ["hide", "reveal", "fire"]
 	if e is InputEventMouseMotion:
-		if captured and phase == "hide":
+		if captured and (phase == "hide" or phase == "move"):
 			hider.look(e.relative * sens.souris)
 		elif captured and (phase == "fire" or phase == "reveal"):
 			_look(e.relative * sens.souris)
@@ -866,7 +940,7 @@ func _unhandled_input(e: InputEvent) -> void:
 			elif e.button_index == MOUSE_BUTTON_RIGHT:
 				breath_held = e.pressed
 	elif e is InputEventKey and not e.echo:
-		if phase == "hide" and e.pressed:
+		if (phase == "hide" or phase == "move") and e.pressed:
 			# Touches physiques : mêmes places en AZERTY et en QWERTY.
 			if e.physical_keycode == KEY_C:
 				hider.toggle("accroupi")
@@ -874,16 +948,21 @@ func _unhandled_input(e: InputEvent) -> void:
 			elif e.physical_keycode == KEY_X or e.physical_keycode == KEY_CTRL:
 				hider.toggle("couche")
 				update_zone_info()
-			elif e.keycode == KEY_ENTER or e.keycode == KEY_KP_ENTER:
+			elif (e.keycode == KEY_ENTER or e.keycode == KEY_KP_ENTER) and phase == "hide":
 				start_paint()
+				return
+			elif e.physical_keycode == KEY_R and phase == "move":
+				end_move()
 				return
 		if e.keycode == KEY_SHIFT and phase != "hide":
 			breath_held = e.pressed
 		elif not e.pressed:
 			return
-		elif (e.physical_keycode == KEY_1 or e.physical_keycode == KEY_2) and phase in ["hide", "fire"]:
+		elif e.physical_keycode == KEY_R and phase == "fire":
+			start_move()
+		elif (e.physical_keycode == KEY_1 or e.physical_keycode == KEY_2) and phase in ["hide", "fire", "move"]:
 			gadgets.use(0 if e.physical_keycode == KEY_1 else 1)
-		elif e.keycode == KEY_SPACE and phase == "hide":
+		elif e.keycode == KEY_SPACE and (phase == "hide" or phase == "move"):
 			hider.jump_req = true
 		elif e.keycode == KEY_SPACE:
 			shoot()
@@ -901,6 +980,8 @@ func _process(dt: float) -> void:
 	dt = minf(dt, 0.05)
 	if phase == "hide":
 		_process_hide(dt)
+	elif phase == "move":
+		_process_move(dt)
 	elif phase == "reveal":
 		reveal_t += dt
 		var e := clampf(reveal_t / 3.0, 0, 1)
@@ -955,7 +1036,7 @@ func _process(dt: float) -> void:
 			ai_shoot()
 	if phase != "reveal":
 		hud.set_fog_amount(0)
-	if phase == "hide" or phase == "fire":
+	if phase == "hide" or phase == "fire" or phase == "move":
 		gadgets.update(dt)
 	if phase == "paint":
 		rig.update(dt)
@@ -978,17 +1059,31 @@ func _process(dt: float) -> void:
 		var f: Dictionary = fx[i]
 		f.t += dt
 		var k: float = f.t / f.life
-		f.m.scale = Vector3.ONE * (0.3 + f.size * sqrt(k))
-		f.mat.albedo_color.a = 0.9 * (1 - k)
-		f.m.position.y += dt * 0.8
+		f.m.scale = Vector3.ONE * (0.3 + f.size * pow(k, 0.35))   # gonfle tout de suite, puis s'étale
+		f.mat.albedo_color.a = (1.0 - k) * (1.0 - k * 0.3)
+		f.m.position.y += dt * f.get("rise", 0.8)
 		if k >= 1:
 			f.m.queue_free()
 			fx.remove_at(i)
+	for i in range(debris.size() - 1, -1, -1):
+		var dbr: Dictionary = debris[i]
+		dbr.t += dt
+		dbr.v.y -= 9.8 * dt
+		dbr.m.position += dbr.v * dt
+		dbr.m.rotation += dbr.spin * dt
+		var ground: float = world.height_at(dbr.m.position.x, dbr.m.position.z)
+		if dbr.m.position.y < ground:
+			dbr.m.position.y = ground
+			dbr.v = Vector3(dbr.v.x * 0.4, absf(dbr.v.y) * 0.25, dbr.v.z * 0.4)
+			dbr.spin *= 0.5
+		if dbr.t > dbr.life:
+			dbr.m.queue_free()
+			debris.remove_at(i)
 
 func _physics_process(dt: float) -> void:
 	if hud == null:
 		return
-	if phase != "hide":
+	if phase != "hide" and phase != "move":
 		return
 	var input := Vector2.ZERO
 	if Input.mouse_mode == Input.MOUSE_MODE_CAPTURED:
@@ -1000,6 +1095,68 @@ func _physics_process(dt: float) -> void:
 		input = touch.move
 		running = touch.move.length() > 0.92   # joystick poussé à fond : on court
 	hider.physics_step(dt, input, running)
+
+# ---------- Changer de cachette pendant le tir (à tes risques et périls) ----------
+## On quitte la lunette 15 s : on marche, court, saute comme pendant la cachette. L'ennemi continue de tirer et te
+## repère 3 fois plus vite. R (ou le bouton LUNETTE) pour reprendre la lunette là où l'on est.
+func start_move() -> void:
+	if phase != "fire":
+		return
+	phase = "move"
+	move_left = MOVE_TIME
+	rig.release()
+	hud.set_scope(false)
+	hud.dot.visible = false
+	world.player.visible = true
+	world.set_near_fade(5.0)
+	hider._first_frame = true
+	touch.set_mode("move" if touch_mode else "")
+	expo_t = 0.0
+	hud.toast("Déplacement : %d s. L'ennemi te repère 3 fois plus vite. %s pour reprendre la lunette." % [MOVE_TIME, "LUNETTE" if touch_mode else "R"], 3.5)
+
+func end_move() -> void:
+	if phase != "move":
+		return
+	phase = "fire"
+	hider.silence()
+	world.player.visible = false
+	world.set_near_fade(35.0)
+	touch.set_mode("fire" if touch_mode else "")
+	player_zone = world.zone_of(hider.pos.x, hider.pos.z)
+	camo_score = camo_match(player_zone)
+	rig.enter_scope(hider.eye(), Vector3(0, 70, -WorldScript.MZ))
+	hud.zoom_label.text = "x1"
+	hud.dot.visible = true
+	hud.center_label.text = ""
+	if enemy_spot != null:
+		fire_exposure = exposure_from([enemy_spot.fig + Vector3(0, 1.05, 0)])
+
+func _process_move(dt: float) -> void:
+	move_left -= dt
+	fight_time += dt
+	cool = maxf(0, cool - dt)
+	hider.update_visual(dt)
+	gadgets.update_hide(hider.pos)
+	if touch_mode:
+		hider.look(touch.consume_look() * 0.9 * sens.tactile)
+	set_fov(HIDE_FOV + RUN_FOV_KICK * hider.run_amt)
+	hider.place_camera(camera, dt)
+	hud.center_label.text = "DÉPLACEMENT  %d" % ceili(move_left)
+	# Ce que voit l'ennemi pendant que tu bouges : recalculé quatre fois par seconde.
+	expo_t -= dt
+	if expo_t <= 0:
+		expo_t = 0.25
+		player_zone = world.zone_of(hider.pos.x, hider.pos.z)
+		camo_score = camo_match(player_zone)
+		if enemy_spot != null:
+			fire_exposure = exposure_from([enemy_spot.fig + Vector3(0, 1.05, 0)])
+	ai_reveal = minf(1, ai_reveal + dt * detect_rate() * MOVE_DETECT)
+	hud.set_eye(ai_reveal)
+	ai_next -= dt
+	if ai_next <= 0:
+		ai_shoot()
+	if move_left <= 0:
+		end_move()
 
 func _process_hide(dt: float) -> void:
 	hide_left -= dt

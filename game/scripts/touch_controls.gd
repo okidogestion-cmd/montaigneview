@@ -10,7 +10,7 @@ const DANGER := Color("#ef4f4f")
 const PAPER := Color("#ecf0e8")
 const JOY_RADIUS := 95.0
 
-## "hide" (joystick + regarder + boutons), "fire" (viser + boutons), "" (rien).
+## "hide" (joystick + regarder + boutons), "fire" (viser + boutons), "move" (changer de cachette pendant le tir), "" (rien).
 var mode := ""
 var move := Vector2.ZERO           # joystick : x droite, y avant (de -1 à 1)
 var _look := Vector2.ZERO          # glissement accumulé depuis la dernière lecture (pixels)
@@ -31,9 +31,12 @@ func _ready() -> void:
 	# Icônes (art/commandes_icones.png, Higgsfield) : 0 sauter, 1 accroupi, 2 couché, 3 viser, 4 prêt, 5 tirer, 6 souffle.
 	_add("pret", Vector2(-110, -560), 58, "PRÊT", BLAZE, ["hide"], false, 4)
 	_add("viser", Vector2(-110, -400), 62, "VISER", PAPER, ["hide"], true, 3)
-	_add("couche", Vector2(-110, -245), 54, "COUCHÉ", PAPER, ["hide"], false, 2)
-	_add("accroupi", Vector2(-240, -150), 54, "ACCROUPI", PAPER, ["hide"], false, 1)
-	_add("sauter", Vector2(-370, -105), 54, "SAUTER", PAPER, ["hide"], false, 0)
+	_add("couche", Vector2(-110, -245), 54, "COUCHÉ", PAPER, ["hide", "move"], false, 2)
+	_add("accroupi", Vector2(-240, -150), 54, "ACCROUPI", PAPER, ["hide", "move"], false, 1)
+	_add("sauter", Vector2(-370, -105), 54, "SAUTER", PAPER, ["hide", "move"], false, 0)
+	# Changer de cachette pendant le tir (BOUGER), puis reprendre la lunette (LUNETTE).
+	_add("bouger", Vector2(-310, -95), 50, "BOUGER", Color("#ffcf8a"), ["fire"], false, 0)
+	_add("lunette", Vector2(-110, -400), 62, "LUNETTE", BLAZE, ["move"], false, 3)
 	_add("tirer", Vector2(-140, -190), 90, "TIRER", BLAZE, ["fire"], false, 5)
 	_add("souffle", Vector2(120, -190), 66, "SOUFFLE", Color("#86d394"), ["fire"], true, 6)
 
@@ -60,7 +63,7 @@ func set_gadgets(items: Array) -> void:
 	for i in 2:
 		var key := "g%d" % (i + 1)
 		if i < items.size():
-			_add(key, Vector2(100, -430 - i * 130), 50, String(items[i][0]).split(" ")[0].to_upper(), Color("#ffcf8a"), ["hide", "fire"], false, -1, items[i][1])
+			_add(key, Vector2(100, -430 - i * 130), 50, String(items[i][0]).split(" ")[0].to_upper(), Color("#ffcf8a"), ["hide", "fire", "move"], false, -1, items[i][1])
 		else:
 			_buttons.erase(key)
 	queue_redraw()
@@ -95,7 +98,7 @@ func _input(e: InputEvent) -> void:
 				_down[name] = e.index
 				if not _buttons[name].hold:
 					tapped.emit(name)
-			elif mode == "hide" and e.position.x < get_viewport_rect().size.x * 0.4 and _joy_finger == -1:
+			elif (mode == "hide" or mode == "move") and e.position.x < get_viewport_rect().size.x * 0.4 and _joy_finger == -1:
 				_joy_finger = e.index
 				_joy_center = e.position
 				_joy_pos = e.position
@@ -157,12 +160,12 @@ func _draw() -> void:
 		var size := 15 if r < 80 else 18
 		var w := FONT_BOLD.get_string_size(b.label, HORIZONTAL_ALIGNMENT_CENTER, -1, size).x
 		draw_string(FONT_BOLD, c + Vector2(-w / 2, r * 0.62), b.label, HORIZONTAL_ALIGNMENT_CENTER, -1, size, Color(1, 1, 1, 0.92))
-	if mode == "hide" and _joy_finger != -1:
+	if (mode == "hide" or mode == "move") and _joy_finger != -1:
 		draw_circle(_joy_center, JOY_RADIUS, Color(0.02, 0.03, 0.04, 0.3))
 		draw_arc(_joy_center, JOY_RADIUS, 0, TAU, 64, Color(1, 1, 1, 0.55), 2.0, true)
 		draw_circle(_joy_pos, 36, Color(1, 1, 1, 0.5))
 		draw_arc(_joy_pos, 36, 0, TAU, 48, Color(1, 1, 1, 0.9), 2.0, true)
-	elif mode == "hide":
+	elif mode == "hide" or mode == "move":
 		# Indique où poser le pouce pour marcher.
 		var s := get_viewport_rect().size
 		var hint := Vector2(170, s.y - 170)

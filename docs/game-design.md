@@ -634,3 +634,17 @@ Le jeu devient une **appli mobile** (même jeu : cachette, peinture, duel), plus
 
 ### Artefact version 32 (31/10/2026)
 - Publié : pas avec frottement d'équipement, bandes du titre fixes. `index.pck` = 8,82 Mo.
+
+### Thermique bridé, bruitages des gadgets, changer de cachette, impacts violents (31/10/2026)
+- **Thermique** (« cheaté ») : plus de point précis. Une grande zone de chaleur floue (≈ 16 m), décalée au hasard
+  jusqu'à 7 m du corps à chaque allumage : on sait où chercher, pas où tirer (`gadgets.HEAT_ZONE`, `HEAT_OFFSET`).
+- **Bruitages des gadgets** : ramassage (deux notes, façon Metal Gear), thermique allumé / éteint (sifflement qui monte
+  / descend), écho (bip radio) — synthétisés (`tools/sons_gadgets.py`) ; couverture de survie (papier alu froissé) et
+  leurre (corps lourd posé dans l'herbe) — vidéo Higgsfield (5 crédits).
+- **Changer de cachette pendant le tir** (R, ou BOUGER au doigt) : 15 s pour se déplacer comme pendant la cachette
+  (marcher, courir, sauter, poser un leurre) ; l'ennemi continue de tirer et te repère 3 fois plus vite. R / LUNETTE
+  (ou la fin des 15 s) pour reprendre la lunette là où tu es (`main.start_move`, `end_move`, `_process_move`).
+- **Impacts violents** : éclair, gros nuages de poussière de la couleur du sol (fumée douce tournée vers la caméra),
+  éclats de roche projetés qui retombent et rebondissent, son d'impact sur la roche (vidéo Higgsfield, 5 crédits) qui
+  arrive avec le retard du son. **Les rochers des cachettes se détruisent** : 3 balles et le rocher vole en éclats,
+  l'ennemi derrière est à découvert (`world.damage_cover`) ; ils reviennent à chaque partie (`restore_covers`).

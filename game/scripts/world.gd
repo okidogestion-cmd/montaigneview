@@ -324,6 +324,37 @@ func set_near_fade(r: float) -> void:
 func is_foliage(collider: Object) -> bool:
 	return collider != null and collider.has_meta("foliage")
 
+## Cachettes en rocher (et nid de sacs) : 3 balles et elles volent en éclats (le corps derrière est à découvert).
+const COVER_HP := 3
+func damage_cover(collider: Object) -> bool:
+	if collider == null:
+		return false
+	for s in enemy_spots + player_spots:
+		if s.body == collider and s.zone in ["roche", "neige", "sacs"]:
+			var hp: int = s.body.get_meta("hp", COVER_HP) - 1
+			s.body.set_meta("hp", hp)
+			if hp > 0:
+				return false
+			for c in (s.cover as Node).get_children():
+				if c is MeshInstance3D:
+					c.visible = false
+			for cs in (s.body as Node).get_children():
+				if cs is CollisionShape3D:
+					cs.set_deferred("disabled", true)
+			return true
+	return false
+
+## Nouvelle partie : les rochers détruits reviennent.
+func restore_covers() -> void:
+	for s in enemy_spots + player_spots:
+		s.body.set_meta("hp", COVER_HP)
+		for c in (s.cover as Node).get_children():
+			if c is MeshInstance3D:
+				c.visible = true
+		for cs in (s.body as Node).get_children():
+			if cs is CollisionShape3D:
+				cs.set_deferred("disabled", false)
+
 ## Une balle qui touche un arbre en ce point frappe-t-elle le tronc (à moins de 0,35 m de son axe) ?
 func hits_trunk(collider: Object, p: Vector3) -> bool:
 	for cs in (collider as Node).get_children():
