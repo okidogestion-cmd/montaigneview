@@ -658,3 +658,6 @@ Le jeu devient une **appli mobile** (même jeu : cachette, peinture, duel), plus
   le relief, les feuillages et le personnage.
 - Feuillages trop clairs par rapport au sol : planches d'herbe, de fleurs, de fougères et de bruyère ramenées à 75 %
   (photos Higgsfield plus claires que le sol) et éclairage plafonné ; arbres à 85 % avec un contre-jour adouci.
+
+### Artefact version 34 (31/10/2026)
+- Publié : étalonnage de l'image, feuillages ramenés au niveau du sol. `index.pck` = 8,96 Mo.
