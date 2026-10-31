@@ -616,3 +616,6 @@ Le jeu devient une **appli mobile** (même jeu : cachette, peinture, duel), plus
   orange ; ≈ 0,5 crédit) au centre, avec des bandes « glitch » orange et noires derrière qui scintillent, puis trois
   choix : JOUER (orange), ADVERSAIRE : NORMAL (appuyer change de niveau), RÉGLAGES ; les aides en petit en bas.
 - Page de chargement de l'artefact refaite à l'identique (même logo, mêmes bandes animées en CSS, barre fine biseautée).
+
+### Artefact version 30 (31/10/2026)
+- Publié : écran titre et chargement façon Call of Duty (logo `logo.png` publié à côté de la page). `index.pck` = 8,82 Mo.
