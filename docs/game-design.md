@@ -631,3 +631,6 @@ Le jeu devient une **appli mobile** (même jeu : cachette, peinture, duel), plus
   sangles à chaque appui. Chaque son = un seul appui avec son frottement (herbe ≈ 0,4 s, feuilles ≈ 0,2 s), silence
   du début retiré pour que le pas tombe pile au bon moment.
 - Bandes de l'écran titre et du chargement : fixes (plus de clignotement).
+
+### Artefact version 32 (31/10/2026)
+- Publié : pas avec frottement d'équipement, bandes du titre fixes. `index.pck` = 8,82 Mo.
