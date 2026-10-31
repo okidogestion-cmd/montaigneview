@@ -605,3 +605,6 @@ Le jeu devient une **appli mobile** (même jeu : cachette, peinture, duel), plus
   (`_title(..., outline)`), lisible sur le ciel et au téléphone debout.
 - Page de chargement de l'artefact : même direction artistique (Barlow Condensed via Google Fonts, plaque à filet
   orange, titre DUSKLINE, barre biseautée orange).
+
+### Artefact version 29 (31/10/2026)
+- Publié : vraie lunette, écran titre lisible, chargement assorti, frottement retiré. `index.pck` = 8,54 Mo.
