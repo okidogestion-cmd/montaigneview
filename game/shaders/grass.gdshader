@@ -82,7 +82,7 @@ void fragment() {
 		if (t.a * (1.0 + mip * 0.3) < 0.45) {
 			discard;
 		}
-		ALBEDO = t.rgb * tint.rgb * shade * COLOR.rgb * 0.6;   // planches photo Higgsfield bien plus claires que le sol : ramenées à son niveau
+		ALBEDO = t.rgb * tint.rgb * shade * COLOR.rgb * 0.9;   // planches photo Higgsfield : à peine atténuées
 	} else {
 		ALBEDO = pow(COLOR.rgb, vec3(2.2)) * tint.rgb * shade;
 	}
@@ -92,5 +92,5 @@ void fragment() {
 
 void light() {
 	float ndl = dot(NORMAL, LIGHT) * ATTENUATION;
-	DIFFUSE_LIGHT += LIGHT_COLOR * clamp((ndl + 0.3) / 1.3, 0.0, 0.75) * ATTENUATION * cloud_shadow(world_pos.xz, TIME);
+	DIFFUSE_LIGHT += LIGHT_COLOR * clamp((ndl + 0.3) / 1.3, 0.0, 1.0) * ATTENUATION * cloud_shadow(world_pos.xz, TIME);
 }
