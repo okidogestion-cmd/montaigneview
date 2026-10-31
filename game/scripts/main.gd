@@ -8,6 +8,7 @@ const HiderScript := preload("res://scripts/hider.gd")
 const PaintScript := preload("res://scripts/paint.gd")
 const LifeScript := preload("res://scripts/life.gd")
 const TouchScript := preload("res://scripts/touch_controls.gd")
+const GadgetsScript := preload("res://scripts/gadgets.gd")
 const CameraRigScene := preload("res://scenes/camera_rig.tscn")
 const CameraRigScript := preload("res://scripts/camera_rig.gd")
 const PerfOverlayScript := preload("res://scripts/perf_overlay.gd")
@@ -34,6 +35,7 @@ var hider
 var paint
 var life
 var touch
+var gadgets   # caisses et gadgets (gadgets.gd)
 var touch_mode := false   # téléphone / tablette (ou PC lancé avec -- --tactile)
 var rig            # CameraRig : propriétaire de la caméra
 var camera: Camera3D   # = rig.camera (cachette : encore placée par hider.gd)
@@ -170,6 +172,9 @@ func _ready() -> void:
 	paint.wear(outfit)
 	hud.ready_pressed.connect(_on_ready_pressed)
 	hud.set_level(level)
+	gadgets = GadgetsScript.new()
+	add_child(gadgets)
+	gadgets.setup(self)
 	to_menu()
 	loading.queue_free()
 
@@ -192,6 +197,12 @@ func _on_touch_tap(name: String) -> void:
 		"sauter":
 			if phase == "hide":
 				hider.jump_req = true
+		"g1":
+			gadgets.use(0)
+		"g2":
+			gadgets.use(1)
+		"zoom":
+			cycle_zoom()
 		"tirer":
 			shoot()
 		"zoom":
@@ -305,6 +316,7 @@ func bang(stream: AudioStream, vol: float, delay := 0.0) -> void:
 # ---------- Menu ----------
 func to_menu() -> void:
 	gid += 1
+	gadgets.clear()
 	touch.set_mode("")
 	phase = "menu"
 	world.set_near_fade(0.0)
@@ -554,6 +566,7 @@ func start_hide() -> void:
 	world.end_marker.visible = false
 	var st := _high_start()
 	hider.reset(st.x, st.y)
+	gadgets.start_hide(hider.pos)
 	hide_left = HIDE_TIME
 	hide_exposure = 1.0
 	expo_t = 0.0
@@ -653,6 +666,7 @@ func detect_rate() -> float:
 	var rate: float = lerpf(L.rate_good, L.rate_bad, 1.0 - camo_score)
 	rate *= hider.info().detect
 	rate *= lerpf(0.35, 1.0, fire_exposure)
+	rate *= gadgets.detect_factor()   # couverture de survie
 	if hider.stance == "couche" and player_zone == "herbe":
 		rate *= 0.7  # couché dans l'herbe haute
 	return rate
@@ -729,9 +743,14 @@ func ai_shoot() -> void:
 	bang(SON_LOIN, 0.8, dist / 343.0)
 	ai_reveal = minf(1, ai_reveal + 0.06)
 	ai_next = randf_range(L.interval[0], L.interval[1]) * (0.4 if ammo == 0 else 1.0)
+	var at_decoy: bool = gadgets.on_enemy_shot(tip)
 	var g := gid
 	await get_tree().create_timer(dist / 850.0).timeout
 	if g != gid or phase != "fire":
+		return
+	if at_decoy:
+		puff(gadgets.decoy_pos() + Vector3(0, 0.8, 0))
+		hud.toast("L'ennemi a tiré sur ton leurre ! Regarde d'où vient le tir.")
 		return
 	if randf() < p:
 		lose()
@@ -759,6 +778,7 @@ func show_enemy() -> void:
 
 func finish(won: bool) -> void:
 	gid += 1
+	gadgets.clear()
 	touch.set_mode("")
 	phase = "end"
 	breath_held = false
@@ -854,6 +874,8 @@ func _unhandled_input(e: InputEvent) -> void:
 			breath_held = e.pressed
 		elif not e.pressed:
 			return
+		elif (e.physical_keycode == KEY_1 or e.physical_keycode == KEY_2) and phase in ["hide", "fire"]:
+			gadgets.use(0 if e.physical_keycode == KEY_1 else 1)
 		elif e.keycode == KEY_SPACE and phase == "hide":
 			hider.jump_req = true
 		elif e.keycode == KEY_SPACE:
@@ -901,7 +923,8 @@ func _process(dt: float) -> void:
 			gasp -= dt
 		hud.breath_bar.value = breath
 		rig.sway(dt, holding, gasp > 0)
-		scope_time = scope_time + dt if rig.zoom_level == 2 else 0.0
+		# Au thermique, la lunette brille deux fois plus vite.
+		scope_time = scope_time + dt * (2.0 if gadgets.active("thermique") else 1.0) if rig.zoom_level == 2 else 0.0
 		var glint := scope_time > 5
 		if glint:
 			glinted = true
@@ -917,6 +940,8 @@ func _process(dt: float) -> void:
 			ai_shoot()
 	if phase != "reveal":
 		hud.set_fog_amount(0)
+	if phase == "hide" or phase == "fire":
+		gadgets.update(dt)
 	if phase == "paint":
 		rig.update(dt)
 		if matches_dirty and not painting:
@@ -968,6 +993,7 @@ func _process_hide(dt: float) -> void:
 		start_paint()
 		return
 	hider.update_visual(dt)
+	gadgets.update_hide(hider.pos)
 	# Clic droit maintenu : on regarde par la lunette depuis sa cachette.
 	if touch_mode:
 		hider.look(touch.consume_look() * 0.9 * sens.tactile)

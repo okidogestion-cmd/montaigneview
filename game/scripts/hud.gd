@@ -83,6 +83,7 @@ var toast_label: Label
 var center_label: Label
 
 var menu: Control
+var gadget_label: Label
 var settings: Control
 var _sens_labels := {}
 var _sens := {"souris": 1.0, "tactile": 2.0}
@@ -367,6 +368,11 @@ func _build_menu() -> void:
 	v.add_child(hint)
 	root.add_child(menu)
 	_build_settings()
+	gadget_label = _label("", 17, Color("#ffcf8a"))
+	gadget_label.position = Vector2(16, 96)
+	gadget_label.add_theme_color_override("font_outline_color", Color(0, 0, 0, 0.8))
+	gadget_label.add_theme_constant_override("outline_size", 5)
+	root.add_child(gadget_label)
 
 ## Réglages : sensibilité du regard à la souris et au doigt (multiplicateur, par pas de 0,25).
 func _build_settings() -> void:
@@ -416,6 +422,11 @@ func set_sens(kind: String, v: float) -> void:
 	_sens[kind] = v
 	if _sens_labels.has(kind):
 		(_sens_labels[kind] as Label).text = "× %.2f" % v
+
+## Gadgets portés et effets en cours (en haut à gauche, pendant la cachette et le tir).
+func set_gadgets(text: String) -> void:
+	if gadget_label != null:
+		gadget_label.text = text
 
 func set_level(level: String) -> void:
 	for lv in level_buttons:
@@ -588,12 +599,12 @@ func _build_fire() -> void:
 	bv.add_child(breath_bar)
 	bh.add_child(bv)
 	var zv := _vbox(4)
-	zv.add_child(_small("Zoom (molette / Z)"))
+	zv.add_child(_small("Zoom (molette / Z, double tape au doigt)"))
 	zoom_label = _label("x1", 26, PAPER)
 	zv.add_child(zoom_label)
 	bh.add_child(zv)
 	bh.add_child(_spacer())
-	fire_keys = _label("Clic gauche ou Espace : tirer\nÉchap : libérer la souris", 14, MUTED)
+	fire_keys = _label("Clic gauche ou Espace : tirer   1 / 2 : gadgets\nÉchap : libérer la souris", 14, MUTED)
 	var keys := fire_keys
 	keys.horizontal_alignment = HORIZONTAL_ALIGNMENT_RIGHT
 	bh.add_child(keys)

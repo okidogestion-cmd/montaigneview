@@ -517,3 +517,16 @@ Le jeu devient une **appli mobile** (même jeu : cachette, peinture, duel), plus
 ### Artefact version 23 (31/10/2026)
 - Publié : saut animé, caméra rapprochée, pentes à 64°, respiration retirée, bande son forêt, caméra de course adoucie.
   `index.pck` = 13,37 Mo (limite 15 Mo par fichier : il reste ≈ 1,6 Mo de marge).
+
+### Gadgets dans des caisses, zoom en double tape, mouette retirée (31/10/2026)
+- Cri de mouette retiré (demande de l'utilisateur).
+- **Caisses** (`scripts/gadgets.gd`) : 3 par partie sur ton île, entre 25 et 110 m du départ, avec un faisceau orange
+  pour les repérer. Textures Higgsfield (`art/caisse.jpg` : face « MATÉRIEL », dessus à poignées, côté ; ≈ 1 crédit pour
+  les 4 images avec les icônes `art/gadgets_icones.png`). On ramasse en passant dessus ; on porte 2 gadgets au plus.
+- **Gadgets** (touches 1 / 2, ou boutons à gauche au doigt, visibles seulement quand on porte un gadget) :
+  - Viseur thermique (pendant le tir) : 6 s, monde sombre en palette « fer chaud », le corps de l'ennemi brille
+    (atténué s'il porte la tenue de feuillage) ; la lunette brille 2 fois plus vite pendant ce temps.
+  - Écho de tir (pendant le tir) : 30 s, chaque tir ennemi laisse un repère rouge (à ± 12 m) visible à travers le décor.
+  - Leurre (pendant la cachette) : un sniper accroupi posé là où tu es ; les 2 tirs ennemis suivants le visent.
+  - Couverture de survie (cachette ou tir) : 20 s, l'ennemi te repère 2,5 fois moins vite.
+- **Zoom au doigt** : double tape sur la vue de tir (le bouton Zoom est retiré).

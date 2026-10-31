@@ -1037,6 +1037,15 @@ func animate_figure(fig: Node3D, stance: String, speed: float) -> void:
 		if t > 0.0:
 			ap.seek(t * ap.current_animation_length)
 
+## Leurre : un sniper accroupi immobile en tenue (gadget « leurre »), sans collision.
+func make_decoy(pos: Vector3, facing: float) -> Node3D:
+	var fig := _make_figure()
+	fig.position = pos
+	fig.rotation.y = facing
+	set_stance(fig, "accroupi")
+	(fig.get_meta("camo") as ShaderMaterial).set_shader_parameter("base_color", (player.get_meta("camo") as ShaderMaterial).get_shader_parameter("base_color"))
+	return fig
+
 ## Saut du personnage (impulsion, en l'air, réception), avec un fondu court.
 func play_jump(fig: Node3D, anim: String, blend: float, speed: float) -> void:
 	var ap: AnimationPlayer = fig.get_meta("anim")

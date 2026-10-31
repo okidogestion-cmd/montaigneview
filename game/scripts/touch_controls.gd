@@ -20,6 +20,8 @@ var _joy_pos := Vector2.ZERO
 var _look_fingers := {}            # doigt → dernière position
 var _buttons := {}                 # nom → {pos (relative au coin), radius, label, color, modes, hold}
 var _down := {}                    # nom → doigt qui appuie
+var _last_tap := -10000            # double tape sur la vue de tir = zoom
+var _last_tap_pos := Vector2.ZERO
 
 
 func _ready() -> void:
@@ -32,7 +34,6 @@ func _ready() -> void:
 	_add("accroupi", Vector2(-245, -150), 58, "Accroupi", PAPER, ["hide"], false)
 	_add("sauter", Vector2(-380, -110), 58, "Sauter", PAPER, ["hide"], false)
 	_add("tirer", Vector2(-140, -190), 92, "TIRER", DANGER, ["fire"], false)
-	_add("zoom", Vector2(-300, -110), 58, "Zoom", PAPER, ["fire"], false)
 	_add("souffle", Vector2(120, -190), 72, "Souffle", Color("#86d394"), ["fire"], true)
 
 func _add(name: String, pos: Vector2, r: float, label: String, color: Color, modes: Array, hold: bool) -> void:
@@ -46,6 +47,16 @@ func set_mode(m: String) -> void:
 	_look_fingers.clear()
 	_down.clear()
 	visible = m != ""
+	queue_redraw()
+
+## Un bouton par gadget porté (à gauche, au-dessus du joystick), seulement quand on en a un.
+func set_gadgets(labels: Array) -> void:
+	for i in 2:
+		var key := "g%d" % (i + 1)
+		if i < labels.size():
+			_add(key, Vector2(110, -430 - i * 140), 56, String(labels[i]).split(" ")[0], Color("#ffcf8a"), ["hide", "fire"], false)
+		else:
+			_buttons.erase(key)
 	queue_redraw()
 
 func held(name: String) -> bool:
@@ -84,6 +95,14 @@ func _input(e: InputEvent) -> void:
 				_joy_pos = e.position
 			else:
 				_look_fingers[e.index] = e.position
+				if mode == "fire":
+					var now := Time.get_ticks_msec()
+					if now - _last_tap < 320 and e.position.distance_to(_last_tap_pos) < 80:
+						tapped.emit("zoom")
+						_last_tap = -10000
+					else:
+						_last_tap = now
+						_last_tap_pos = e.position
 		else:
 			for name in _down.keys():
 				if _down[name] == e.index:

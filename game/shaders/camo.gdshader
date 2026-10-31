@@ -23,6 +23,7 @@ uniform sampler2D stroke_tex : filter_nearest, repeat_disable;
 uniform int stroke_count = 0;
 uniform vec4 cursor = vec4(0.0, 0.0, 0.0, -1.0);  // cercle du pinceau (atelier)
 uniform float band = 0.5;
+uniform float heat = 0.0;          // viseur thermique : le corps chaud brille (0 : normal)
 
 varying vec3 ref_pos;
 varying vec3 world_pos;
@@ -56,7 +57,8 @@ void fragment() {
 		float d = abs(distance(ref_pos, cursor.xyz) - cursor.w);
 		c = mix(c, vec3(1.0), 1.0 - smoothstep(0.004, 0.009, d));
 	}
-	ALBEDO = c;
+	ALBEDO = mix(c, vec3(1.0), heat * 0.7);
+	EMISSION = vec3(1.0, 0.95, 0.85) * heat * 4.0;
 	ROUGHNESS = 1.0;
 	SPECULAR = 0.0;
 }
