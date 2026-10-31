@@ -44,7 +44,6 @@ var env: Environment
 const SON_TIR := preload("res://art/son_tir.ogg")
 const SON_LOIN := preload("res://art/son_loin.ogg")
 const SON_IMPACT := preload("res://art/son_impact.wav")
-const SON_SOUFFLE := preload("res://art/son_souffle.wav")   # respiration du tireur (synthétisée, boucle de 4,6 s)
 
 var level := "normal"
 var phase := "menu"
@@ -64,7 +63,6 @@ var fight_time := 0.0
 var breath := 100.0
 var breath_held := false
 var gasp := 0.0
-var _breath_player: AudioStreamPlayer
 var sens := {"souris": 1.0, "tactile": 2.0}   # sensibilité du regard (multiplicateurs, réglables dans le menu)
 const SETTINGS_FILE := "user://reglages.cfg"
 var scope_time := 0.0
@@ -191,6 +189,9 @@ func _on_touch_tap(name: String) -> void:
 		"couche":
 			hider.toggle("couche")
 			update_zone_info()
+		"sauter":
+			if phase == "hide":
+				hider.jump_req = true
 		"tirer":
 			shoot()
 		"zoom":
@@ -299,30 +300,6 @@ func bang(stream: AudioStream, vol: float, delay := 0.0) -> void:
 	add_child(p)
 	p.finished.connect(p.queue_free)
 	p.play()
-
-
-# ---------- Respiration du tireur ----------
-## Souffle en boucle quand on vise (lunette ou clic droit) ; s'étouffe quand on retient son souffle,
-## devient plus rapide et plus fort quand on est à bout de souffle.
-func _breath_sound(dt: float, want: bool, gasping: bool) -> void:
-	if _breath_player == null:
-		if not want:
-			return
-		var st: AudioStreamWAV = SON_SOUFFLE
-		st.loop_mode = AudioStreamWAV.LOOP_FORWARD
-		st.loop_begin = 0
-		st.loop_end = st.data.size() / 2
-		_breath_player = AudioStreamPlayer.new()
-		_breath_player.stream = st
-		_breath_player.volume_db = -50.0
-		add_child(_breath_player)
-	var target := (-1.0 if gasping else -8.0) if want else -50.0
-	_breath_player.volume_db = move_toward(_breath_player.volume_db, target, dt * (60.0 if not want else 30.0))
-	_breath_player.pitch_scale = move_toward(_breath_player.pitch_scale, 1.45 if gasping else 1.0, dt * 2.0)
-	if _breath_player.volume_db > -45.0 and not _breath_player.playing:
-		_breath_player.play()
-	elif _breath_player.volume_db <= -49.0 and _breath_player.playing:
-		_breath_player.stop()
 
 
 # ---------- Menu ----------
@@ -877,6 +854,8 @@ func _unhandled_input(e: InputEvent) -> void:
 			breath_held = e.pressed
 		elif not e.pressed:
 			return
+		elif e.keycode == KEY_SPACE and phase == "hide":
+			hider.jump_req = true
 		elif e.keycode == KEY_SPACE:
 			shoot()
 		elif e.keycode == KEY_Z and phase != "hide":
@@ -921,7 +900,6 @@ func _process(dt: float) -> void:
 		if gasp > 0:
 			gasp -= dt
 		hud.breath_bar.value = breath
-		_breath_sound(dt, rig.zoom_level > 0 and not holding, gasp > 0)
 		rig.sway(dt, holding, gasp > 0)
 		scope_time = scope_time + dt if rig.zoom_level == 2 else 0.0
 		var glint := scope_time > 5
@@ -939,8 +917,6 @@ func _process(dt: float) -> void:
 			ai_shoot()
 	if phase != "reveal":
 		hud.set_fog_amount(0)
-	if phase != "fire" and phase != "hide":
-		_breath_sound(dt, false, false)
 	if phase == "paint":
 		rig.update(dt)
 		if matches_dirty and not painting:
@@ -998,7 +974,6 @@ func _process_hide(dt: float) -> void:
 	var preview: bool = Input.is_mouse_button_pressed(MOUSE_BUTTON_RIGHT) or (touch_mode and touch.held("viser"))
 	world.player.visible = not preview
 	hud.dot.visible = preview
-	_breath_sound(dt, preview, false)
 	if preview:
 		set_fov(FIRE_FOV[0])
 		hider.first_person(camera)

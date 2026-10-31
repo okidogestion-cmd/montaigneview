@@ -30,6 +30,7 @@ func _ready() -> void:
 	_add("viser", Vector2(-110, -390), 62, "Viser", PAPER, ["hide"], true)
 	_add("couche", Vector2(-110, -235), 58, "Couché", PAPER, ["hide"], false)
 	_add("accroupi", Vector2(-245, -150), 58, "Accroupi", PAPER, ["hide"], false)
+	_add("sauter", Vector2(-380, -110), 58, "Sauter", PAPER, ["hide"], false)
 	_add("tirer", Vector2(-140, -190), 92, "TIRER", DANGER, ["fire"], false)
 	_add("zoom", Vector2(-300, -110), 58, "Zoom", PAPER, ["fire"], false)
 	_add("souffle", Vector2(120, -190), 72, "Souffle", Color("#86d394"), ["fire"], true)

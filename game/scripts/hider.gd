@@ -4,9 +4,9 @@ extends RefCounted
 ## accélère et freine en douceur, et peut se tenir debout, accroupi ou couché.
 
 const STANCES := {
-	"debout":   {"label": "Debout",   "speed": 4.2, "eye": 1.6,  "height": 1.75, "body": 1.75, "cam_h": 1.65, "cam_d": 4.2, "detect": 1.8},
-	"accroupi": {"label": "Accroupi", "speed": 1.8, "eye": 1.1,  "height": 1.2,  "body": 1.2,  "cam_h": 1.25, "cam_d": 3.6, "detect": 1.0},
-	"couche":   {"label": "Couché",   "speed": 1.1, "eye": 0.35, "height": 0.45, "body": 0.6,  "cam_h": 0.8,  "cam_d": 3.2, "detect": 0.55},
+	"debout":   {"label": "Debout",   "speed": 4.2, "eye": 1.6,  "height": 1.75, "body": 1.75, "cam_h": 1.6, "cam_d": 2.2, "detect": 1.8},
+	"accroupi": {"label": "Accroupi", "speed": 1.8, "eye": 1.1,  "height": 1.2,  "body": 1.2,  "cam_h": 1.2, "cam_d": 2.0, "detect": 1.0},
+	"couche":   {"label": "Couché",   "speed": 1.1, "eye": 0.35, "height": 0.45, "body": 0.6,  "cam_h": 0.8,  "cam_d": 1.9, "detect": 0.55},
 }
 const RUN_SPEED := 7.5      # course (Maj), seulement debout
 const ACCEL := 20.0
@@ -15,6 +15,8 @@ const GRAVITY := 18.0
 const AREA_RADIUS := 200.0  # on reste sur son île
 const MOUSE_SENS := 0.0028
 const RADIUS := 0.3
+const JUMP_SPEED := 5.6     # vitesse de départ d'un saut (m/s) : ≈ 0,85 m de haut
+const LAND_TIME := 0.42     # durée de la réception avant de reprendre la marche (s)
 
 var world
 var body: CharacterBody3D
@@ -25,11 +27,15 @@ var stance := "debout"
 var cam_yaw := 0.0
 var cam_pitch := -0.25
 var _cam_pos := Vector3.ZERO
-var _cam_dist := 4.2
+var _cam_dist := 2.2
 var _cam_h := 1.65
 var _first_frame := true
 var _prev_pos := Vector3.ZERO   # position à l'image physique précédente (pour lisser l'affichage)
 var _vis := Vector3.ZERO        # position affichée, lissée
+var jump_req := false           # saut demandé (Espace / bouton Sauter), traité à l'image physique suivante
+var air := ""                   # "" au sol, "start" impulsion, "loop" en l'air, "land" réception
+var _air_t := 0.0               # temps passé en l'air
+var _land_t := 0.0
 var run_amt := 0.0              # 0 à l'arrêt ou en marche, 1 en pleine course : élargit l'angle de vue
 var _bob_t := 0.0               # cycle de foulée (une foulée = gauche + droite)
 var _bob_amp := 0.0             # intensité du balancement de la caméra embarquée (0 à l'arrêt)
@@ -40,7 +46,7 @@ func _init(w) -> void:
 	body = CharacterBody3D.new()
 	body.collision_layer = 2       # joueurs
 	body.collision_mask = 1        # décor
-	body.floor_max_angle = deg_to_rad(50)
+	body.floor_max_angle = deg_to_rad(64)   # on gravit les pentes raides des îles Higgsfield
 	body.floor_snap_length = 0.6
 	body.safe_margin = 0.02
 	var cs := CollisionShape3D.new()
@@ -105,6 +111,13 @@ func physics_step(dt: float, input: Vector2, running: bool) -> void:
 	v.x = horiz.x
 	v.z = horiz.z
 	v.y = 0.0 if body.is_on_floor() else v.y - GRAVITY * dt
+	if jump_req and body.is_on_floor():
+		if stance != "debout":
+			set_stance("debout")
+		v.y = JUMP_SPEED
+		air = "start"
+		_air_t = 0.0
+	jump_req = false
 	body.velocity = v
 	var before := body.global_position
 	body.move_and_slide()
@@ -154,11 +167,38 @@ func update_visual(dt: float) -> void:
 	# Petites bosses du sol adoucies en hauteur seulement.
 	_vis = Vector3(d.x, lerpf(_vis.y, d.y, 1.0 - exp(-dt * 22.0)) if not _first_frame else d.y, d.z)
 	_apply()
-	world.animate_figure(world.player, stance, ground_speed())
+	_update_air(dt)
+	if air == "":
+		world.animate_figure(world.player, stance, ground_speed())
 	var spd := ground_speed()
 	run_amt = move_toward(run_amt, 1.0 if spd > 5.5 else 0.0, dt * 3.0)
 	_bob_amp = move_toward(_bob_amp, clampf(spd / RUN_SPEED, 0.0, 1.0), dt * 5.0)
 	_bob_t += dt * lerpf(5.7, 8.8, run_amt)   # marche ≈ 1,8 pas/s, course ≈ 2,8 pas/s
+
+## Saut : impulsion, en l'air, réception (animations Jump_* de la bibliothèque Quaternius). Une petite descente
+## en marchant (moins de 0,3 s en l'air) ne déclenche rien : pas de clignotement d'animation dans les pentes.
+func _update_air(dt: float) -> void:
+	var grounded := body.is_on_floor()
+	if not grounded:
+		_air_t += dt
+		if air == "" and _air_t > 0.3:
+			air = "loop"
+			world.play_jump(world.player, "Jump_Loop", 0.2, 1.0)
+		elif air == "start" and _air_t < dt * 1.5:
+			world.play_jump(world.player, "Jump_Start", 0.08, 2.2)
+		elif air == "start" and _air_t > 0.45:
+			air = "loop"
+			world.play_jump(world.player, "Jump_Loop", 0.25, 1.0)
+		return
+	if air == "start" or air == "loop":
+		air = "land"
+		_land_t = 0.0
+		world.play_jump(world.player, "Jump_Land", 0.08, 1.7)
+	elif air == "land":
+		_land_t += dt
+		if _land_t > LAND_TIME or (ground_speed() > 1.0 and _land_t > LAND_TIME * 0.5):
+			air = ""
+	_air_t = 0.0
 
 func eye() -> Vector3:
 	return pos + Vector3(0, info().eye, 0) + forward() * 0.3
@@ -177,7 +217,7 @@ func place_camera(cam: Camera3D, dt: float) -> void:
 	var target := _vis + Vector3(0, _cam_h, 0)
 	var rot := Basis.from_euler(Vector3(cam_pitch, cam_yaw, 0))
 	var back := rot.z
-	var shoulder := rot.x * 0.45
+	var shoulder := rot.x * 0.55   # par-dessus l'épaule, caméra proche du personnage
 	var want: float = info().cam_d
 	var q := PhysicsRayQueryParameters3D.create(target, target + shoulder + back * want, 1)
 	var hit: Dictionary = world.get_world_3d().direct_space_state.intersect_ray(q)

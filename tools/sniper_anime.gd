@@ -16,6 +16,7 @@ extends SceneTree
 
 const KEEP := [
 	"Idle_Loop", "Walk_Loop", "Jog_Fwd_Loop", "Sprint_Loop", "Crouch_Idle_Loop", "Crouch_Fwd_Loop", "Death01",
+	"Jump_Start", "Jump_Loop", "Jump_Land",
 ]
 # Os du sniper → os des animations.
 const MAP := {

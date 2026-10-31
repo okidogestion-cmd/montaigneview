@@ -1037,6 +1037,12 @@ func animate_figure(fig: Node3D, stance: String, speed: float) -> void:
 		if t > 0.0:
 			ap.seek(t * ap.current_animation_length)
 
+## Saut du personnage (impulsion, en l'air, réception), avec un fondu court.
+func play_jump(fig: Node3D, anim: String, blend: float, speed: float) -> void:
+	var ap: AnimationPlayer = fig.get_meta("anim")
+	ap.speed_scale = speed
+	ap.play(anim, blend)
+
 ## Le perdant tombe.
 func fall(fig: Node3D) -> void:
 	var ap: AnimationPlayer = fig.get_meta("anim")

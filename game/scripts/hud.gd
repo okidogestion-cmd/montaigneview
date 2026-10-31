@@ -486,7 +486,7 @@ func _build_hide() -> void:
 	zone_info.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	r1.add_child(zone_info)
 	bv.add_child(r1)
-	keys_hint = _label("ZQSD : marcher   Maj : courir   C : s'accroupir   X : se coucher   Clic droit (maintenu) : vue de tir   Entrée : prêt   Échap : souris", 13, MUTED)
+	keys_hint = _label("ZQSD : marcher   Maj : courir   Espace : sauter   C : s'accroupir   X : se coucher   Clic droit (maintenu) : vue de tir   Entrée : prêt   Échap : souris", 13, MUTED)
 	keys_hint.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 	bv.add_child(keys_hint)
 	var r2 := _hbox()

@@ -475,7 +475,7 @@ Le jeu devient une **appli mobile** (même jeu : cachette, peinture, duel), plus
 - **Viseur** (`SCOPE_SHADER` dans `hud.gd`) : verre rond cerné d'un épais tube noir, bords du verre assombris, réticule fin
   avec gros traits à gauche, à droite et en bas, points de repère (mil-dots) autour du centre, point rouge central.
   Le x1 garde sa petite croix.
-- **Respiration** : `art/son_souffle.wav` (synthétisée par code, aucun crédit ; boucle de 4,6 s, inspiration puis expiration).
+- **Respiration** (retirée le 31/10) : `art/son_souffle.wav` (synthétisée par code, aucun crédit ; boucle de 4,6 s, inspiration puis expiration).
   Elle joue quand on vise (lunette x4 / x10, ou clic droit pendant la cachette), s'étouffe quand on retient son souffle,
   devient plus rapide et plus forte à bout de souffle (`main._breath_sound`).
 - **Angle de vue** : cachette 62° → 70° (`HIDE_FOV`), +9° en courant (`RUN_FOV_KICK`, progressif).
@@ -497,3 +497,12 @@ Le jeu devient une **appli mobile** (même jeu : cachette, peinture, duel), plus
   départ en hauteur, réglages de sensibilité. `index.pck` = 12,47 Mo (limite 15 Mo par fichier).
 - Décision de l'utilisateur : on n'exécute plus le long test de caméra (`tools/tests/test_camera.gd`, ~10 min) à chaque
   changement. Les vérifications rapides (`test_reglages.gd`, mesures de jouabilité, captures) restent à la demande.
+
+### Saut, caméra rapprochée, pentes raides ; respiration retirée (31/10/2026)
+- Respiration retirée (demande de l'utilisateur : le son ne ressemblait pas à une respiration) : `son_souffle.wav` supprimé.
+- Caméra de la cachette rapprochée, par-dessus l'épaule : distance 4,2 → 2,2 m debout (2,0 accroupi, 1,9 couché),
+  décalage d'épaule 0,45 → 0,55 m.
+- Pentes : le personnage gravit jusqu'à 64° (avant 50°) ; on peut sauter (Espace, bouton « Sauter » au doigt),
+  ≈ 0,9 m de haut. Animations Jump_Start / Jump_Loop / Jump_Land de la bibliothèque Quaternius (déjà utilisée pour la
+  marche, CC0), ajoutées à `sniper_anime.scn` par `tools/sniper_anime.gd` (aucun crédit Higgsfield). États dans
+  `hider._update_air` : impulsion, en l'air, réception (une petite descente de moins de 0,3 s ne déclenche rien).
