@@ -53,7 +53,7 @@ void fragment() {
 	if (!FRONT_FACING) {
 		NORMAL = -NORMAL;
 	}
-	ALBEDO = t.rgb * tint.rgb * COLOR.rgb;
+	ALBEDO = t.rgb * tint.rgb * COLOR.rgb * 0.85;   // feuillage un peu plus sombre : il ressortait trop sur le relief
 	ROUGHNESS = 1.0;
 	SPECULAR = 0.0;
 }
@@ -61,6 +61,6 @@ void fragment() {
 void light() {
 	float ndl = dot(NORMAL, LIGHT);
 	float diff = clamp((ndl + 0.35) / 1.35, 0.0, 1.0) * ATTENUATION;
-	float back = pow(clamp(dot(VIEW, -LIGHT), 0.0, 1.0), 4.0) * translucency * ATTENUATION;
+	float back = pow(clamp(dot(VIEW, -LIGHT), 0.0, 1.0), 4.0) * translucency * 0.45 * ATTENUATION;   // contre-jour adouci
 	DIFFUSE_LIGHT += LIGHT_COLOR * (diff + back) * cloud_shadow(world_pos.xz, TIME);
 }

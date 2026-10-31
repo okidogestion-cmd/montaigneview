@@ -651,3 +651,10 @@ Le jeu devient une **appli mobile** (même jeu : cachette, peinture, duel), plus
 
 ### Artefact version 33 (31/10/2026)
 - Publié : thermique en zone floue, bruitages des gadgets, changer de cachette, impacts violents, rochers destructibles. `index.pck` = 8,96 Mo.
+
+### Étalonnage de l'image, feuillages moins éclairés (31/10/2026)
+- Un « filtre » unique sur toute l'image (`main._build_environment`) : saturation 0,82, contraste 1,08 et courbes par
+  couleur (LUT 1D, `adjustment_color_correction`) : ombres légèrement bleu-vert, lumières dorées. Unifie le ciel,
+  le relief, les feuillages et le personnage.
+- Feuillages trop clairs par rapport au sol : planches d'herbe, de fleurs, de fougères et de bruyère ramenées à 75 %
+  (photos Higgsfield plus claires que le sol) et éclairage plafonné ; arbres à 85 % avec un contre-jour adouci.

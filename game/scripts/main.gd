@@ -269,9 +269,17 @@ func _build_environment() -> void:
 	env.tonemap_exposure = 1.12
 	env.tonemap_white = 6.0
 	env.adjustment_enabled = true
-	# Couleurs plus naturelles (moins saturées), un peu plus de contraste : rendu réaliste.
-	env.adjustment_saturation = 0.9
-	env.adjustment_contrast = 1.1
+	# Étalonnage de toute l'image (un seul « filtre » qui unifie les couleurs, façon film) : couleurs un peu moins
+	# saturées, plus de contraste, ombres froides bleu-vert et lumières chaudes dorées (courbes par couleur, LUT 1D).
+	env.adjustment_saturation = 0.82
+	env.adjustment_contrast = 1.08
+	var grade := Gradient.new()
+	grade.offsets = PackedFloat32Array([0.0, 0.25, 0.6, 1.0])
+	grade.colors = PackedColorArray([Color(0.045, 0.06, 0.075), Color(0.27, 0.29, 0.3), Color(0.64, 0.62, 0.57), Color(1.0, 0.94, 0.82)])
+	var lut := GradientTexture1D.new()
+	lut.gradient = grade
+	lut.width = 256
+	env.adjustment_color_correction = lut
 	env.fog_enabled = true
 	env.fog_mode = Environment.FOG_MODE_DEPTH
 	env.fog_light_color = SKY
