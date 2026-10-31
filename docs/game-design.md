@@ -619,3 +619,7 @@ Le jeu devient une **appli mobile** (même jeu : cachette, peinture, duel), plus
 
 ### Artefact version 30 (31/10/2026)
 - Publié : écran titre et chargement façon Call of Duty (logo `logo.png` publié à côté de la page). `index.pck` = 8,82 Mo.
+- Correction (31/10/2026, « deux pas qui se chevauchent, on dirait un cheval au galop ») : chaque son de pas contenait deux
+  impacts (le pied filmé et le suivant, ou un petit coup avant le principal). Chaque son est recoupé sur son seul impact
+  principal (0,16 s) ; les deux qui gardaient un second coup sont remplacés par des sons propres (la hauteur au hasard
+  les rend différents).
