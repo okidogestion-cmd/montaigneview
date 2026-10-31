@@ -82,7 +82,7 @@ void fragment() {
 		if (t.a * (1.0 + mip * 0.3) < 0.45) {
 			discard;
 		}
-		ALBEDO = t.rgb * tint.rgb * shade * COLOR.rgb * 0.75;   // planches photo Higgsfield bien plus claires que le sol : ramenées à son niveau
+		ALBEDO = t.rgb * tint.rgb * shade * COLOR.rgb * 0.6;   // planches photo Higgsfield bien plus claires que le sol : ramenées à son niveau
 	} else {
 		ALBEDO = pow(COLOR.rgb, vec3(2.2)) * tint.rgb * shade;
 	}

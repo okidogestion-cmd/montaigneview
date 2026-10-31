@@ -661,3 +661,5 @@ Le jeu devient une **appli mobile** (même jeu : cachette, peinture, duel), plus
 
 ### Artefact version 34 (31/10/2026)
 - Publié : étalonnage de l'image, feuillages ramenés au niveau du sol. `index.pck` = 8,96 Mo.
+- Réglage final choisi par l'utilisateur (31/10/2026) : la version la plus sombre — planches d'herbe et de fleurs à 60 %,
+  arbres à 78 %, contraste 1,14, ombres profondes bleu-vert (courbe 0 → 0,015 / 0,03 / 0,05 ; 0,25 → 0,21 / 0,24 / 0,26).

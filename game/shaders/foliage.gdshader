@@ -53,7 +53,7 @@ void fragment() {
 	if (!FRONT_FACING) {
 		NORMAL = -NORMAL;
 	}
-	ALBEDO = t.rgb * tint.rgb * COLOR.rgb * 0.85;   // feuillage un peu plus sombre : il ressortait trop sur le relief
+	ALBEDO = t.rgb * tint.rgb * COLOR.rgb * 0.78;   // feuillage un peu plus sombre : il ressortait trop sur le relief
 	ROUGHNESS = 1.0;
 	SPECULAR = 0.0;
 }

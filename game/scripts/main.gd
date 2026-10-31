@@ -272,10 +272,10 @@ func _build_environment() -> void:
 	# Étalonnage de toute l'image (un seul « filtre » qui unifie les couleurs, façon film) : couleurs un peu moins
 	# saturées, plus de contraste, ombres froides bleu-vert et lumières chaudes dorées (courbes par couleur, LUT 1D).
 	env.adjustment_saturation = 0.82
-	env.adjustment_contrast = 1.08
+	env.adjustment_contrast = 1.14
 	var grade := Gradient.new()
 	grade.offsets = PackedFloat32Array([0.0, 0.25, 0.6, 1.0])
-	grade.colors = PackedColorArray([Color(0.045, 0.06, 0.075), Color(0.27, 0.29, 0.3), Color(0.64, 0.62, 0.57), Color(1.0, 0.94, 0.82)])
+	grade.colors = PackedColorArray([Color(0.015, 0.03, 0.05), Color(0.21, 0.24, 0.26), Color(0.62, 0.59, 0.54), Color(1.0, 0.93, 0.8)])
 	var lut := GradientTexture1D.new()
 	lut.gradient = grade
 	lut.width = 256
