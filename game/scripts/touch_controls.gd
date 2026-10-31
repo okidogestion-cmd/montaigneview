@@ -35,7 +35,7 @@ func _ready() -> void:
 	_add("accroupi", Vector2(-240, -150), 54, "ACCROUPI", PAPER, ["hide", "move"], false, 1)
 	_add("sauter", Vector2(-370, -105), 54, "SAUTER", PAPER, ["hide", "move"], false, 0)
 	# Changer de cachette pendant le tir (BOUGER), puis reprendre la lunette (LUNETTE).
-	_add("bouger", Vector2(-310, -95), 50, "BOUGER", Color("#ffcf8a"), ["fire"], false, 0)
+	_add("bouger", Vector2(-300, -330), 50, "BOUGER", Color("#ffcf8a"), ["fire"], false, 0)
 	_add("lunette", Vector2(-110, -400), 62, "LUNETTE", BLAZE, ["move"], false, 3)
 	_add("tirer", Vector2(-140, -190), 90, "TIRER", BLAZE, ["fire"], false, 5)
 	_add("souffle", Vector2(120, -190), 66, "SOUFFLE", Color("#86d394"), ["fire"], true, 6)

@@ -334,7 +334,12 @@ func _build_environment() -> void:
 	# Ombres seulement autour de la caméra, en deux tranches : léger pour les téléphones.
 	sun.directional_shadow_mode = DirectionalLight3D.SHADOW_PARALLEL_2_SPLITS
 	sun.directional_shadow_max_distance = 90.0
-	sun.shadow_blur = 1.0
+	# Anti-scintillement (31/10/2026, « la lumière fait clignoter les arbres du fond et l'ombre sur le personnage ») :
+	# bords d'ombre plus doux, pas de petites taches d'ombre sur le personnage et le feuillage, et les ombres
+	# s'effacent progressivement de 45 à 90 m au lieu d'apparaître d'un coup sur les arbres en marchant.
+	sun.shadow_normal_bias = 2.0
+	sun.shadow_blur = 1.6
+	sun.directional_shadow_fade_start = 0.5
 	add_child(sun)
 	_sky_mat = sky_mat
 	_set_dusk(0.0)

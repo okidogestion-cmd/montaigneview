@@ -752,3 +752,16 @@ Le jeu devient une **appli mobile** (même jeu : cachette, peinture, duel), plus
   la caméra (`shaders/imposteur.gdshader`, `world.gd` → `_impostor` / `_inst_impostors`). Pas d'ombre, pas de vent,
   pas de collision : la forêt paraît pleine pour bien moins de calcul. Buissons et cailloux restent allégés.
 - Artefact version 46 : publié. `index.pck` = 9,32 Mo.
+
+### Ombres, brume du début, boutons au doigt (31/10/2026)
+- « La lumière fait clignoter les arbres du fond et l'ombre sur le personnage quand je bouge » : ombres du soleil
+  adoucies (`shadow_blur` 1,6), décalées des surfaces (`shadow_normal_bias` 2 : plus de petites taches sur le
+  personnage et le feuillage), et effacées progressivement de 45 à 90 m (`directional_shadow_fade_start` 0,5) au lieu
+  d'apparaître d'un coup sur les arbres en marchant. Mesure (caméra qui glisse de 2 mm par image) : sans ombres le
+  sapin change sur 5,8 % de ses pixels (vent), avec les anciennes ombres 8,4 %.
+- Brouillard du début de partie : les deux nappes d'image (`brume.jpg`, retirée) qui glissaient sont remplacées par
+  un voile uniforme de la teinte du brouillard, qui se dissipe pendant que le brouillard du décor se lève.
+- Au doigt, écran « Cache-toi » : la barre d'infos du bas (terrain, camouflage, vu depuis l'île d'en face) monte
+  sous le titre ; le bas de l'écran reste aux pouces (joystick, SAUTER). Écran de tir : BOUGER remonte au-dessus
+  de la barre du souffle.
+- Artefact version 47 : publié. `index.pck` = 9,25 Mo.

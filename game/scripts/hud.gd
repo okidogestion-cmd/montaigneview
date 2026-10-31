@@ -92,7 +92,6 @@ void fragment() {
 
 var root: Control
 var fog_overlay: ColorRect
-var fog_layers: Array[TextureRect] = []
 var scope: ColorRect
 var dot: Control
 var flash: ColorRect
@@ -112,6 +111,8 @@ var level_buttons := {}
 var hide_hud: Control
 var hide_timer: Label
 var zone_info: RichTextLabel
+var hide_top_box: VBoxContainer
+var hide_bottom: Control
 var keys_hint: Label
 var swatches := {}
 var inset: SubViewportContainer
@@ -165,22 +166,8 @@ func _ready() -> void:
 	theme.default_font_size = 18
 	root.theme = theme
 	add_child(root)
-	fog_overlay = _full(_rect(Color("#dfe6ea", 0)))
+	fog_overlay = _full(_rect(Color("#d8c3b2", 0)))   # même teinte chaude que le brouillard du décor
 	root.add_child(fog_overlay)
-	# Deux nappes de brume (art/brume.jpg, créée avec Higgsfield) qui s'écartent quand le brouillard se lève.
-	for i in 2:
-		var f := TextureRect.new()
-		f.texture = preload("res://art/brume.jpg")
-		f.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
-		f.stretch_mode = TextureRect.STRETCH_SCALE
-		f.flip_h = i == 1
-		var fm := CanvasItemMaterial.new()
-		fm.blend_mode = CanvasItemMaterial.BLEND_MODE_ADD
-		f.material = fm
-		f.mouse_filter = Control.MOUSE_FILTER_IGNORE
-		f.visible = false
-		root.add_child(f)
-		fog_layers.append(f)
 	scope = _full(ColorRect.new())
 	var sm := ShaderMaterial.new()
 	sm.shader = Shader.new()
@@ -219,18 +206,11 @@ func _ready() -> void:
 
 
 ## Brume de 1 (écran noyé) à 0 (dégagé) : fond clair + deux nappes qui s'écartent et s'effacent.
+## Brouillard du début de la partie : un voile uniforme qui se dissipe (le brouillard du décor se lève en même temps,
+## main.gd → set_fog). Avant : deux nappes d'image (art/brume.jpg) qui s'écartaient, retirées le 31/10/2026.
 func set_fog_amount(a: float) -> void:
-	fog_overlay.color.a = clampf((a - 0.45) / 0.55, 0, 1)
-	var vs := root.size
-	for i in fog_layers.size():
-		var f := fog_layers[i]
-		f.visible = a > 0.001
-		if not f.visible:
-			continue
-		var spread := (1.0 - a) * 0.5 * vs.x
-		f.size = vs * Vector2(1.6, 1.2) * (1.0 + (1.0 - a) * 0.4)
-		f.position = Vector2((vs.x - f.size.x) / 2 + (spread if i == 1 else -spread), (vs.y - f.size.y) / 2)
-		f.modulate.a = clampf(a * 1.4, 0, 1)
+	var k := clampf(a, 0.0, 1.0)
+	fog_overlay.color.a = k * k * (3.0 - 2.0 * k) * 0.92
 
 
 # ---------- Petites fabriques ----------
@@ -648,7 +628,8 @@ func _build_hide() -> void:
 	hide_hud = _full(Control.new())
 	var top := _bar(true)
 	var th := _hbox()
-	th.add_child(_tac_top("Cache-toi", "Trouve une cachette sur ton île, puis tu choisiras ta tenue de camouflage sur place. L'ennemi regarde depuis l'île d'en face.")[0])
+	hide_top_box = _tac_top("Cache-toi", "Trouve une cachette sur ton île, puis tu choisiras ta tenue de camouflage sur place. L'ennemi regarde depuis l'île d'en face.")[0]
+	th.add_child(hide_top_box)
 	var tr := _vbox(2)
 	var tl := _small("Temps")
 	tl.horizontal_alignment = HORIZONTAL_ALIGNMENT_RIGHT
@@ -726,6 +707,7 @@ func _build_hide() -> void:
 	bv.add_child(r2)
 	bottom.add_child(bv)
 	hide_hud.add_child(bottom)
+	hide_bottom = bottom
 	hide_hud.visible = false
 	root.add_child(hide_hud)
 
@@ -1072,6 +1054,11 @@ func set_touch_mode(on: bool) -> void:
 	keys_hint.text = "Pouce gauche : marcher (à fond : courir)   ·   Glisser à droite : regarder   ·   Viser (maintenu) : vue de tir"
 	ready_btn.visible = false
 	fire_keys.visible = false
+	# Le bas de l'écran est aux pouces (joystick, boutons) : les infos de la cachette montent sous le titre.
+	zone_info.reparent(hide_top_box)
+	zone_info.add_theme_font_size_override("normal_font_size", 18)
+	zone_info.add_theme_font_size_override("bold_font_size", 18)
+	hide_bottom.visible = false
 	# La petite lunette ennemie passe en haut à gauche : la droite est aux gros boutons.
 	inset.set_anchors_preset(Control.PRESET_TOP_LEFT)
 	inset.position = Vector2(14, 92)
