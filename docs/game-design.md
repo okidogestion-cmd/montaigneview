@@ -513,3 +513,7 @@ Le jeu devient une **appli mobile** (même jeu : cachette, peinture, duel), plus
   Remplace les vagues et le vent synthétisés (`life.gd`) ; les cris de mouettes restent.
 - Caméra embarquée adoucie (demande : « trop brutal ») : balancement ÷ 3 environ (rebond 1,6 cm, roulis 0,4°),
   montée en douceur ; élargissement de l'angle en courant 9° → 5°, plus progressif.
+
+### Artefact version 23 (31/10/2026)
+- Publié : saut animé, caméra rapprochée, pentes à 64°, respiration retirée, bande son forêt, caméra de course adoucie.
+  `index.pck` = 13,37 Mo (limite 15 Mo par fichier : il reste ≈ 1,6 Mo de marge).
