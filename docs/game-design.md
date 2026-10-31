@@ -696,3 +696,6 @@ Le jeu devient une **appli mobile** (même jeu : cachette, peinture, duel), plus
 
 ### Artefact version 38 (31/10/2026)
 - Publié : coucher de soleil pendant la partie, faux rayons de lumière. `index.pck` = 8,97 Mo.
+- Correction des rayons (31/10/2026, « le soleil est super fort et le côté lumineux bouge ») : seul le ciel tout près
+  du soleil (≈ 30 % de l'écran autour) envoie des rayons, plus les nuages lointains ; force plafonnée à un léger voile,
+  coupée dès que le soleil sort de l'écran, et qui varie en douceur quand on tourne.

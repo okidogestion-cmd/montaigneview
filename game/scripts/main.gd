@@ -47,6 +47,7 @@ var sun: DirectionalLight3D
 var _sky_mat: ShaderMaterial
 var dusk_t := 0.0             # temps écoulé depuis le début de la partie (le soleil descend)
 const DUSK_TIME := 240.0      # en 4 minutes, le soleil passe de l'heure dorée au coucher
+var _rays_k := 0.0
 var _rays: ColorRect          # faux rayons de lumière (post-traitement à l'écran)
 const RAYS_SHADER := """
 shader_type canvas_item;
@@ -67,12 +68,14 @@ void fragment() {
 	for (int i = 0; i < 16; i++) {
 		p += step;
 		vec3 c = texture(screen, clamp(p, vec2(0.0), vec2(1.0))).rgb;
-		acc += smoothstep(0.5, 0.9, dot(c, vec3(0.3, 0.59, 0.11))) * w;
+		// Seul le ciel tout près du soleil éclaire : les nuages lointains n'envoient pas de rayons (sinon la lueur bouge).
+		float near = 1.0 - smoothstep(0.0, 0.3, distance(p * vec2(1.6, 1.0), sun_uv * vec2(1.6, 1.0)));
+		acc += smoothstep(0.6, 0.95, dot(c, vec3(0.3, 0.59, 0.11))) * near * w;
 		w *= 0.92;
 	}
-	acc /= 6.0;
+	acc = min(acc / 8.0, 0.6);
 	float fall = 1.0 - smoothstep(0.0, 1.1, distance(uv * vec2(1.6, 1.0), sun_uv * vec2(1.6, 1.0)));
-	COLOR = vec4(tint * acc * strength * fall, 1.0);
+	COLOR = vec4(tint * min(acc * strength * fall, 0.28), 1.0);   // jamais plus d'un léger voile
 }
 """
 # Sons de tir : vrai Kar98k (sources/k98_pixabay.mp3, découpé par tools/sons_k98.sh) pour ton tir (avec la
@@ -375,10 +378,12 @@ func _update_rays() -> void:
 		return
 	var vs := get_viewport().get_visible_rect().size
 	var uv := camera.unproject_position(far) / vs
-	var edge := clampf(1.6 - maxf(absf(uv.x - 0.5), absf(uv.y - 0.5)) * 1.6, 0.0, 1.0)   # s'éteint quand le soleil s'éloigne de l'écran
-	_rays.visible = edge > 0.01
+	# S'éteint dès que le soleil sort de l'écran ; la force change en douceur (pas d'à-coups en tournant).
+	var edge := clampf((0.62 - maxf(absf(uv.x - 0.5), absf(uv.y - 0.5))) / 0.15, 0.0, 1.0)
+	_rays_k = lerpf(_rays_k, edge, 1.0 - exp(-get_process_delta_time() * 4.0))
+	_rays.visible = _rays_k > 0.01
 	sm.set_shader_parameter("sun_uv", uv)
-	sm.set_shader_parameter("strength", 1.1 * edge * (1.0 + 0.4 * clampf(dusk_t / DUSK_TIME, 0.0, 1.0)))
+	sm.set_shader_parameter("strength", 0.7 * _rays_k * (1.0 + 0.4 * clampf(dusk_t / DUSK_TIME, 0.0, 1.0)))
 	sm.set_shader_parameter("tint", Color("#ffd9a6").lerp(Color("#ff9a5c"), clampf(dusk_t / DUSK_TIME, 0.0, 1.0)))
 
 func D() -> Dictionary:
