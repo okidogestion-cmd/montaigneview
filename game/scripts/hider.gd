@@ -40,9 +40,8 @@ var run_amt := 0.0              # 0 à l'arrêt ou en marche, 1 en pleine course
 var _bob_t := 0.0               # cycle de foulée (une foulée = gauche + droite)
 var _bob_amp := 0.0             # intensité du balancement de la caméra embarquée (0 à l'arrêt)
 # Sons (tools/sons_pas.py) : un pas à chaque appui de la foulée, herbe ou feuilles selon le terrain,
-# et le frottement de l'équipement pendant la course.
+# (le frottement de l'équipement a été retiré le 31/10 : il doublait le rythme des pas).
 var _steps := {}                # "herbe" / "feuilles" → lecteur (AudioStreamRandomizer : 4 variantes, hauteur au hasard)
-var _gear: AudioStreamPlayer
 var _step_idx := 0
 var steps_played := 0           # nombre de pas joués (pour les tests)
 
@@ -73,12 +72,6 @@ func _init(w) -> void:
 		p.max_polyphony = 1   # un pas à la fois : jamais deux pas qui se chevauchent
 		world.add_child(p)
 		_steps[kind] = p
-	var g: AudioStreamOggVorbis = load("res://art/son_equipement.ogg")
-	g.loop = true
-	_gear = AudioStreamPlayer.new()
-	_gear.stream = g
-	_gear.volume_db = -60.0
-	world.add_child(_gear)
 
 func reset(x: float, z: float) -> void:
 	body.global_position = Vector3(x, world.height_at(x, z) + 0.05, z)
@@ -232,16 +225,6 @@ func _update_sounds(dt: float, spd: float) -> void:
 		_step_idx = idx
 		if spd > 0.6 and air == "" and stance != "couche":
 			_play_step(0.0)
-	# Équipement : silencieux à l'arrêt, léger en marchant, net en courant ; la boucle suit le rythme.
-	var target := -60.0
-	if spd > 0.5 and air == "":
-		target = lerpf(-30.0, -15.0, run_amt) - (6.0 if stance != "debout" else 0.0)   # sous les pas
-	_gear.volume_db = move_toward(_gear.volume_db, target, dt * 40.0)
-	_gear.pitch_scale = lerpf(0.8, 1.0, run_amt)
-	if _gear.volume_db > -55.0 and not _gear.playing:
-		_gear.play()
-	elif _gear.volume_db <= -59.0 and _gear.playing:
-		_gear.stop()
 
 func _play_step(extra_db: float) -> void:
 	var kind := "feuilles" if world.zone_of(pos.x, pos.z) == "foret" else "herbe"
@@ -253,8 +236,8 @@ func _play_step(extra_db: float) -> void:
 
 ## Fin de la cachette : plus de pas ni d'équipement.
 func silence() -> void:
-	_gear.stop()
-	_gear.volume_db = -60.0
+	for p in _steps.values():
+		p.stop()
 
 func eye() -> Vector3:
 	return pos + Vector3(0, info().eye, 0) + forward() * 0.3

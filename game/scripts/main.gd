@@ -70,6 +70,8 @@ var gasp := 0.0
 var sens := {"souris": 1.0, "tactile": 2.0}   # sensibilité du regard (multiplicateurs, réglables dans le menu)
 const SETTINGS_FILE := "user://reglages.cfg"
 var scope_time := 0.0
+var _scope_par := Vector2.ZERO   # décalage de l'objectif dans la lunette (pixels), lissé
+var _last_look := Vector2.ZERO
 var glint_warned := false
 var glinted := false
 var ai_reveal := 0.0
@@ -938,6 +940,14 @@ func _process(dt: float) -> void:
 				hud.toast("Ta lunette brille au soleil ! Change de zoom.", 3.0)
 		if rig.zoom_level > 0:
 			hud.set_scope(true, glint)
+			# Effet de tube : l'objectif se décale avec le balancement, le recul et les mouvements du regard,
+			# puis revient au centre (comme une lunette qu'on déplace devant l'œil).
+			var look := Vector2(rig.scope_yaw, rig.scope_pitch)
+			var turn := (look - _last_look) / maxf(dt, 0.001)
+			_last_look = look
+			var target := Vector2((camera.rotation.y - rig.scope_yaw) * 3000.0 + turn.x * 40.0, -(camera.rotation.x - rig.scope_pitch) * 3000.0 - turn.y * 40.0)
+			_scope_par = _scope_par.lerp(target.limit_length(60.0), 1.0 - exp(-dt * 10.0))
+			hud.set_scope_parallax(_scope_par)
 		ai_reveal = minf(1, ai_reveal + dt * detect_rate() + (dt * L.glint if glint else 0.0))
 		hud.set_eye(ai_reveal)
 		ai_next -= dt

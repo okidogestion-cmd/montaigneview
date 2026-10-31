@@ -40,38 +40,53 @@ const SENS_STEP := 0.25
 
 const SCOPE_SHADER := """
 shader_type canvas_item;
-// Lunette de sniper : verre rond cerné d'un épais tube noir, bords du verre assombris, réticule fin
-// avec gros traits à l'extérieur (gauche, droite, bas) et points de repère (mil-dots) autour du centre.
+// Lunette de sniper façon jeu de tir moderne : on regarde dans un tube. L'oculaire (grand cercle) et l'objectif
+// (cercle un peu plus petit) se décalent l'un par rapport à l'autre quand l'arme bouge (parallaxe) ; entre les deux,
+// l'intérieur sombre du tube. Verre assombri sur les bords, légère frange colorée, réticule fin à gros traits et mil-dots.
 uniform float glint = 0.0;
+uniform vec2 parallax = vec2(0.0);   // décalage de l'objectif (pixels), donné par main.gd selon le balancement et le recul
 void fragment() {
 	vec2 size = 1.0 / SCREEN_PIXEL_SIZE;
 	vec2 p = (UV - 0.5) * size;
-	float r = min(size.x * 0.46, size.y * 0.43);
+	float r = min(size.x * 0.47, size.y * 0.45);          // oculaire
+	float ro = r * 0.9;                                  // objectif, vu au fond du tube
+	vec2 q = p - parallax;
 	float d = length(p);
-	float ax = abs(p.x);
-	float ay = abs(p.y);
-	float u = max(1.0, r / 420.0);                         // épaisseur d'un trait fin
-	float vig = smoothstep(r * 0.62, r, d) * 0.78;        // verre assombri vers le bord
+	float dq = length(q);
+	float u = max(1.0, r / 420.0);
+	// Verre : assombri vers le bord de l'objectif, frange rouge / bleue juste avant le bord.
+	float vig = smoothstep(ro * 0.55, ro, dq) * 0.72;
 	vec4 col = vec4(0.0, 0.0, 0.0, vig);
+	float fringe = smoothstep(ro * 0.93, ro * 0.985, dq) * (1.0 - smoothstep(ro * 0.985, ro, dq));
+	col = mix(col, vec4(0.25, 0.08, 0.06, 0.75), fringe * 0.3);   // frange discrète
+	// Réticule (suit l'objectif).
+	float ax = abs(q.x);
+	float ay = abs(q.y);
 	float hair = 0.0;
-	float gap = r * 0.035;
-	if (ay < u * 0.7 && ax > gap && ax < r) hair = 1.0;    // trait horizontal
-	if (ax < u * 0.7 && ay > gap && ay < r) hair = 1.0;    // trait vertical
-	if (ay < u * 3.2 && ax > r * 0.34 && ax < r) hair = 1.0;                    // gros traits gauche et droite
-	if (ax < u * 3.2 && p.y > r * 0.34 && p.y < r) hair = 1.0;                  // gros trait du bas
-	for (int k = 1; k <= 5; k++) {                         // mil-dots
-		float o = r * 0.058 * float(k);
-		float rad = u * 1.9;
-		if (length(vec2(ax - o, p.y)) < rad || length(vec2(p.x, ay - o)) < rad) hair = 1.0;
+	float gap = r * 0.03;
+	if (ay < u * 0.75 && ax > gap && ax < ro) hair = 1.0;
+	if (ax < u * 0.75 && ay > gap && ay < ro) hair = 1.0;
+	if (ay < u * 3.4 && ax > ro * 0.36 && ax < ro) hair = 1.0;
+	if (ax < u * 3.4 && q.y > ro * 0.36 && q.y < ro) hair = 1.0;
+	for (int k = 1; k <= 5; k++) {
+		float o = ro * 0.06 * float(k);
+		if (length(vec2(ax - o, q.y)) < u * 1.9 || length(vec2(q.x, ay - o)) < u * 1.9) hair = 1.0;
 	}
-	col = mix(col, vec4(0.015, 0.015, 0.015, 1.0), hair);
-	if (d < u * 1.6) col = vec4(0.94, 0.31, 0.31, 1.0);   // point rouge central
-	float g = glint * smoothstep(r * 0.55, r, d) * 0.35;
+	col = mix(col, vec4(0.012, 0.012, 0.012, 1.0), hair);
+	if (dq < u * 1.7) col = vec4(0.94, 0.25, 0.22, 1.0);
+	float g = glint * smoothstep(ro * 0.5, ro, dq) * 0.35;
 	col = mix(col, vec4(1.0, 0.92, 0.67, max(col.a, g)), g);
-	float outside = smoothstep(r - 2.5, r, d);
-	float rim = smoothstep(r * 1.0, r * 1.012, d) * (1.0 - smoothstep(r * 1.03, r * 1.05, d));   // fin liseré du tube
-	vec4 tube = mix(vec4(0.012, 0.014, 0.016, 1.0), vec4(0.10, 0.105, 0.11, 1.0), rim);
-	COLOR = mix(col, tube, outside);
+	// Intérieur du tube (entre l'objectif et l'oculaire) : métal sombre, plus clair vers l'oculaire.
+	float in_tube = smoothstep(ro - 2.0, ro + 1.0, dq);
+	float t = clamp((d - ro * 0.8) / (r - ro * 0.8), 0.0, 1.0);
+	vec4 tube = vec4(mix(vec3(0.03, 0.025, 0.025), vec3(0.11, 0.085, 0.08), t * t), 1.0);
+	tube.rgb *= 0.8 + 0.2 * smoothstep(-r, r, -p.y);    // lumière qui vient d'en haut
+	col = mix(col, tube, in_tube);
+	// Bord de l'oculaire : liseré clair puis noir complet.
+	float rim = smoothstep(r * 0.985, r, d) * (1.0 - smoothstep(r, r * 1.012, d));
+	col = mix(col, vec4(0.2, 0.18, 0.17, 1.0), rim * 0.8);
+	col = mix(col, vec4(0.0, 0.0, 0.0, 1.0), smoothstep(r * 1.004, r * 1.02, d));
+	COLOR = col;
 }
 """
 
@@ -275,8 +290,11 @@ func ui_sound(strong := false) -> void:
 	p.play()
 
 ## Titre en capitales étroites et grasses (police Barlow Condensed 800), avec espacement des lettres.
-func _title(text: String, size: int, color: Color, spacing := 0) -> Label:
+func _title(text: String, size: int, color: Color, spacing := 0, outline := false) -> Label:
 	var l := _label(text, size, color)
+	if outline:
+		l.add_theme_color_override("font_outline_color", Color(0, 0, 0, 0.85))
+		l.add_theme_constant_override("outline_size", maxi(4, size / 10))
 	var fv := FontVariation.new()
 	fv.base_font = FONT_BOLD
 	fv.spacing_glyph = spacing
@@ -385,20 +403,28 @@ func _build_menu() -> void:
 	holder.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	menu_card = holder
 	menu.add_child(holder)
-	var v := _vbox(14)
-	v.alignment = BoxContainer.ALIGNMENT_CENTER
-	holder.add_child(v)
-	v.add_child(_title("DUEL DE SNIPERS  ·  1 CONTRE 1", 18, BLAZE, 3))
-	v.add_child(_title("DUSKLINE", 104, PAPER, 6))
-	var bar := _rect(BLAZE)
-	bar.custom_minimum_size = Vector2(140, 5)
-	bar.size_flags_horizontal = Control.SIZE_SHRINK_BEGIN
-	v.add_child(bar)
-	var pitch := _label("Deux montagnes. Deux snipers. Cache-toi, laisse le brouillard se lever, trouve-le à la lunette et tire le premier.", 19, PAPER)
+	var col := _vbox(0)
+	col.alignment = BoxContainer.ALIGNMENT_CENTER
+	holder.add_child(col)
+	# Plaque sombre derrière le titre et le texte (lisible sur le ciel, au téléphone debout aussi), filet orange à gauche.
+	var plate := PanelContainer.new()
+	var ps := _style(Color(0.035, 0.05, 0.06, 0.78), Color(0, 0, 0, 0), 0, 26)
+	ps.border_width_left = 7
+	ps.border_color = BLAZE
+	plate.add_theme_stylebox_override("panel", ps)
+	plate.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	col.add_child(plate)
+	var head := _vbox(10)
+	plate.add_child(head)
+	head.add_child(_title("DUEL DE SNIPERS  ·  1 CONTRE 1", 22, BLAZE, 3, true))
+	head.add_child(_title("DUSKLINE", 112, PAPER, 6, true))
+	var pitch := _title("Deux montagnes. Deux snipers. Cache-toi, laisse le brouillard se lever, trouve-le à la lunette et tire le premier.", 24, PAPER, 0, true)
 	pitch.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
-	v.add_child(pitch)
-	v.add_child(_spacer_v(6))
-	v.add_child(_title("ADVERSAIRE", 15, MUTED, 3))
+	head.add_child(pitch)
+	var v := _vbox(14)
+	col.add_child(_spacer_v(18))
+	col.add_child(v)
+	v.add_child(_title("ADVERSAIRE", 19, PAPER, 3, true))
 	var seg := _hbox(6)
 	for lv in ["facile", "normal", "difficile"]:
 		var b := _tac_button(lv.to_upper(), Color(1, 1, 1, 0.06), PAPER, 20)
@@ -415,7 +441,7 @@ func _build_menu() -> void:
 	var cfg := _tac_button("RÉGLAGES", Color(1, 1, 1, 0.04), PAPER, 20)
 	cfg.pressed.connect(func(): settings.visible = true)
 	v.add_child(cfg)
-	menu_hint = _label("Souris pour viser, clic gauche ou Espace pour tirer, clic droit ou Maj pour retenir ta respiration, molette ou Z pour zoomer, Échap pour libérer la souris.", 14, MUTED)
+	menu_hint = _title("Souris pour viser, clic gauche ou Espace pour tirer, clic droit ou Maj pour retenir ta respiration, molette ou Z pour zoomer, Échap pour libérer la souris.", 17, Color(PAPER, 0.88), 0, true)
 	var hint := menu_hint
 	hint.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 	v.add_child(hint)
@@ -716,6 +742,10 @@ func render_ammo(left: int, total: int) -> void:
 func set_eye(v: float) -> void:
 	eye_fill.size = Vector2(170 * clampf(v, 0, 1), 8)
 	eye_fill.color = OK.lerp(Color("#e9c84a"), clampf(v * 2, 0, 1)).lerp(DANGER, clampf(v * 2 - 1, 0, 1))
+
+## Décalage de l'objectif dans la lunette (pixels) : effet de tube quand l'arme bouge.
+func set_scope_parallax(v: Vector2) -> void:
+	(scope.material as ShaderMaterial).set_shader_parameter("parallax", v)
 
 func set_scope(on: bool, glint := false) -> void:
 	scope.visible = on

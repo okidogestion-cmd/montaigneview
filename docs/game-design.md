@@ -594,3 +594,14 @@ Le jeu devient une **appli mobile** (même jeu : cachette, peinture, duel), plus
 
 ### Artefact version 28 (31/10/2026)
 - Publié : correction des sons de course superposés. `index.pck` = 8,60 Mo.
+
+### Vraie lunette, écran titre lisible, chargement assorti ; frottement retiré (31/10/2026)
+- Frottement de l'équipement retiré (on garde seulement les pas).
+- Lunette (`SCOPE_SHADER`) : tube vu de l'intérieur. Oculaire et objectif sont deux cercles ; l'objectif se décale
+  (parallaxe, `hud.set_scope_parallax`, calculée dans `main.gd` selon le balancement, le recul et les mouvements du
+  regard, puis revient au centre). Entre les deux, l'intérieur sombre du tube, éclairé d'en haut ; verre assombri sur les
+  bords, frange colorée discrète, réticule fin à gros traits et mil-dots, liseré de l'oculaire.
+- Écran titre : titre, accroche et texte sur une plaque sombre à filet orange, capitales grasses bordées de noir
+  (`_title(..., outline)`), lisible sur le ciel et au téléphone debout.
+- Page de chargement de l'artefact : même direction artistique (Barlow Condensed via Google Fonts, plaque à filet
+  orange, titre DUSKLINE, barre biseautée orange).
