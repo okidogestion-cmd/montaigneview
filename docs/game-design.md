@@ -729,3 +729,15 @@ Le jeu devient une **appli mobile** (même jeu : cachette, peinture, duel), plus
 - **Validé par l'utilisateur (31/10/2026) : « c'est top, on reste dessus ».** Ce style (police Barlow Condensed,
   titres et boutons en gras 800, textes en 600, plaques biseautées, accents orange) est la référence pour tous
   les futurs écrans et menus.
+
+### Bouquetins (31/10/2026)
+- Une petite harde de **3 bouquetins par île**, sur l'herbe et les rochers de mi-pente, loin des cachettes (> 30 m).
+- Modèle Meshy créé avec Higgsfield le 30/10/2026 (4,3 Mo), allégé avec gltf-transform : ≈ 3 900 triangles,
+  texture 512 px → `sources/bouquetin_higgsfield.glb` (254 Ko). `tools/faune.gd` le remet droit, à taille réelle
+  (1,45 m cornes comprises), sabots au sol → `game/art/bouquetin.res` + `bouquetin.jpg`. Poids ajouté au jeu : ≈ 250 Ko.
+- Pas de squelette : `shaders/animal.gdshader` anime les pattes (diagonales ensemble, sabot levé), le balancement
+  du corps, la tête qui broute (mâchonne) et qui tourne pour regarder. `world.gd` → `update_fauna` : brouter,
+  relever la tête et regarder, faire quelques pas (0,75 m/s) sans quitter la harde ni descendre dans l'eau ;
+  le corps suit la pente.
+- Décor seulement : pas de collision, ni pour les balles ni pour la vue de l'ennemi (équilibre inchangé).
+- Artefact version 44 : publié. `index.pck` = 9,31 Mo.

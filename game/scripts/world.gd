@@ -395,6 +395,7 @@ func build() -> void:
 	enemy_hitbox.position.y = 0.7
 	enemy.add_child(enemy_hitbox)
 	_build_sprites()
+	_build_fauna()
 
 func _load_or_compute_relief() -> void:
 	# Le relief (hauteurs et zones) est fabriqué une fois pour toutes par tools/relief.py (montagnes, crêtes,
@@ -1341,3 +1342,99 @@ func _build_sprites() -> void:
 	flash_sprite.visible = false
 	end_marker = _sprite(ring, Color("#ef4f4f"), 1.6)
 	end_marker.visible = false
+
+
+# ---------- Faune : bouquetins ----------
+# Modèle Meshy créé avec Higgsfield, préparé par tools/faune.gd (art/bouquetin.res). Pas de squelette : le shader
+# animal.gdshader anime pattes et tête. Décor seulement : pas de collision, l'ennemi voit à travers (équilibre inchangé).
+const ANIMAL := preload("res://shaders/animal.gdshader")
+const IBEX_MESH := preload("res://art/bouquetin.res")
+const IBEX_TEX := preload("res://art/bouquetin.jpg")
+const IBEX_PER_ISLAND := 3
+const IBEX_SPEED := 0.75          # m/s au pas
+const IBEX_STRIDE := 1.2          # m par cycle de pas
+var fauna: Array = []             # {node, mat, home, target, state, t, phase, walk, graze, look, look_to}
+
+func _build_fauna() -> void:
+	var r := RandomNumberGenerator.new()
+	r.seed = 77
+	for cz in [MZ, -MZ]:
+		# Une petite harde par île, sur les rochers et l'herbe de mi-pente, loin des cachettes.
+		var center := Vector2.ZERO
+		for tries in 400:
+			var a := r.randf() * TAU
+			var d := 50.0 + r.randf() * 90.0
+			var x := cos(a) * d
+			var z: float = cz + sin(a) * d
+			if height_at(x, z) > WATER_Y + 8.0 and zone_of(x, z) in ["roche", "herbe"] and not _near_spot(x, z, 900):
+				center = Vector2(x, z)
+				break
+		if center == Vector2.ZERO:
+			continue
+		for i in IBEX_PER_ISLAND:
+			var p := center + Vector2(r.randf_range(-6, 6), r.randf_range(-6, 6))
+			var m := ShaderMaterial.new()
+			m.shader = ANIMAL
+			m.set_shader_parameter("albedo_tex", IBEX_TEX)
+			var mi := MeshInstance3D.new()
+			mi.mesh = IBEX_MESH
+			mi.material_override = m
+			mi.scale = Vector3.ONE * (0.85 + r.randf() * 0.25)   # mâles et femelles, jeunes
+			add_child(mi)
+			var an := {"node": mi, "mat": m, "home": center, "pos": p, "yaw": r.randf() * TAU, "target": p,
+				"state": "graze", "t": r.randf_range(2, 8), "phase": 0.0, "walk": 0.0, "graze": 1.0,
+				"look": 0.0, "look_to": 0.0, "rng": r}
+			fauna.append(an)
+			_place_animal(an)
+
+func _place_animal(an: Dictionary) -> void:
+	var p: Vector2 = an.pos
+	var y := height_at(p.x, p.y)
+	var f := Vector2(sin(an.yaw), cos(an.yaw))
+	var pitch := atan2(height_at(p.x + f.x * 0.5, p.y + f.y * 0.5) - height_at(p.x - f.x * 0.5, p.y - f.y * 0.5), 1.0)
+	var mi: MeshInstance3D = an.node
+	mi.transform = Transform3D(Basis(Vector3.UP, an.yaw) * Basis(Vector3.RIGHT, -clampf(pitch, -0.5, 0.5)) * Basis.from_scale(mi.scale), Vector3(p.x, y, p.y))
+
+## Comportement : brouter, relever la tête et regarder, faire quelques pas vers un autre coin d'herbe.
+func update_fauna(dt: float) -> void:
+	for an in fauna:
+		var r: RandomNumberGenerator = an.rng
+		an.t -= dt
+		if an.state == "walk":
+			var to: Vector2 = an.target - an.pos
+			if to.length() < 0.3 or an.t < 0.0:
+				an.state = "graze" if r.randf() < 0.65 else "look"
+				an.t = r.randf_range(3, 9)
+			else:
+				var want := atan2(to.x, to.y)
+				an.yaw = lerp_angle(an.yaw, want, 1.0 - exp(-dt * 2.5))
+				var step := IBEX_SPEED * dt * clampf(1.0 - absf(angle_difference(an.yaw, want)) / PI, 0.2, 1.0)
+				an.pos += Vector2(sin(an.yaw), cos(an.yaw)) * step
+				an.phase = fmod(an.phase + step / IBEX_STRIDE * TAU, TAU * 100.0)
+		elif an.t < 0.0:
+			if r.randf() < 0.55:
+				# Quelques pas, sans quitter la harde ni descendre dans l'eau.
+				for tries in 6:
+					var home: Vector2 = an.home
+					var tg := home + Vector2(r.randf_range(-12, 12), r.randf_range(-12, 12))
+					if height_at(tg.x, tg.y) > WATER_Y + 3.0 and absf(height_at(tg.x, tg.y) - height_at(an.pos.x, an.pos.y)) < 6.0:
+						an.target = tg
+						an.state = "walk"
+						an.t = 25.0
+						break
+			else:
+				an.state = "graze" if an.state == "look" else "look"
+				an.t = r.randf_range(3, 8)
+			an.look_to = r.randf_range(-0.7, 0.7) if an.state == "look" else 0.0
+		if an.state == "look" and r.randf() < dt * 0.4:
+			an.look_to = r.randf_range(-0.8, 0.8)
+		var k := 1.0 - exp(-dt * 3.0)
+		an.walk = lerpf(an.walk, 1.0 if an.state == "walk" else 0.0, k)
+		an.graze = lerpf(an.graze, 1.0 if an.state == "graze" else 0.0, 1.0 - exp(-dt * 1.5))
+		an.look = lerpf(an.look, an.look_to, 1.0 - exp(-dt * 2.0))
+		var m: ShaderMaterial = an.mat
+		m.set_shader_parameter("walk", an.walk)
+		m.set_shader_parameter("phase", an.phase)
+		m.set_shader_parameter("graze", an.graze)
+		m.set_shader_parameter("look", an.look)
+		_place_animal(an)

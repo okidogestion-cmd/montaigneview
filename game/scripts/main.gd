@@ -1147,6 +1147,7 @@ func _process(dt: float) -> void:
 			_look(touch.consume_look() * sens.tactile)
 		rig.update(dt)
 	world.update_grass(camera.global_position)
+	world.update_fauna(dt)
 	life.update(dt, camera.global_position)
 	if phase in ["hide", "reveal", "fire", "move", "paint"]:
 		dusk_t += dt
