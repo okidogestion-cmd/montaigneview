@@ -564,3 +564,6 @@ Le jeu devient une **appli mobile** (même jeu : cachette, peinture, duel), plus
   et libellé court. Boutons de gadgets avec l'icône du gadget.
 - Gadgets portés : deux cases avec icône et touche (1 / 2) en haut à gauche (au doigt, les boutons portent l'icône).
 - Petite lunette ennemie retirée de la cachette (plus de deuxième rendu de la scène).
+
+### Artefact version 26 (31/10/2026)
+- Publié : interface DUSKLINE (accueil, police, boutons à icônes, cases de gadgets), lunette ennemie retirée. `index.pck` = 8,44 Mo.
