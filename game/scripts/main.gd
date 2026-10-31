@@ -65,6 +65,8 @@ var breath := 100.0
 var breath_held := false
 var gasp := 0.0
 var _breath_player: AudioStreamPlayer
+var sens := {"souris": 1.0, "tactile": 2.0}   # sensibilité du regard (multiplicateurs, réglables dans le menu)
+const SETTINGS_FILE := "user://reglages.cfg"
 var scope_time := 0.0
 var glint_warned := false
 var glinted := false
@@ -154,6 +156,8 @@ func _ready() -> void:
 	hud.again_pressed.connect(start_hide)
 	hud.menu_pressed.connect(to_menu)
 	hud.level_chosen.connect(_on_level)
+	hud.sens_changed.connect(_on_sens)
+	_load_settings()
 	paint = PaintScript.new(world.player.get_meta("camo"), world.figure_samples())
 	hud.paint_color.connect(func(c): brush_color = c; _paint_state())
 	hud.paint_size.connect(func(i): brush_size = i; _paint_state())
@@ -194,6 +198,21 @@ func _on_touch_tap(name: String) -> void:
 
 func _on_orientation(portrait: bool) -> void:
 	rig.set_portrait(portrait)
+
+func _load_settings() -> void:
+	var cf := ConfigFile.new()
+	if cf.load(SETTINGS_FILE) == OK:
+		for k in sens:
+			sens[k] = clampf(float(cf.get_value("sensibilite", k, sens[k])), hud.SENS_MIN, hud.SENS_MAX)
+	for k in sens:
+		hud.set_sens(k, sens[k])
+
+func _on_sens(kind: String, v: float) -> void:
+	sens[kind] = v
+	var cf := ConfigFile.new()
+	cf.load(SETTINGS_FILE)
+	cf.set_value("sensibilite", kind, v)
+	cf.save(SETTINGS_FILE)   # peut échouer (navigation privée) : le réglage reste valable pour la séance
 
 func _on_level(lv: String) -> void:
 	level = lv
@@ -826,9 +845,9 @@ func _unhandled_input(e: InputEvent) -> void:
 	var playing := phase in ["hide", "reveal", "fire"]
 	if e is InputEventMouseMotion:
 		if captured and phase == "hide":
-			hider.look(e.relative)
+			hider.look(e.relative * sens.souris)
 		elif captured and (phase == "fire" or phase == "reveal"):
-			_look(e.relative)
+			_look(e.relative * sens.souris)
 	elif e is InputEventMouseButton:
 		if playing and not captured:
 			if e.pressed:
@@ -934,7 +953,7 @@ func _process(dt: float) -> void:
 		rig.update(dt)
 	elif phase != "hide":
 		if touch_mode and phase in ["fire", "reveal"]:
-			_look(touch.consume_look())
+			_look(touch.consume_look() * sens.tactile)
 		rig.update(dt)
 	world.update_grass(camera.global_position)
 	life.update(dt, camera.global_position)
@@ -975,7 +994,7 @@ func _process_hide(dt: float) -> void:
 	hider.update_visual(dt)
 	# Clic droit maintenu : on regarde par la lunette depuis sa cachette.
 	if touch_mode:
-		hider.look(touch.consume_look() * 0.9)
+		hider.look(touch.consume_look() * 0.9 * sens.tactile)
 	var preview: bool = Input.is_mouse_button_pressed(MOUSE_BUTTON_RIGHT) or (touch_mode and touch.held("viser"))
 	world.player.visible = not preview
 	hud.dot.visible = preview

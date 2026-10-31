@@ -18,6 +18,7 @@ signal paint_done
 signal paint_outfit(outfit: String)
 signal paint_ghillie(on: bool)
 signal orientation_changed(portrait: bool)
+signal sens_changed(kind: String, value: float)   # "souris" ou "tactile", multiplicateur de sensibilité
 
 const ZONES: Dictionary = preload("res://scripts/world.gd").ZONES
 const INK := Color("#0e1418")
@@ -28,6 +29,10 @@ const MUTED := Color("#a3ada7")
 const BLAZE := Color("#ff7a2f")
 const DANGER := Color("#ef4f4f")
 const OK := Color("#86d394")
+
+const SENS_MIN := 0.25
+const SENS_MAX := 5.0
+const SENS_STEP := 0.25
 
 const SCOPE_SHADER := """
 shader_type canvas_item;
@@ -78,6 +83,9 @@ var toast_label: Label
 var center_label: Label
 
 var menu: Control
+var settings: Control
+var _sens_labels := {}
+var _sens := {"souris": 1.0, "tactile": 2.0}
 var level_buttons := {}
 
 var hide_hud: Control
@@ -350,11 +358,64 @@ func _build_menu() -> void:
 	var play := _button("JOUER", BLAZE, Color("#1a0d04"), 28)
 	play.pressed.connect(func(): play_pressed.emit())
 	v.add_child(play)
+	var cfg := _button("Réglages : sensibilité souris / tactile", Color(1, 1, 1, 0.06), PAPER, 16)
+	cfg.pressed.connect(func(): settings.visible = true)
+	v.add_child(cfg)
 	menu_hint = _label("Souris pour viser, clic gauche ou Espace pour tirer, clic droit ou Maj pour retenir ta respiration, molette ou Z pour zoomer, Échap pour libérer la souris.", 14, MUTED)
 	var hint := menu_hint
 	hint.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 	v.add_child(hint)
 	root.add_child(menu)
+	_build_settings()
+
+## Réglages : sensibilité du regard à la souris et au doigt (multiplicateur, par pas de 0,25).
+func _build_settings() -> void:
+	var parts := _center_card(440)
+	settings = _full(Control.new())
+	settings.add_child(_full(_rect(Color(0, 0, 0, 0.55))))
+	settings.add_child(parts[0])
+	var v: VBoxContainer = parts[1]
+	v.add_child(_label("Réglages", 34, PAPER))
+	var names := {"souris": "Sensibilité souris", "tactile": "Sensibilité tactile (doigt)"}
+	for kind in ["souris", "tactile"]:
+		v.add_child(_small(names[kind]))
+		var row := _hbox(10)
+		var minus := _button("−", Color(1, 1, 1, 0.08), PAPER, 30)
+		minus.custom_minimum_size = Vector2(64, 56)
+		minus.pressed.connect(func(): _step_sens(kind, -SENS_STEP))
+		row.add_child(minus)
+		var lab := _label("", 28, BLAZE)
+		lab.custom_minimum_size.x = 110
+		lab.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+		lab.size_flags_vertical = Control.SIZE_SHRINK_CENTER
+		row.add_child(lab)
+		_sens_labels[kind] = lab
+		var plus := _button("+", Color(1, 1, 1, 0.08), PAPER, 30)
+		plus.custom_minimum_size = Vector2(64, 56)
+		plus.pressed.connect(func(): _step_sens(kind, SENS_STEP))
+		row.add_child(plus)
+		v.add_child(row)
+	var note := _label("Si tu dois balayer l'écran plusieurs fois pour chercher à la lunette, augmente la sensibilité tactile.", 14, MUTED)
+	note.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	v.add_child(note)
+	var ok := _button("OK", BLAZE, Color("#1a0d04"), 24)
+	ok.pressed.connect(func(): settings.visible = false)
+	v.add_child(ok)
+	settings.visible = false
+	root.add_child(settings)
+	for kind in _sens:
+		set_sens(kind, _sens[kind])
+
+func _step_sens(kind: String, delta: float) -> void:
+	var v := clampf(snappedf(_sens[kind] + delta, SENS_STEP), SENS_MIN, SENS_MAX)
+	set_sens(kind, v)
+	sens_changed.emit(kind, v)
+
+## Affiche la valeur (appelé au chargement des réglages et à chaque pas).
+func set_sens(kind: String, v: float) -> void:
+	_sens[kind] = v
+	if _sens_labels.has(kind):
+		(_sens_labels[kind] as Label).text = "× %.2f" % v
 
 func set_level(level: String) -> void:
 	for lv in level_buttons:

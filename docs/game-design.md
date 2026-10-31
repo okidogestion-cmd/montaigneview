@@ -483,3 +483,11 @@ Le jeu devient une **appli mobile** (même jeu : cachette, peinture, duel), plus
   un peu ; plus fort en courant ; nul à l'arrêt.
 - **Départ en hauteur** (`main._high_start`) : 70 m au-dessus de la mer, sur un endroit dégagé avec vue libre vers l'île
   d'en face ; le joueur redescend chercher sa cachette.
+
+### Réglages de sensibilité souris / tactile (31/10/2026)
+- Demande de l'utilisateur : au doigt, il fallait balayer l'écran plusieurs fois pour chercher à la lunette.
+- Menu principal → bouton « Réglages » : deux lignes (souris, tactile) avec − / + par pas de 0,25, de ×0,25 à ×5.
+  Valeurs par défaut : souris ×1 (comme avant), tactile ×2 (deux fois plus de rotation qu'avant). Le multiplicateur
+  s'applique au regard à la lunette et au regard pendant la cachette. Enregistré dans `user://reglages.cfg`
+  (conservé d'une séance à l'autre quand le navigateur le permet).
+- Test : `tools/tests/test_reglages.gd`.
