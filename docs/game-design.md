@@ -693,3 +693,6 @@ Le jeu devient une **appli mobile** (même jeu : cachette, peinture, duel), plus
   additionnant les parties très claires (ciel, bords des nuages) ; la lumière fuit entre les arbres et les nuages,
   plus orange au coucher. Seulement quand le soleil est à l'écran ou juste à côté, pas à la lunette ni au thermique.
   16 lectures de l'écran par pixel : à surveiller au compteur `?perf` sur iPhone.
+
+### Artefact version 38 (31/10/2026)
+- Publié : coucher de soleil pendant la partie, faux rayons de lumière. `index.pck` = 8,97 Mo.
