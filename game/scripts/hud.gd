@@ -377,7 +377,7 @@ func _center_card(width: float) -> Array:
 
 # ---------- Menu ----------
 ## Écran titre DUSKLINE, inspiré des menus de Call of Duty : la photo en plein écran assombrie comme au cinéma,
-## le logo (art/logo.png, créé avec Higgsfield) au centre avec des bandes « glitch » orange derrière,
+## le logo (art/logo.png, créé avec Higgsfield) au centre avec des bandes orange fixes derrière (sans clignotement),
 ## trois choix sobres dessous, les aides en petit en bas.
 func _build_menu() -> void:
 	menu = _full(Control.new())
@@ -428,17 +428,6 @@ func _build_menu() -> void:
 		r.anchor_bottom = bdef[3]
 		r.mouse_filter = Control.MOUSE_FILTER_IGNORE
 		menu_logo.add_child(r)
-		# Léger scintillement des bandes, chacune à son rythme.
-		var tw := r.create_tween().set_loops()
-		tw.tween_interval(1.6 + i * 0.7)
-		var dx := 14.0 if i % 2 == 0 else -18.0
-		tw.tween_property(r, "modulate:a", 0.35, 0.06)
-		tw.parallel().tween_property(r, "offset_left", dx, 0.0)
-		tw.parallel().tween_property(r, "offset_right", dx, 0.0)
-		tw.tween_interval(0.08)
-		tw.tween_property(r, "modulate:a", 1.0, 0.05)
-		tw.parallel().tween_property(r, "offset_left", 0.0, 0.0)
-		tw.parallel().tween_property(r, "offset_right", 0.0, 0.0)
 	var logo := TextureRect.new()
 	logo.texture = preload("res://art/logo.png")
 	logo.expand_mode = TextureRect.EXPAND_IGNORE_SIZE

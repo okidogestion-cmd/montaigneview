@@ -626,3 +626,8 @@ Le jeu devient une **appli mobile** (même jeu : cachette, peinture, duel), plus
 
 ### Artefact version 31 (31/10/2026)
 - Publié : pas à un seul impact (plus de galop). `index.pck` = 8,81 Mo.
+- Nouveaux pas (31/10/2026, « on dirait des talons ; mets le frottement de l'équipement dans le même son ») : deux vidéos
+  Higgsfield (10 crédits) d'un sniper en bottes souples, foulée lente, appuis espacés, frottement de la tenue et des
+  sangles à chaque appui. Chaque son = un seul appui avec son frottement (herbe ≈ 0,4 s, feuilles ≈ 0,2 s), silence
+  du début retiré pour que le pas tombe pile au bon moment.
+- Bandes de l'écran titre et du chargement : fixes (plus de clignotement).
