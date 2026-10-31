@@ -88,8 +88,8 @@ var _pinch := -1.0
 var matches_dirty := true
 # Mode normal : tenues de camouflage. La peinture libre (PAINT_MODE) reviendra dans un mode à part.
 const PAINT_MODE := false
-var outfit := "digital_olive"
-var ghillie := false
+var outfit := "multi_alpin"
+var ghillie := ""   # tenue de feuillage portée (clé de PaintScript.GHILLIES, "" : sans)
 var paint_enemy
 var camo_score := 0.0       # ressemblance de ta peinture avec le terrain où tu te caches
 
@@ -377,19 +377,19 @@ func _paint_state() -> void:
 func _on_outfit(o: String) -> void:
 	outfit = o
 	paint.wear(o)
-	world.set_ghillie(world.player, ghillie, Color(PaintScript.OUTFITS[o][2]))
 	matches_dirty = true
 	_paint_state()
 
-func _on_ghillie(on: bool) -> void:
-	ghillie = on
-	world.set_ghillie(world.player, on, Color(PaintScript.OUTFITS[outfit][2]))
+func _on_ghillie(kind: String) -> void:
+	ghillie = kind
+	world.set_ghillie(world.player, load(PaintScript.GHILLIES[kind][1]) if kind != "" else null)
 	matches_dirty = true
 	_paint_state()
 
-## Ressemblance de la tenue avec un terrain (la tenue de feuillage ajoute un bonus).
+## Ressemblance de la tenue avec un terrain (la tenue de feuillage ajoute un bonus selon le terrain).
 func camo_match(zone: String) -> float:
-	return clampf(paint.match_zone(zone) + (PaintScript.GHILLIE_BONUS if ghillie else 0.0), 0.0, 1.0)
+	var bonus: float = PaintScript.GHILLIES[ghillie][2][zone] if ghillie != "" else 0.0
+	return clampf(paint.match_zone(zone) + bonus, 0.0, 1.0)
 
 func _on_paint_pose(p: String) -> void:
 	ws_pose = p
@@ -641,7 +641,7 @@ func start_fire() -> void:
 	enemy_camo = enemy_spot.zone if randf() < L.camo else others.pick_random()
 	var eo: String = PaintScript.ZONE_OUTFIT[enemy_camo]
 	paint_enemy.wear(eo)
-	world.set_ghillie(world.enemy, randf() < 0.5, Color(PaintScript.OUTFITS[eo][2]))
+	world.set_ghillie(world.enemy, load(PaintScript.GHILLIES[PaintScript.ZONE_GHILLIE[enemy_camo]][1]) if randf() < 0.5 else null)
 	rig.enter_scope(eye, Vector3(0, 78, -150))   # à l'œil, x1, sans recul
 	hud.zoom_label.text = "x1"
 	ammo = AMMO

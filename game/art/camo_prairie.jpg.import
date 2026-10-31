@@ -2,16 +2,16 @@
 
 importer="texture"
 type="CompressedTexture2D"
-uid="uid://ijweccpd5ed3"
-path="res://.godot/imported/camo_woodland.jpg-62517f341ece2bab20667f4453cb1f7a.ctex"
+uid="uid://beal2pb348jfi"
+path="res://.godot/imported/camo_prairie.jpg-591ad2c705b2c2dce615e084907e70a4.ctex"
 metadata={
 "vram_texture": false
 }
 
 [deps]
 
-source_file="res://art/camo_woodland.jpg"
-dest_files=["res://.godot/imported/camo_woodland.jpg-62517f341ece2bab20667f4453cb1f7a.ctex"]
+source_file="res://art/camo_prairie.jpg"
+dest_files=["res://.godot/imported/camo_prairie.jpg-591ad2c705b2c2dce615e084907e70a4.ctex"]
 
 [params]
 

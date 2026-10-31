@@ -13,16 +13,28 @@ const PALETTE := [
 ]
 # Tenues de camouflage (mode normal : on choisit une tenue au lieu de peindre ; la peinture reviendra dans un
 # mode à part). Motifs donnés par l'utilisateur (art/camo_*.jpg). [nom, motif, couleur moyenne, camouflage par terrain]
+# Tenues (motifs créés avec Higgsfield, 31/10/2026, sources/higgsfield/camouflage/) :
+# [nom, motif, couleur moyenne, ressemblance avec chaque terrain].
 const OUTFITS := {
-	"woodland": ["Woodland", "res://art/camo_woodland.jpg", "#4a4c2d", {"foret": 0.9, "herbe": 0.6, "roche": 0.3, "neige": 0.05}],
-	"terrain_sec": ["Terrain sec", "res://art/camo_terrain_sec.jpg", "#a59059", {"herbe": 0.85, "roche": 0.55, "foret": 0.4, "neige": 0.1}],
-	"arctique": ["Arctique", "res://art/camo_arctique.jpg", "#d8d8d8", {"neige": 0.9, "roche": 0.75, "herbe": 0.15, "foret": 0.1}],
-	"digital_olive": ["Digital olive", "res://art/camo_digital_olive.jpg", "#3d4535", {"foret": 0.78, "herbe": 0.72, "roche": 0.4, "neige": 0.05}],
+	"foret_alpine": ["Forêt alpine", "res://art/camo_foret_alpine.jpg", "#30321e", {"foret": 0.9, "herbe": 0.55, "roche": 0.25, "neige": 0.05}],
+	"prairie": ["Prairie", "res://art/camo_prairie.jpg", "#71732b", {"herbe": 0.9, "foret": 0.5, "roche": 0.3, "neige": 0.05}],
+	"granit": ["Granit", "res://art/camo_granit.jpg", "#65645d", {"roche": 0.9, "neige": 0.4, "herbe": 0.3, "foret": 0.2}],
+	"neige_roche": ["Neige et roche", "res://art/camo_neige_roche.jpg", "#cacdd0", {"neige": 0.9, "roche": 0.6, "herbe": 0.1, "foret": 0.05}],
+	"multi_alpin": ["Multi-alpin", "res://art/camo_multi_alpin.jpg", "#6e6449", {"foret": 0.65, "herbe": 0.65, "roche": 0.65, "neige": 0.2}],
+	"bruyere": ["Bruyère", "res://art/camo_bruyere.jpg", "#75502e", {"herbe": 0.75, "foret": 0.6, "roche": 0.45, "neige": 0.05}],
 }
 # Tenue de l'ennemi selon le terrain qu'il a choisi.
-const ZONE_OUTFIT := {"foret": "woodland", "herbe": "terrain_sec", "roche": "arctique", "neige": "arctique"}
+const ZONE_OUTFIT := {"foret": "foret_alpine", "herbe": "prairie", "roche": "granit", "neige": "neige_roche"}
 var outfit := ""   # tenue portée ("" : peinture libre)
-const GHILLIE_BONUS := 0.1   # tenue de feuillage : la silhouette se fond encore mieux
+# Tenues de feuillage (ghillie) : planches de feuillage Higgsfield ; bonus de ressemblance selon le terrain.
+const GHILLIES := {
+	"herbes": ["Herbes hautes", "res://art/vege_herbe.png", {"herbe": 0.14, "foret": 0.06, "roche": 0.04, "neige": 0.0}],
+	"fougeres": ["Fougères", "res://art/vege_fougere.png", {"foret": 0.14, "herbe": 0.08, "roche": 0.03, "neige": 0.0}],
+	"pin": ["Branches de pin", "res://art/vege_pin.png", {"foret": 0.15, "herbe": 0.05, "roche": 0.04, "neige": 0.02}],
+	"bruyere": ["Bruyère", "res://art/vege_bruyere.png", {"herbe": 0.1, "roche": 0.1, "foret": 0.06, "neige": 0.0}],
+	"lichen": ["Lichen et neige", "res://art/vege_lichen.png", {"neige": 0.14, "roche": 0.12, "herbe": 0.02, "foret": 0.0}],
+}
+const ZONE_GHILLIE := {"foret": "pin", "herbe": "herbes", "roche": "bruyere", "neige": "lichen"}
 
 const MATCH_DIST := 0.32               # au-delà de cet écart de couleur, ça ne ressemble plus du tout
 

@@ -2,16 +2,16 @@
 
 importer="texture"
 type="CompressedTexture2D"
-uid="uid://bg6vad0hf2hcc"
-path="res://.godot/imported/camo_digital_olive.jpg-ed7c06a9a700405e518f4ff8284da60f.ctex"
+uid="uid://dhl6f3reqxfhh"
+path="res://.godot/imported/vege_lichen.png-b9d3db99c076f28fb90a2954fef4b97b.ctex"
 metadata={
 "vram_texture": false
 }
 
 [deps]
 
-source_file="res://art/camo_digital_olive.jpg"
-dest_files=["res://.godot/imported/camo_digital_olive.jpg-ed7c06a9a700405e518f4ff8284da60f.ctex"]
+source_file="res://art/vege_lichen.png"
+dest_files=["res://.godot/imported/vege_lichen.png-b9d3db99c076f28fb90a2954fef4b97b.ctex"]
 
 [params]
 

@@ -41,8 +41,8 @@ func _run() -> void:
 	Input.parse_input_event(press)
 	await _wait(10)
 	main.start_paint()
-	main._on_outfit("digital_olive")
-	main._on_ghillie(true)
+	main._on_outfit("multi_alpin")
+	main._on_ghillie("herbes")
 	await _wait(20)
 	await _shot("atelier_camouflage")
 	# Orbite à la souris (clic gauche maintenu), molette, puis au doigt (glisser, pincer), puis posture couchée.

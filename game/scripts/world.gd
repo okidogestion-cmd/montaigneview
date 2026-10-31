@@ -1138,16 +1138,20 @@ func pick_part(fig: Node3D, from: Vector3, dir: Vector3) -> Dictionary:
 
 ## Tenue de feuillage (« ghillie ») : des touffes d'herbe accrochées sur les épaules, le dos, la capuche, les bras et
 ## les jambes ; elles suivent les os du corps. Teinte de la tenue choisie ; sans effacement près de la caméra.
-const GHILLIE_TEX := preload("res://art/vege_herbe.png")
+const GHILLIE_TEX := preload("res://art/vege_herbe.png")   # feuillage par défaut à la création
 
-func set_ghillie(fig: Node3D, on: bool, tint: Color) -> void:
+## Tenue de feuillage : tex = planche de feuillage (herbes, fougères, pin…), null = sans.
+func set_ghillie(fig: Node3D, tex: Texture2D) -> void:
 	if not fig.has_meta("ghillie"):
-		if not on:
+		if tex == null:
 			return
 		fig.set_meta("ghillie", _make_ghillie(fig))
 	var g: MeshInstance3D = fig.get_meta("ghillie")
-	g.visible = on
-	(g.material_override as ShaderMaterial).set_shader_parameter("tint", tint.lerp(Color.WHITE, 0.25))
+	g.visible = tex != null
+	if tex != null:
+		var m := g.material_override as ShaderMaterial
+		m.set_shader_parameter("albedo_tex", tex)
+		m.set_shader_parameter("tint", Color.WHITE)
 
 func _make_ghillie(fig: Node3D) -> MeshInstance3D:
 	var body: MeshInstance3D = fig.get_meta("mesh")

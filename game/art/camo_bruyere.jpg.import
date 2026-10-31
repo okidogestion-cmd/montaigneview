@@ -2,16 +2,16 @@
 
 importer="texture"
 type="CompressedTexture2D"
-uid="uid://tke3stlf1pfl"
-path="res://.godot/imported/camo_terrain_sec.jpg-109ae60790e2338bf74dad486634a384.ctex"
+uid="uid://dbsnp23vr0c0u"
+path="res://.godot/imported/camo_bruyere.jpg-cf4b81d20aa4da2a48ea0bf68e4b984b.ctex"
 metadata={
 "vram_texture": false
 }
 
 [deps]
 
-source_file="res://art/camo_terrain_sec.jpg"
-dest_files=["res://.godot/imported/camo_terrain_sec.jpg-109ae60790e2338bf74dad486634a384.ctex"]
+source_file="res://art/camo_bruyere.jpg"
+dest_files=["res://.godot/imported/camo_bruyere.jpg-cf4b81d20aa4da2a48ea0bf68e4b984b.ctex"]
 
 [params]
 

@@ -16,7 +16,7 @@ signal paint_undo
 signal paint_clear
 signal paint_done
 signal paint_outfit(outfit: String)
-signal paint_ghillie(on: bool)
+signal paint_ghillie(kind: String)   # "" : sans feuillage
 signal orientation_changed(portrait: bool)
 signal sens_changed(kind: String, value: float)   # "souris" ou "tactile", multiplicateur de sensibilité
 
@@ -115,7 +115,7 @@ var paint_sizes := []
 var paint_tools := {}
 var paint_poses := {}
 var outfit_buttons := {}
-var ghillie_button: Button
+var ghillie_buttons := {}
 var match_bars := {}
 var match_labels := {}
 var paint_info: Label
@@ -720,7 +720,7 @@ func _build_paint() -> void:
 	# Mode normal : on choisit une tenue de camouflage (la peinture libre reviendra dans un mode à part).
 	var os := _section("Tenue")
 	var og := GridContainer.new()
-	og.columns = 2   # quatre motifs
+	og.columns = 2   # six motifs
 	og.add_theme_constant_override("h_separation", 6)
 	og.add_theme_constant_override("v_separation", 6)
 	for k in PaintScript.OUTFITS:
@@ -738,10 +738,20 @@ func _build_paint() -> void:
 	os.add_child(og)
 	lv.add_child(os)
 	var gs := _section("Feuillage")
-	ghillie_button = _button("Tenue de feuillage (ghillie)", Color(1, 1, 1, 0.06), PAPER, 15)
-	ghillie_button.toggle_mode = true
-	ghillie_button.toggled.connect(func(on): paint_ghillie.emit(on))
-	gs.add_child(ghillie_button)
+	var gg := GridContainer.new()
+	gg.columns = 2
+	gg.add_theme_constant_override("h_separation", 6)
+	gg.add_theme_constant_override("v_separation", 6)
+	var kinds := {"": "Sans"}
+	for k in PaintScript.GHILLIES:
+		kinds[k] = PaintScript.GHILLIES[k][0]
+	for k in kinds:
+		var b := _button(kinds[k], Color(1, 1, 1, 0.06), PAPER, 14)
+		b.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+		b.pressed.connect(func(): paint_ghillie.emit(k))
+		ghillie_buttons[k] = b
+		gg.add_child(b)
+	gs.add_child(gg)
 	lv.add_child(gs)
 	var ps := _section("Voir la posture")
 	var ph := _hbox(6)
@@ -829,10 +839,9 @@ func set_paint_state(color: Color, size_idx: int, tool: String, pose: String) ->
 	_mark(paint_tools, tool)
 	_mark(paint_poses, pose)
 
-func set_outfit_state(outfit: String, ghillie: bool, pose: String) -> void:
+func set_outfit_state(outfit: String, ghillie: String, pose: String) -> void:
 	_mark(outfit_buttons, outfit)
-	ghillie_button.set_pressed_no_signal(ghillie)
-	ghillie_button.add_theme_stylebox_override("normal", _style(Color(1, 1, 1, 0.22) if ghillie else Color(1, 1, 1, 0.06), BLAZE if ghillie else LINE, 4, 10))
+	_mark(ghillie_buttons, ghillie)
 	_mark(paint_poses, pose)
 
 func set_matches(scores: Dictionary) -> void:

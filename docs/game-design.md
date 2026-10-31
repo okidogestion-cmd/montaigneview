@@ -540,3 +540,11 @@ Le jeu devient une **appli mobile** (même jeu : cachette, peinture, duel), plus
   s'il porte la tenue de feuillage. Monde un peu moins sombre (luminosité 0,45).
 - Ordinateur ralenti (`LEVELS`) : premier tir 16 → 26 s (normal), tirs espacés de 10 à 14 s, repérage ≈ 45 % plus lent.
 - Caisses seulement sur le versant face à l'ennemi (pas plus de 12 m derrière le point de départ).
+
+### Nouvelles tenues et tenues de feuillage (31/10/2026)
+- 6 tenues Higgsfield remplacent les 4 anciennes (`paint.gd` → `OUTFITS`, motifs dans `sources/higgsfield/camouflage/`) :
+  Forêt alpine, Prairie, Granit, Neige et roche, Multi-alpin, Bruyère, chacune avec sa ressemblance par terrain.
+  L'ennemi porte la tenue du terrain qu'il a choisi (`ZONE_OUTFIT`).
+- 5 tenues de feuillage au choix au lieu d'une (`GHILLIES`) : Herbes hautes, Fougères, Branches de pin, Bruyère,
+  Lichen et neige (planches Higgsfield ; pin et lichen nouveaux, ≈ 0,5 crédit). Le bonus dépend du terrain
+  (ex. pin +15 % en forêt, lichen +14 % sur la neige) au lieu de +10 % partout. L'ennemi en porte une sur deux.

@@ -2,16 +2,16 @@
 
 importer="texture"
 type="CompressedTexture2D"
-uid="uid://dbt401eqgxtlv"
-path="res://.godot/imported/camo_arctique.jpg-1a741538ed644bfb9cfa12fe3800c8a8.ctex"
+uid="uid://d0xedq2i6vctk"
+path="res://.godot/imported/vege_pin.png-9cfa385f37a6d591dc46fd8a5d1c5816.ctex"
 metadata={
 "vram_texture": false
 }
 
 [deps]
 
-source_file="res://art/camo_arctique.jpg"
-dest_files=["res://.godot/imported/camo_arctique.jpg-1a741538ed644bfb9cfa12fe3800c8a8.ctex"]
+source_file="res://art/vege_pin.png"
+dest_files=["res://.godot/imported/vege_pin.png-9cfa385f37a6d591dc46fd8a5d1c5816.ctex"]
 
 [params]
 
