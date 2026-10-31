@@ -648,3 +648,6 @@ Le jeu devient une **appli mobile** (même jeu : cachette, peinture, duel), plus
   éclats de roche projetés qui retombent et rebondissent, son d'impact sur la roche (vidéo Higgsfield, 5 crédits) qui
   arrive avec le retard du son. **Les rochers des cachettes se détruisent** : 3 balles et le rocher vole en éclats,
   l'ennemi derrière est à découvert (`world.damage_cover`) ; ils reviennent à chaque partie (`restore_covers`).
+
+### Artefact version 33 (31/10/2026)
+- Publié : thermique en zone floue, bruitages des gadgets, changer de cachette, impacts violents, rochers destructibles. `index.pck` = 8,96 Mo.
