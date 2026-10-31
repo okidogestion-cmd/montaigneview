@@ -15,9 +15,9 @@ dest_files=["res://.godot/imported/ciel_nuages.jpg-595abe7af76ee60270741f72d6860
 
 [params]
 
-compress/mode=0
+compress/mode=1
 compress/high_quality=false
-compress/lossy_quality=0.7
+compress/lossy_quality=0.82
 compress/uastc_level=0
 compress/rdo_quality_loss=0.0
 compress/hdr_compression=1

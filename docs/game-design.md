@@ -548,3 +548,9 @@ Le jeu devient une **appli mobile** (même jeu : cachette, peinture, duel), plus
 - 5 tenues de feuillage au choix au lieu d'une (`GHILLIES`) : Herbes hautes, Fougères, Branches de pin, Bruyère,
   Lichen et neige (planches Higgsfield ; pin et lichen nouveaux, ≈ 0,5 crédit). Le bonus dépend du terrain
   (ex. pin +15 % en forêt, lichen +14 % sur la neige) au lieu de +10 % partout. L'ennemi en porte une sur deux.
+
+### Artefact version 25 et poids allégé (31/10/2026)
+- Publié : nouvelles tenues et feuillages, thermique avec tache de chaleur, ordinateur ralenti, caisses face à l'ennemi.
+- Poids : `index.pck` était monté à 14,9 Mo (limite 15 Mo). Les images JPG du jeu sont maintenant importées en
+  compression « avec perte » (WebP, qualité 0,82 ; `compress/mode=1` dans les `.import`) au lieu de « sans perte » :
+  `index.pck` = 8,4 Mo, rendu vérifié sur captures. Garder ce réglage pour toute nouvelle image JPG.
