@@ -530,3 +530,6 @@ Le jeu devient une **appli mobile** (même jeu : cachette, peinture, duel), plus
   - Leurre (pendant la cachette) : un sniper accroupi posé là où tu es ; les 2 tirs ennemis suivants le visent.
   - Couverture de survie (cachette ou tir) : 20 s, l'ennemi te repère 2,5 fois moins vite.
 - **Zoom au doigt** : double tape sur la vue de tir (le bouton Zoom est retiré).
+
+### Artefact version 24 (31/10/2026)
+- Publié : gadgets et caisses, zoom en double tape, mouette retirée. `index.pck` = 13,60 Mo (limite 15 Mo : ≈ 1,4 Mo de marge).
