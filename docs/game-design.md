@@ -669,3 +669,6 @@ Le jeu devient une **appli mobile** (même jeu : cachette, peinture, duel), plus
 - Correction (31/10/2026, « tu as mis de l'ombre, je veux juste étalonner les couleurs ») : plantes remises presque à
   leur luminosité (herbe et fleurs 90 %, arbres 92 %), et le filtre ne fait plus que teinter sans assombrir : courbes
   proches de l'identité (ombres à peine bleutées, lumières dorées), contraste 1,04, saturation 0,86.
+
+### Artefact version 36 (31/10/2026)
+- Publié : étalonnage des couleurs seulement, plantes à leur luminosité. `index.pck` = 8,96 Mo.
