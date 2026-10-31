@@ -623,3 +623,6 @@ Le jeu devient une **appli mobile** (même jeu : cachette, peinture, duel), plus
   impacts (le pied filmé et le suivant, ou un petit coup avant le principal). Chaque son est recoupé sur son seul impact
   principal (0,16 s) ; les deux qui gardaient un second coup sont remplacés par des sons propres (la hauteur au hasard
   les rend différents).
+
+### Artefact version 31 (31/10/2026)
+- Publié : pas à un seul impact (plus de galop). `index.pck` = 8,81 Mo.
