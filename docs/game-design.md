@@ -683,3 +683,13 @@ Le jeu devient une **appli mobile** (même jeu : cachette, peinture, duel), plus
 
 ### Artefact version 37 (31/10/2026)
 - Publié : couché sur les rochers corrigé, champs de lavande, coin enneigé. `index.pck` = 8,96 Mo.
+
+### Le soleil se couche pendant la partie, faux rayons de lumière (31/10/2026)
+- Coucher de soleil (`main._set_dusk`, `DUSK_TIME` = 240 s depuis le début de la cachette) : soleil de 25° à 6°,
+  lumière dorée → orange, plus faible, ambiance et brume plus roses, bas du ciel qui rougit et haut qui s'assombrit
+  (`sky.gdshader` → `dusk`). Tout le décor (herbe, fleurs, arbres) suit la lumière du soleil : rien à régler à part.
+  Retour à l'heure dorée au menu et à chaque partie.
+- Faux rayons de lumière (« god rays », `RAYS_SHADER`) : à l'écran, on remonte de chaque pixel vers le soleil en
+  additionnant les parties très claires (ciel, bords des nuages) ; la lumière fuit entre les arbres et les nuages,
+  plus orange au coucher. Seulement quand le soleil est à l'écran ou juste à côté, pas à la lunette ni au thermique.
+  16 lectures de l'écran par pixel : à surveiller au compteur `?perf` sur iPhone.

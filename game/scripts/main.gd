@@ -43,6 +43,38 @@ var rig            # CameraRig : propriétaire de la caméra
 var camera: Camera3D   # = rig.camera (cachette : encore placée par hider.gd)
 var inset_cam: Camera3D
 var env: Environment
+var sun: DirectionalLight3D
+var _sky_mat: ShaderMaterial
+var dusk_t := 0.0             # temps écoulé depuis le début de la partie (le soleil descend)
+const DUSK_TIME := 240.0      # en 4 minutes, le soleil passe de l'heure dorée au coucher
+var _rays: ColorRect          # faux rayons de lumière (post-traitement à l'écran)
+const RAYS_SHADER := """
+shader_type canvas_item;
+render_mode blend_add;
+// Faux rayons de lumière (« god rays ») : depuis chaque point de l'écran, on remonte vers le soleil et on additionne
+// les parties très claires (ciel, bords des nuages) : la lumière « fuit » entre les arbres et les nuages.
+uniform sampler2D screen : hint_screen_texture, filter_linear;
+uniform vec2 sun_uv = vec2(0.5);
+uniform float strength = 0.0;
+uniform vec3 tint : source_color = vec3(1.0, 0.8, 0.55);
+void fragment() {
+	vec2 uv = SCREEN_UV;
+	vec2 step = (sun_uv - uv) * (1.0 / 16.0);
+	float acc = 0.0;
+	float w = 1.0;
+	// Départ décalé au hasard selon le pixel : pas de rayures en escalier.
+	vec2 p = uv + step * fract(sin(dot(FRAGCOORD.xy, vec2(12.9898, 78.233))) * 43758.5453);
+	for (int i = 0; i < 16; i++) {
+		p += step;
+		vec3 c = texture(screen, clamp(p, vec2(0.0), vec2(1.0))).rgb;
+		acc += smoothstep(0.5, 0.9, dot(c, vec3(0.3, 0.59, 0.11))) * w;
+		w *= 0.92;
+	}
+	acc /= 6.0;
+	float fall = 1.0 - smoothstep(0.0, 1.1, distance(uv * vec2(1.6, 1.0), sun_uv * vec2(1.6, 1.0)));
+	COLOR = vec4(tint * acc * strength * fall, 1.0);
+}
+"""
 # Sons de tir : vrai Kar98k (sources/k98_pixabay.mp3, découpé par tools/sons_k98.sh) pour ton tir (avec la
 # culasse) et celui de l'ennemi (étouffé, avec l'écho) ; balle qui passe tout près : tools/sons.py.
 const SON_TIR := preload("res://art/son_tir.ogg")
@@ -291,7 +323,7 @@ func _build_environment() -> void:
 	var we := WorldEnvironment.new()
 	we.environment = env
 	add_child(we)
-	var sun := DirectionalLight3D.new()
+	sun = DirectionalLight3D.new()
 	sun.light_color = Color("#ffd9a6")   # soleil bas et doré
 	sun.light_energy = 0.5
 	sun.shadow_enabled = true
@@ -301,7 +333,53 @@ func _build_environment() -> void:
 	sun.directional_shadow_max_distance = 90.0
 	sun.shadow_blur = 1.0
 	add_child(sun)
-	sun.look_at_from_position(Vector3(-0.85, 0.45, 0.25) * 100, Vector3.ZERO)   # 25° au-dessus de l'horizon : longues ombres
+	_sky_mat = sky_mat
+	_set_dusk(0.0)
+	_build_rays()
+
+## Heure : k = 0 heure dorée (soleil à 25°), k = 1 coucher (soleil à 6°, lumière orange, ombres très longues).
+func _set_dusk(k: float) -> void:
+	var elev := lerpf(0.45, 0.1, k)
+	sun.look_at_from_position(Vector3(-0.85, elev, 0.25) * 100, Vector3.ZERO)
+	sun.light_color = Color("#ffd9a6").lerp(Color("#ff9550"), k)
+	sun.light_energy = lerpf(0.5, 0.34, k)
+	env.ambient_light_color = Color("#93a8d8").lerp(Color("#7f7fb4"), k)
+	env.ambient_light_energy = lerpf(0.8, 0.62, k)
+	env.fog_light_color = SKY.lerp(Color("#c98a7a"), k)
+	_sky_mat.set_shader_parameter("dusk", k)
+	_sky_mat.set_shader_parameter("horizon_color", SKY.lerp(Color("#c98a7a"), k))
+
+func _build_rays() -> void:
+	_rays = ColorRect.new()
+	_rays.set_anchors_preset(Control.PRESET_FULL_RECT)
+	_rays.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	var sm := ShaderMaterial.new()
+	sm.shader = Shader.new()
+	sm.shader.code = RAYS_SHADER
+	_rays.material = sm
+
+## Rayons : seulement quand le soleil est devant la caméra (ou juste hors de l'écran), hors lunette et hors thermique.
+func _update_rays() -> void:
+	if _rays == null or hud == null:
+		return
+	if _rays.get_parent() == null:
+		hud.root.add_child(_rays)
+		hud.root.move_child(_rays, 0)
+	var sun_dir := -sun.global_transform.basis.z
+	var far := camera.global_position - sun_dir * 2000.0
+	var on: bool = not camera.is_position_behind(far) and rig.zoom_level == 0 and phase != "menu" and phase != "paint" \
+		and not (gadgets != null and gadgets.active("thermique"))
+	var sm := _rays.material as ShaderMaterial
+	if not on:
+		_rays.visible = false
+		return
+	var vs := get_viewport().get_visible_rect().size
+	var uv := camera.unproject_position(far) / vs
+	var edge := clampf(1.6 - maxf(absf(uv.x - 0.5), absf(uv.y - 0.5)) * 1.6, 0.0, 1.0)   # s'éteint quand le soleil s'éloigne de l'écran
+	_rays.visible = edge > 0.01
+	sm.set_shader_parameter("sun_uv", uv)
+	sm.set_shader_parameter("strength", 1.1 * edge * (1.0 + 0.4 * clampf(dusk_t / DUSK_TIME, 0.0, 1.0)))
+	sm.set_shader_parameter("tint", Color("#ffd9a6").lerp(Color("#ff9a5c"), clampf(dusk_t / DUSK_TIME, 0.0, 1.0)))
 
 func D() -> Dictionary:
 	return LEVELS[level]
@@ -336,6 +414,8 @@ func bang(stream: AudioStream, vol: float, delay := 0.0) -> void:
 func to_menu() -> void:
 	gid += 1
 	hider.silence()
+	dusk_t = 0.0
+	_set_dusk(0.0)
 	gadgets.clear()
 	touch.set_mode("")
 	phase = "menu"
@@ -587,6 +667,7 @@ func start_hide() -> void:
 	world.end_marker.visible = false
 	var st := _high_start()
 	hider.reset(st.x, st.y)
+	dusk_t = 0.0
 	gadgets.start_hide(hider.pos)
 	world.restore_covers()
 	hide_left = HIDE_TIME
@@ -1062,6 +1143,10 @@ func _process(dt: float) -> void:
 		rig.update(dt)
 	world.update_grass(camera.global_position)
 	life.update(dt, camera.global_position)
+	if phase in ["hide", "reveal", "fire", "move", "paint"]:
+		dusk_t += dt
+		_set_dusk(clampf(dusk_t / DUSK_TIME, 0.0, 1.0))
+	_update_rays()
 
 	for i in range(fx.size() - 1, -1, -1):
 		var f: Dictionary = fx[i]

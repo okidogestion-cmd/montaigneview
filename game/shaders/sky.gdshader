@@ -10,6 +10,7 @@ uniform vec3 horizon_color : source_color = vec3(0.70, 0.86, 0.96);
 uniform vec3 cloud_color : source_color = vec3(1.0, 1.0, 1.0);
 uniform vec3 cloud_shade : source_color = vec3(0.72, 0.80, 0.92);
 uniform sampler2D clouds : filter_linear, repeat_enable;
+uniform float dusk = 0.0;         // 0 : heure dorée ; 1 : soleil couchant (ciel plus orange en bas, plus sombre en haut)
 uniform float cloud_lo = 0.08;     // en dessous : ciel dégagé ; plus haut, moins de nuages
 
 void sky() {
@@ -36,5 +37,9 @@ void sky() {
 		vec3 cc = mix(cloud_shade, cloud_color, smoothstep(0.15, 0.85, c));
 		col = mix(col, cc, a * 0.92);
 	}
+	// Coucher de soleil : le bas du ciel rougit, le haut s'assombrit.
+	float hz = 1.0 - smoothstep(0.0, 0.45, d.y);
+	col = mix(col, col * vec3(1.12, 0.78, 0.62), dusk * hz * 0.7);
+	col *= 1.0 - dusk * 0.35 * smoothstep(0.15, 0.9, d.y);
 	COLOR = col;
 }
