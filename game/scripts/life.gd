@@ -1,6 +1,6 @@
 extends Node3D
 ## La vie de l'archipel : mouettes, voiliers au large, feuilles et pollen dans le vent,
-## ambiance de forêt et cris de mouettes. Purement décoratif : rien ici n'arrête les balles
+## ambiance de forêt. Purement décoratif : rien ici n'arrête les balles
 ## ni n'aide à repérer l'adversaire.
 
 const TOON := preload("res://shaders/toon.gdshader")
@@ -12,8 +12,6 @@ var _birds: Array = []
 var _boats: Array = []
 var _particles: GPUParticles3D
 var _waves: AudioStreamPlayer
-var _cry: AudioStreamWAV
-var _cry_t := 4.0
 var _rng := RandomNumberGenerator.new()
 var _t := 0.0
 
@@ -198,29 +196,9 @@ func _noise_loop(seconds: float, cutoff: float, swell_period: float, swell_depth
 	s.loop_end = n
 	return s
 
-func _gull_cry() -> AudioStreamWAV:
-	var rate := 16000
-	var n := int(rate * 0.9)
-	var data := PackedByteArray()
-	data.resize(n * 2)
-	var ph := 0.0
-	for i in n:
-		var t := float(i) / rate
-		var note := fmod(t, 0.3) / 0.3                     # trois cris courts
-		var f := lerpf(1900.0, 1250.0, note) + sin(t * 70.0) * 40.0
-		ph += TAU * f / rate
-		var env := sin(PI * note) * (1.0 - t / 0.9)
-		var v := (sin(ph) * 0.6 + sin(ph * 2.0) * 0.25 + sin(ph * 3.0) * 0.15) * env
-		data.encode_s16(i * 2, int(clampf(v * 0.6, -1, 1) * 32767))
-	var s := AudioStreamWAV.new()
-	s.format = AudioStreamWAV.FORMAT_16_BITS
-	s.mix_rate = rate
-	s.data = data
-	return s
-
 func _make_sounds() -> void:
 	# Bande son : ambiance de forêt enregistrée (art/son_foret.ogg, La Sonothèque, « AMBForst Forêt ID 0100 »),
-	# en boucle (fin fondue dans le début sur 3 s). Remplace les vagues et le vent synthétisés.
+	# en boucle (fin fondue dans le début sur 3 s). Remplace les vagues, le vent et les cris de mouettes synthétisés.
 	var amb: AudioStreamOggVorbis = SON_FORET
 	amb.loop = true
 	_waves = AudioStreamPlayer.new()
@@ -228,7 +206,6 @@ func _make_sounds() -> void:
 	_waves.volume_db = -6
 	add_child(_waves)
 	_waves.play()
-	_cry = _gull_cry()
 
 
 # ---------- Chaque image ----------
@@ -237,13 +214,3 @@ func update(dt: float, cam: Vector3) -> void:
 	_update_birds(dt)
 	_update_boats(dt)
 	_particles.global_position = cam
-	_cry_t -= dt
-	if _cry_t <= 0.0:
-		_cry_t = _rng.randf_range(7.0, 16.0)
-		var p := AudioStreamPlayer.new()
-		p.stream = _cry
-		p.volume_db = _rng.randf_range(-24.0, -17.0)
-		p.pitch_scale = _rng.randf_range(0.9, 1.15)
-		add_child(p)
-		p.finished.connect(p.queue_free)
-		p.play()
