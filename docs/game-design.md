@@ -587,3 +587,7 @@ Le jeu devient une **appli mobile** (même jeu : cachette, peinture, duel), plus
 
 ### Artefact version 27 (31/10/2026)
 - Publié : bruits de pas et d'équipement, sons de culasse dans le menu, balles qui traversent les feuillages. `index.pck` = 8,60 Mo.
+- Correction (31/10/2026, « plusieurs sons de course se superposent ») : la boucle d'équipement contenait aussi les pas
+  du soldat filmé ; elle est filtrée (passe-haut à 1,8 kHz, transitoires écrasés : il ne reste que le froissement),
+  original gardé dans `sources/higgsfield/son_equipement_brut.ogg`, et jouée plus bas (−15 dB en courant). Un seul pas
+  à la fois (`max_polyphony = 1`).

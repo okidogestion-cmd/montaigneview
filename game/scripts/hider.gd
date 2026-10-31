@@ -70,7 +70,7 @@ func _init(w) -> void:
 			r.add_stream(i, load("res://art/son_pas_%s_%d.ogg" % [kind, i + 1]))
 		var p := AudioStreamPlayer.new()
 		p.stream = r
-		p.max_polyphony = 2
+		p.max_polyphony = 1   # un pas à la fois : jamais deux pas qui se chevauchent
 		world.add_child(p)
 		_steps[kind] = p
 	var g: AudioStreamOggVorbis = load("res://art/son_equipement.ogg")
@@ -235,7 +235,7 @@ func _update_sounds(dt: float, spd: float) -> void:
 	# Équipement : silencieux à l'arrêt, léger en marchant, net en courant ; la boucle suit le rythme.
 	var target := -60.0
 	if spd > 0.5 and air == "":
-		target = lerpf(-27.0, -9.0, run_amt) - (6.0 if stance != "debout" else 0.0)
+		target = lerpf(-30.0, -15.0, run_amt) - (6.0 if stance != "debout" else 0.0)   # sous les pas
 	_gear.volume_db = move_toward(_gear.volume_db, target, dt * 40.0)
 	_gear.pitch_scale = lerpf(0.8, 1.0, run_amt)
 	if _gear.volume_db > -55.0 and not _gear.playing:
